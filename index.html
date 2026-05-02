@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TaskFlow Portal – Management Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="is-logged-out">
+
+  <!-- Modern Centered Alert Modal -->
+  <div id="alert-modal" class="modal-overlay hidden">
+    <div class="modal-content alert-modal-content" style="max-width: 400px;">
+      <div class="modal-body" style="text-align: center; padding: 2.5rem 2rem;">
+        <div id="alert-modal-icon" style="width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem;">
+          <i data-lucide="alert-circle" style="width: 32px; height: 32px;"></i>
+        </div>
+        <h3 id="alert-modal-title" style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--text-main);">Notice</h3>
+        <p id="alert-modal-message" style="color: var(--text-muted); font-size: 0.95rem; line-height: 1.5; margin-bottom: 2rem;">Message goes here.</p>
+        <button class="btn btn-primary" onclick="closeModalAlert()" style="width: 100%; padding: 12px; border-radius: 12px; font-weight: 600;">Dismiss</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modern Centered Prompt Modal -->
+  <div id="custom-prompt-modal" class="modal-overlay hidden">
+    <div class="modal-content alert-modal-content" style="max-width: 400px;">
+      <div class="modal-body" style="text-align: center; padding: 2.5rem 2rem;">
+        <div id="custom-prompt-icon" style="width: 64px; height: 64px; border-radius: 50%; background: var(--blue-soft); display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem;">
+          <i data-lucide="help-circle" style="width: 32px; height: 32px; color: var(--blue-text);"></i>
+        </div>
+        <h3 id="custom-prompt-title" style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--text-main);">Prompt</h3>
+        <p id="custom-prompt-message" style="color: var(--text-muted); font-size: 0.95rem; line-height: 1.5; margin-bottom: 1.5rem;">Enter value:</p>
+        <div class="field" style="margin-bottom: 2rem;">
+          <input type="text" id="custom-prompt-input" class="modal-input" style="background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-main); padding: 12px; border-radius: 12px; text-align: center; font-size: 1.1rem;">
+        </div>
+        <div class="flex-end" style="gap: 10px;">
+          <button class="btn" onclick="closeCustomPrompt(null)" style="flex: 1; padding: 12px; border-radius: 12px; font-weight: 600;">Cancel</button>
+          <button class="btn btn-primary" onclick="confirmCustomPrompt()" style="flex: 1; padding: 12px; border-radius: 12px; font-weight: 600;">Confirm</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<!-- LOGIN SCREEN -->
+<div id="login-screen" class="login-screen">
+  <div class="login-card">
+    <div class="login-logo" style="margin-bottom: 2rem; font-weight: 800; letter-spacing: -1px; color: var(--primary); font-size: 2.5rem; text-align: center;">TaskFlow</div>
+    
+    <div class="field" style="text-align: left; margin-bottom: 1.5rem;">
+      <label>Username</label>
+      <input type="text" id="login-username" placeholder="Enter username" style="width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-card); color: var(--text-main);">
+    </div>
+    
+    <div class="field" style="text-align: left; margin-bottom: 1rem; position: relative;">
+      <label>Password</label>
+      <input type="password" id="login-password" placeholder="••••••••" style="width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 10px; padding-right: 40px; background: var(--bg-card); color: var(--text-main);">
+      <span onclick="toggleLoginPassword()" style="position: absolute; right: 12px; top: 38px; cursor: pointer; color: var(--text-muted); display: flex; align-items: center; justify-content: center;">
+        <i data-lucide="eye" id="eye-icon" style="width: 20px; height: 20px;"></i>
+      </span>
+    </div>
+
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; font-size: 13px;">
+      <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text-main);">
+        <input type="checkbox" id="login-remember" style="width: 16px; height: 16px; cursor: pointer;"> Remember Me
+      </label>
+      <a href="#" onclick="forgotPassword()" style="color: var(--primary); text-decoration: none; font-weight: 500;">Forgot Password?</a>
+    </div>
+
+    <button class="btn btn-primary" style="width: 100%; padding: 14px; border-radius: 12px; font-weight: 700;" onclick="handleLogin()">Sign In</button>
+  </div>
+</div>
+
+<nav class="nav hidden" id="main-nav">
+  <div class="nav-brand" onclick="showTab('dashboard')" style="display: flex; align-items: center; gap: 10px;">
+    <i data-lucide="zap" style="width: 24px; height: 24px; color: var(--primary);"></i>
+    TaskFlow
+  </div>
+  <div class="nav-links">
+    <button class="nav-link active" onclick="showTab('dashboard')" id="btn-dashboard">
+      <i data-lucide="layout-dashboard" style="width: 16px; height: 16px;"></i> Dashboard
+    </button>
+    <button class="nav-link" onclick="showTab('invoices')" id="btn-invoices">
+      <i data-lucide="file-text" style="width: 16px; height: 16px;"></i> Invoices
+    </button>
+    <button class="nav-link" onclick="showTab('dataview')" id="btn-dataview">
+      <i data-lucide="database" style="width: 16px; height: 16px;"></i> Data View
+    </button>
+    <button class="nav-link" onclick="showTab('customers')" id="btn-customers">
+      <i data-lucide="users" style="width: 16px; height: 16px;"></i> Customers
+    </button>
+  </div>
+  <div class="user-badge">
+    <div class="avatar" id="nav-user-avatar">?</div>
+    <span id="nav-user-name">User</span>
+    <button class="nav-link" onclick="handleLogout()" style="font-size: 12px; border: 1px solid var(--border-color); padding: 5px 12px; border-radius: 8px;">
+      <i data-lucide="log-out" style="width: 14px; height: 14px;"></i> Logout
+    </button>
+    <div style="display:flex; align-items:center; gap:8px; margin-left:10px; padding-left:10px; border-left:1px solid var(--border-color);">
+      <i data-lucide="moon" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
+      <label class="theme-switch">
+        <input type="checkbox" id="dark-mode-toggle" onchange="toggleDarkMode()">
+        <span class="theme-slider"></span>
+      </label>
+    </div>
+    <button class="nav-link" onclick="showSettingsWithAuth()" id="btn-settings" title="Settings" style="margin-left: 10px;">
+      <i data-lucide="settings" style="width: 20px; height: 20px;"></i>
+    </button>
+  </div>
+</nav>
+
+<main class="container hidden" id="main-content">
+  
+  <!-- DASHBOARD SECTION -->
+  <section id="section-dashboard" class="section active">
+    
+    <!-- DASHBOARD HOME VIEW -->
+    <div id="dashboard-home">
+      <div class="hero" style="background: linear-gradient(135deg, #1f2937 0%, #111827 100%); border-radius: 20px; color: white; padding: 4rem 2rem; margin-bottom: 2rem; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
+        <h1 id="dashboard-welcome" style="color: white; font-size: 2.8rem; margin-bottom: 0.75rem; font-weight: 800; letter-spacing: -0.02em;">Welcome to TaskFlow</h1>
+        <p style="color: rgba(255,255,255,0.8); font-size: 1.2rem; margin-bottom: 2.5rem; max-width: 600px; margin-left: auto; margin-right: auto;">Manage your services, track CRM tickets, and simplify your invoicing workflow with precision.</p>
+        
+        <button class="btn" onclick="toggleMainForm('category')" style="background: var(--primary); color: white; font-size: 1.1rem; font-weight: 700; padding: 1.1rem 3.5rem; border-radius: 50px; border: none; cursor: pointer; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); display: inline-flex; align-items: center; gap: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
+          <i data-lucide="plus-circle" style="width: 24px; height: 24px;"></i> CREATE NEW TICKET
+        </button>
+      </div>
+
+      <!-- Quick Stats -->
+      <div class="grid-4 mb-2">
+        <div class="stat-card">
+          <div class="stat-label">Active Tickets</div>
+          <div class="stat-value" id="stat-active-tickets">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Monthly Revenue</div>
+          <div class="stat-value" id="stat-monthly-revenue">£0.00</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Hold Records</div>
+          <div class="stat-value" id="stat-hold-records">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Sync Status</div>
+          <div class="stat-value" id="stat-sync-status" style="font-size: 1.2rem; color: #10b981;">Online</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CATEGORY SELECTION -->
+    <div id="dashboard-category-selection" style="display:none; margin-top: 2rem;">
+      <div class="flex-between mb-2" style="align-items: center;">
+        <h2 style="display: flex; align-items: center; gap: 12px; font-weight: 700; font-size: 1.5rem;">
+          <i data-lucide="layout-grid" style="color: var(--primary); width: 28px; height: 28px;"></i> Select Service Category
+        </h2>
+        <button class="btn" onclick="toggleMainForm('home')">Back to Dashboard</button>
+      </div>
+
+      <div class="tiles-grid">
+        <div class="tile" onclick="selectCategory('S1')">
+          <div class="tile-icon"><i data-lucide="utensils"></i></div>
+          <div class="tile-title">MENU UPDATE</div>
+          <div class="tile-desc">Update menu items, prices, or layouts.</div>
+        </div>
+        <div class="tile" onclick="selectCategory('S2')">
+          <div class="tile-icon"><i data-lucide="credit-card"></i></div>
+          <div class="tile-title">CREDIT CARD</div>
+          <div class="tile-desc">Setup or troubleshoot card terminals.</div>
+        </div>
+        <div class="tile" onclick="selectCategory('S3')">
+          <div class="tile-icon"><i data-lucide="refresh-cw"></i></div>
+          <div class="tile-title">DATA RESET</div>
+          <div class="tile-desc">Database reset or sales data cleanup.</div>
+        </div>
+        <div class="tile" onclick="selectCategory('S4')">
+          <div class="tile-icon"><i data-lucide="wrench"></i></div>
+          <div class="tile-title">SERVICE</div>
+          <div class="tile-desc">General hardware or software maintenance.</div>
+        </div>
+        <div class="tile" onclick="selectCategory('S6')">
+          <div class="tile-icon"><i data-lucide="monitor-smartphone"></i></div>
+          <div class="tile-title">TILL SETUP</div>
+          <div class="tile-desc">Full installation of new or used till systems.</div>
+        </div>
+        <div class="tile" onclick="selectCategory('S5')">
+          <div class="tile-icon"><i data-lucide="more-horizontal"></i></div>
+          <div class="tile-title">OTHER SERVICE</div>
+          <div class="tile-desc">Miscellaneous technical tasks or requests.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MAIN FORM -->
+    <div id="dashboard-form-container" style="display:none; margin-top: 2rem;">
+      <div class="card" style="border-top: 5px solid var(--primary);">
+        <div class="flex-between mb-2">
+           <h2 id="form-title">Create Ticket</h2>
+           <button class="btn" onclick="toggleMainForm('category')">Back</button>
+        </div>
+        <form id="master-form">
+          <div class="grid-4">
+             <div class="field"><label>Staff</label><select id="f-user"></select></div>
+             <div class="field"><label>DB ID</label><input type="text" id="f-db-id" readonly></div>
+             <div class="field"><label>CRM Ticket</label><input type="text" id="f-crm-ticket"></div>
+             <div class="field"><label>Timestamp</label><input type="text" id="f-timestamp" readonly></div>
+          </div>
+          <div class="grid-3 mt-2">
+             <div class="field"><label>Company Name</label>
+               <input type="text" id="f-company" list="vtiger-customer-list" placeholder="Start typing shop name...">
+               <datalist id="vtiger-customer-list"></datalist>
+             </div>
+             <div class="field"><label>Postcode</label><input type="text" id="f-postcode" placeholder="e.g. SW1A 1AA"></div>
+             <div class="field"><label>Payment Status</label>
+               <select id="f-payment-status">
+                 <option value="Chargeable">Chargeable</option>
+                 <option value="Free">Free</option>
+                 <option value="Contract">Included in Contract</option>
+               </select>
+             </div>
+          </div>
+          <div class="grid-2 mt-2">
+             <div class="field"><label>Main Service Category</label><select id="f-service-type" onchange="updateDynamicFields()"></select></div>
+             <div class="field"><label>Sub-Service Option</label><select id="f-sub-service" onchange="calculateEstimatedPrice()"></select></div>
+          </div>
+          
+          <!-- Dynamic Fields Container -->
+          <div id="dynamic-fields" class="mt-2"></div>
+
+          <div class="grid-2 mt-2">
+            <div class="field">
+              <label>Service Date</label>
+              <input type="date" id="f-date">
+            </div>
+            <div class="grid-2">
+              <div class="field"><label>Start Time</label><input type="time" id="f-start-time" onchange="calculateDuration()"></div>
+              <div class="field"><label>End Time</label><input type="time" id="f-end-time" onchange="calculateDuration()"></div>
+            </div>
+          </div>
+          
+          <div class="grid-2 mt-2">
+            <div class="field">
+              <label>Estimated Price (£)</label>
+              <div class="price-wrap"><span>£</span><input type="number" id="f-price" step="0.01"></div>
+            </div>
+            <div class="field">
+              <label>Duration (Minutes)</label>
+              <input type="number" id="f-duration" readonly placeholder="Auto-calculated">
+            </div>
+          </div>
+
+          <div class="field mt-2">
+            <label>Detailed Description</label>
+            <textarea id="f-description" rows="3" placeholder="Enter service details here..."></textarea>
+          </div>
+
+          <div class="flex-end mt-2">
+            <button type="submit" class="btn btn-primary" style="padding: 12px 30px; font-weight: 700;">Submit Ticket</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- DATA VIEW SECTION -->
+  <section id="section-dataview" class="section">
+    <div class="hero">
+      <h1>System Records</h1>
+      <p>Analyze, filter, and export all past technical transactions.</p>
+    </div>
+    
+    <div class="card mb-2">
+      <div style="display:flex; gap:1rem; align-items:center; flex-wrap:wrap;">
+        <!-- Search -->
+        <div style="flex:2; position:relative; min-width:250px;">
+          <input type="text" id="dataview-search" placeholder="Search by Company, ID or CRM..." style="width:100%; padding-left:36px; height:42px; border-radius:10px; border:1px solid var(--border-color); background: var(--bg-card); color: var(--text-main);" oninput="renderDataTable()">
+          <i data-lucide="search" style="position:absolute; left:12px; top:12px; width:18px; height:18px; color:var(--text-muted);"></i>
+        </div>
+        <!-- Category Filter -->
+        <div class="sub-nav" style="background: var(--bg-card); border: 1px solid var(--border-color); padding: 4px; border-radius: 12px; display: flex; gap: 4px;">
+           <button class="sub-nav-link active" id="data-btn-all" onclick="showDataSubTab('all')">ALL</button>
+           <button class="sub-nav-link" id="data-btn-S1" onclick="showDataSubTab('S1')">MENU</button>
+           <button class="sub-nav-link" id="data-btn-S2" onclick="showDataSubTab('S2')">CARD</button>
+           <button class="sub-nav-link" id="data-btn-S3" onclick="showDataSubTab('S3')">RESET</button>
+           <button class="sub-nav-link" id="data-btn-S4" onclick="showDataSubTab('S4')">SERV</button>
+           <button class="sub-nav-link" id="data-btn-S6" onclick="showDataSubTab('S6')">TILL</button>
+        </div>
+        <!-- Date Filters -->
+        <div style="display: flex; align-items: center; gap: 8px; background: var(--bg-card); padding: 4px 10px; border-radius: 12px; border: 1px solid var(--border-color);">
+           <input type="date" id="dataview-start-date" onchange="renderDataTable()" style="border:none; background:transparent; font-size:12px;">
+           <span style="color:var(--text-hint)">-</span>
+           <input type="date" id="dataview-end-date" onchange="renderDataTable()" style="border:none; background:transparent; font-size:12px;">
+        </div>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Timestamp</th>
+            <th>Staff</th>
+            <th>Ticket ID</th>
+            <th>Company</th>
+            <th>Service Type</th>
+            <th>Status</th>
+            <th>Amount</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="data-table-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- INVOICES SECTION -->
+  <section id="section-invoices" class="section">
+    <div class="hero">
+      <h1>Invoicing Module</h1>
+      <p>Process pending charges, handle holds, and track completed payments.</p>
+    </div>
+    
+    <div class="card mb-2" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+       <div class="sub-nav" style="background: var(--bg-card); border: 1px solid var(--border-color); padding: 4px; border-radius: 12px; display: flex; gap: 4px;">
+          <button class="sub-nav-link active" onclick="setInvoiceFilter('all')">All Records</button>
+          <button class="sub-nav-link" onclick="setInvoiceFilter('pending')">Pending</button>
+          <button class="sub-nav-link" onclick="setInvoiceFilter('hold')">On Hold</button>
+          <button class="sub-nav-link" onclick="setInvoiceFilter('completed')">Completed</button>
+       </div>
+       <div style="display:flex; gap:10px;">
+         <button class="btn" onclick="exportInvoices()"><i data-lucide="download" style="width:14px; height:14px;"></i> Export CSV</button>
+       </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Service Date</th>
+            <th>ID</th>
+            <th>Customer Name</th>
+            <th>Service Details</th>
+            <th>Price</th>
+            <th>Payment Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="invoices-table-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- CUSTOMERS SECTION -->
+  <section id="section-customers" class="section">
+    <div class="hero">
+      <h1>Customer Database</h1>
+      <p>Direct view of the vTiger CRM synchronized records.</p>
+    </div>
+    <div class="card mb-2">
+      <div style="position:relative; max-width:400px;">
+        <input type="text" id="customer-search" placeholder="Filter by Name or Postcode..." style="width:100%; padding-left:36px; height:42px; border-radius:10px; border:1px solid var(--border-color); background: var(--bg-card); color: var(--text-main);" oninput="renderCustomersTable()">
+        <i data-lucide="search" style="position:absolute; left:12px; top:12px; width:18px; height:18px; color:var(--text-muted);"></i>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>CRM ID</th>
+            <th>Company Name</th>
+            <th>Postcode</th>
+            <th>Phone Number</th>
+            <th>Account Status</th>
+          </tr>
+        </thead>
+        <tbody id="customers-table-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- SETTINGS SECTION -->
+  <section id="section-settings" class="section">
+    <div class="hero">
+      <h1>Settings & Management</h1>
+      <p>Configure integration, pricing tariffs, personnel, and system rules.</p>
+    </div>
+    
+    <div class="sub-nav mb-2" style="background: var(--bg-card); border: 1px solid var(--border-color); padding: 6px; border-radius: 12px; display: inline-flex; gap: 4px; flex-wrap:wrap;">
+       <button class="sub-nav-link active" id="sbtn-general" onclick="showSettingsTab('general')">Integrations</button>
+       <button class="sub-nav-link" id="sbtn-pricing" onclick="showSettingsTab('pricing')">Pricing</button>
+       <button class="sub-nav-link" id="sbtn-personnel" onclick="showSettingsTab('personnel')">Personnel</button>
+       <button class="sub-nav-link" id="sbtn-subservices" onclick="showSettingsTab('subservices')">Services</button>
+       <button class="sub-nav-link" id="sbtn-rules" onclick="showSettingsTab('rules')">Rules</button>
+       <button class="sub-nav-link" id="sbtn-activity" onclick="showSettingsTab('activity')">Activity</button>
+       <button class="sub-nav-link" id="sbtn-backup" onclick="showSettingsTab('backup')">Backup</button>
+    </div>
+
+    <!-- Integrations Tab -->
+    <div id="settings-general" class="settings-tab">
+       <div class="card" style="max-width:600px;">
+          <div class="card-header"><h3 class="card-title">Google Sheets Integration</h3></div>
+          <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 1.5rem;">Sync your data instantly with Google Sheets for reporting.</p>
+          <div class="field">
+            <label>Web App URL</label>
+            <input type="text" id="setting-sheet-url" placeholder="https://script.google.com/macros/s/...">
+          </div>
+          <div class="flex-end mt-2"><button class="btn btn-primary" onclick="saveSettings()">Save Configuration</button></div>
+          <hr style="margin:2rem 0; border:none; border-top:1px solid var(--border-color);">
+          <div class="card-header"><h3 class="card-title">CRM Sync</h3></div>
+          <button class="btn btn-primary" style="width:100%; justify-content:center; background:var(--bg-hover); color:var(--text-main); border:1px solid var(--border-color);" onclick="syncVTigerCustomers()" id="btn-sync-vtiger">🔄 Sync Customers from CRM</button>
+       </div>
+    </div>
+    
+    <!-- Pricing Tab -->
+    <div id="settings-pricing" class="settings-tab" style="display:none;">
+      <div class="card" style="max-width: 600px;">
+        <div class="card-header"><h3 class="card-title">Base Price Management</h3></div>
+        <div class="grid-2 mt-2" style="gap:15px;">
+           <div class="field"><label>S1: Set Menu (£)</label><input type="number" id="p-S1-SetMenu" step="0.01"></div>
+           <div class="field"><label>S1: Base (£)</label><input type="number" id="p-S1-Base" step="0.01"></div>
+           <div class="field"><label>S1: Hourly (£)</label><input type="number" id="p-S1-Hourly" step="0.01"></div>
+           <div class="field"><label>S2: Credit Card (£)</label><input type="number" id="p-S2" step="0.01"></div>
+           <div class="field"><label>S3: Data Reset (£)</label><input type="number" id="p-S3" step="0.01"></div>
+           <div class="field"><label>S4: Service (£)</label><input type="number" id="p-S4" step="0.01"></div>
+           <div class="field"><label>S6: Till Setup (£)</label><input type="number" id="p-S6" step="0.01"></div>
+        </div>
+        <div class="flex-end mt-2"><button class="btn btn-primary" onclick="saveSettings()">Save Pricing</button></div>
+      </div>
+    </div>
+
+    <!-- Personnel Tab -->
+    <div id="settings-personnel" class="settings-tab" style="display:none;">
+      <div class="card" style="max-width: 600px;">
+        <div class="card-header"><h3 class="card-title">Staff Management</h3></div>
+        <div style="display:flex; gap:8px; margin-bottom:1rem;">
+          <input type="text" id="new-person-name" placeholder="Name" style="flex:2;">
+          <input type="password" id="new-person-pass" placeholder="Password" style="flex:1;">
+          <button class="btn btn-primary" onclick="addPersonnel()">Add</button>
+        </div>
+        <div id="personnel-list" class="mt-2"></div>
+      </div>
+    </div>
+
+    <!-- Services Tab -->
+    <div id="settings-subservices" class="settings-tab" style="display:none;">
+      <div class="card" style="max-width: 600px;">
+        <div class="card-header"><h3 class="card-title">Sub-Service Management</h3></div>
+        <div class="field mb-2">
+          <label>Select Category</label>
+          <select id="manage-srv-cat" onchange="renderSubServiceManagement()">
+            <option value="S1">S1 - MENU UPDATE</option>
+            <option value="S2">S2 - CREDIT CARD</option>
+            <option value="S3">S3 - DATA RESET</option>
+            <option value="S4">S4 - SERVICE</option>
+            <option value="S6">S6 - TILL SETUP</option>
+          </select>
+        </div>
+        <div style="display:flex; gap:8px; margin-bottom:1rem;">
+          <input type="text" id="new-sub-name" placeholder="Option Name" style="flex:2;">
+          <input type="number" id="new-sub-price" placeholder="£0.00" style="flex:1;">
+          <button class="btn btn-primary" onclick="addSubService()">Add</button>
+        </div>
+        <div id="subservices-list" class="mt-2"></div>
+      </div>
+    </div>
+
+    <!-- Rules Tab -->
+    <div id="settings-rules" class="settings-tab" style="display:none;">
+      <div class="card" style="max-width: 600px;">
+        <div class="card-header"><h3 class="card-title">Automatic Rules</h3></div>
+        <div class="field mt-2">
+          <label>Duration Threshold (Mins)</label>
+          <input type="number" id="rule-duration-mins">
+        </div>
+        <div class="field mt-2">
+          <label>Surcharge Amount (£)</label>
+          <input type="number" id="rule-surcharge-price" step="0.01">
+        </div>
+        <div class="flex-end mt-2"><button class="btn btn-primary" onclick="saveSettings()">Save Rules</button></div>
+      </div>
+    </div>
+
+    <!-- Activity Tab -->
+    <div id="settings-activity" class="settings-tab" style="display:none;">
+      <div class="card" style="max-width: 700px;">
+        <div class="card-header" style="display:flex; justify-content:space-between;">
+           <h3 class="card-title">Recent Activity</h3>
+           <button class="btn" style="font-size:11px;" onclick="clearActivity()">Clear</button>
+        </div>
+        <div id="activity-list" class="mt-2" style="max-height:400px; overflow-y:auto;"></div>
+      </div>
+    </div>
+
+    <!-- Backup Tab -->
+    <div id="settings-backup" class="settings-tab" style="display:none;">
+      <div class="card" style="max-width: 600px;">
+        <div class="card-header"><h3 class="card-title">System Backup</h3></div>
+        <div style="display:flex; gap:10px;" class="mt-2">
+           <button class="btn btn-primary" onclick="exportBackup()"><i data-lucide="download"></i> Export Settings</button>
+           <button class="btn" onclick="triggerImport()"><i data-lucide="upload"></i> Import Settings</button>
+           <input type="file" id="import-file" style="display:none;" onchange="handleImport(event)">
+        </div>
+      </div>
+    </div>
+
+  </section>
+
+</main>
+
+<!-- Details Modal -->
+<div id="details-modal" class="modal-overlay hidden">
+  <div class="modal-content" style="max-width: 600px;">
+    <div class="modal-header">
+      <h2 id="modal-title">Details</h2>
+      <button class="close-btn" onclick="closeModal()">&times;</button>
+    </div>
+    <div class="modal-body" id="modal-details-content"></div>
+    <div class="modal-footer" id="modal-footer"></div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script src="config.js"></script>
+<script src="ui.js"></script>
+<script src="auth.js"></script>
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
