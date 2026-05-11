@@ -485,6 +485,7 @@
       <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 1.5rem;">Paste your Google Apps Script Web App URL below for real-time synchronization.</p>
       <div class="field"><label>Google Web App URL</label><input type="text" id="setting-sheet-url" placeholder="https://script.google.com/macros/s/.../exec"></div>
       <div class="flex-end mt-2" style="display: flex; justify-content: flex-end;"><button class="btn btn-primary" onclick="saveSettings()">Save Integration</button></div>
+    </div>
     <!-- Export Pane -->
     <div id="set-pane-export" class="settings-pane card hidden" style="max-width: 800px; margin: 0 auto;">
       <div class="card-header"><h3 class="card-title">Database Export Center</h3></div>
@@ -638,7 +639,7 @@
       <div class="filter-group">
         <label>View Mode</label>
         <select id="invoice-tab-filter" onchange="showInvoiceTab(this.value)">
-          <option value="pending">PENDIN</option>
+          <option value="pending">PENDING</option>
           <option value="invoiced">INVOICED</option>
         </select>
       </div>
