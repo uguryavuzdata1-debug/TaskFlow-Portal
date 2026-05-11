@@ -993,14 +993,15 @@ function calculateDuration() {
     if (s && e) { const [sh,sm] = s.split(':').map(Number); const [eh,em] = e.split(':').map(Number); let diff = (eh*60+em) - (sh*60+sm); if (diff < 0) diff += 1440; document.getElementById('f-duration').value = diff; calculatePrice(); }
 }
 function autoFillCustomerInfo() {
-    const company = document.getElementById('f-company').value;
-    const customer = appState.customers.find(c => c.COMPANY === company);
+    const companyInput = document.getElementById('f-company');
+    if (!companyInput) return;
+    const company = companyInput.value;
+    const customer = (appState.customers || []).find(c => (c.COMPANY || '') === company);
     if (customer) {
         document.getElementById('f-company-id').value = customer['CUSTOMER ID'] || '';
         document.getElementById('f-postcode').value = customer['POSTCODE'] || '';
         document.getElementById('f-status').value = customer['SERVICE STATUS'] || 'No Contract';
         
-        // Auto-select payment status if it matches
         if (customer['SERVICE STATUS'] === 'Contract') {
             document.getElementById('f-payment-status').value = 'Contract';
         } else {
@@ -1088,10 +1089,7 @@ function updateStats() {
     document.getElementById('stat-completed').innerText = appState.tickets.filter(t => t.status === 'Completed').length;
     document.getElementById('stat-customers').innerText = appState.customers.length;
 }
-function autoFillCustomerInfo() {
-    const c = appState.customers.find(x => x.COMPANY === document.getElementById('f-company').value);
-    if (c) { document.getElementById('f-company-id').value = c['CUSTOMER ID'] || ''; document.getElementById('f-postcode').value = c['POSTCODE'] || ''; }
-}
+// Placeholder for potential future logic
 async function markAsInvoiced(id) {
     showAlert('Process Invoice', 'Enter Invoice Number:', '🧾', true, true, async (n) => {
         if (!n) return; try { await sbClient.from('records').update({ invoiced: true, "INV NO": n === true ? `INV-${Date.now()}` : n, "INV DATE": new Date().toISOString().split('T')[0] }).eq('id', id); initApp(); showAlert('Invoiced', 'Record marked as invoiced with current date.', '✅'); } catch (e) { showAlert('Error', e.message, '❌'); }
