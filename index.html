@@ -23,24 +23,26 @@
       <h2>TaskFlow Portal</h2>
     </div>
     
-    <div class="field">
-      <label>Username</label>
-      <input type="text" id="login-username" placeholder="Enter your full name">
-    </div>
-    
-    <div class="field mt-2">
-      <label>Password</label>
-      <input type="password" id="login-password" placeholder="••••••••">
-    </div>
+    <form onsubmit="event.preventDefault(); handleLogin();">
+      <div class="field">
+        <label>Username</label>
+        <input type="text" id="login-username" placeholder="Enter your full name" required>
+      </div>
+      
+      <div class="field mt-2">
+        <label>Password</label>
+        <input type="password" id="login-password" placeholder="••••••••" required>
+      </div>
 
-    <label class="login-remember">
-        <input type="checkbox" id="login-remember">
-        <span>Remember Me</span>
-    </label>
+      <label class="login-remember">
+          <input type="checkbox" id="login-remember" checked>
+          <span>Remember Me</span>
+      </label>
 
-    <button class="btn btn-primary" style="width: 100%; padding: 12px; display: flex; align-items: center; justify-content: center; gap: 8px;" onclick="handleLogin()">
-      <i data-lucide="log-in" style="width: 18px; height: 18px;"></i> Sign In
-    </button>
+      <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+        <i data-lucide="log-in" style="width: 18px; height: 18px;"></i> Sign In
+      </button>
+    </form>
   </div>
 </div>
 
@@ -355,7 +357,7 @@
       <div id="personnel-management-container">
         <div style="display: flex; gap: 8px; margin-bottom: 2rem; background: #f8fafc; padding: 1.5rem; border-radius: 16px; border: 1px solid #e2e8f0; align-items: flex-end;">
           <div class="field" style="flex: 1;"><label>Staff Name</label><input type="text" id="new-personnel-name" placeholder="John Doe" style="padding: 12px; border-radius: 10px;"></div>
-          <div class="field" style="width: 150px;"><label>Role</label><select id="new-personnel-role" style="padding: 12px; border-radius: 10px;"><option value="User">User</option><option value="Muhasebe">Muhasebe</option><option value="Admin">Admin</option></select></div>
+          <div class="field" style="width: 150px;"><label>Role</label><select id="new-personnel-role" style="padding: 12px; border-radius: 10px;"><option value="User">User</option><option value="Accounting">Accounting</option><option value="Admin">Admin</option></select></div>
           <div class="field" style="width: 150px;"><label>Password</label><input type="text" id="new-personnel-pass" value="1234" style="padding: 12px; border-radius: 10px;"></div>
           <button class="btn btn-primary" onclick="addPersonnel()" style="height: 48px; border-radius: 12px;">Add Staff</button>
         </div>
