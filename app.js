@@ -1,6 +1,31 @@
 // --- Supabase Configuration ---
 const SB_URL = 'https://ekjhhjrhfkoiklyxjfpu.supabase.co';
 const SB_KEY = 'sb_publishable_hz1a48NHx7c8RPV_RYHfZg_YNvnNOdH';
+let appState = {
+    tickets: [],
+    customers: [],
+    settings: {
+        personnel: [],
+        users_auth: {}, 
+        sub_services: {}, 
+        pricing: {}, 
+        operating_systems: [], 
+        cc_local_settings: [], 
+        card_companies: [], 
+        till_cpu: [], 
+        till_models: [], 
+        sheet_url: ''
+    },
+    activeTab: 'dashboard',
+    currentInvoiceTab: 'pending',
+    currentDataTab: 'all',
+    currentCustomerFilter: 'all',
+    currentUser: '',
+    currentUserRole: 'User', 
+    editingRecordId: null,
+    alertCallback: null
+};
+
 let sbClient;
 try {
     sbClient = supabase.createClient(SB_URL, SB_KEY);
@@ -80,31 +105,7 @@ window.addTillModel = addTillModel;
 window.editTillModel = editTillModel;
 window.deleteTillModel = deleteTillModel;
 
-// --- App State ---
-let appState = {
-    tickets: [],
-    customers: [],
-    settings: {
-        personnel: [],
-        users_auth: {}, // Populated from 'users' table
-        sub_services: {}, // Populated from 'sub_services' table
-        pricing: {}, // Populated from 'services' table
-        operating_systems: [], // Populated from 'app_settings'
-        cc_local_settings: [], // Populated from 'app_settings'
-        card_companies: [], // Populated from 'app_settings'
-        till_cpu: [], // Populated from 'app_settings'
-        till_models: [], // Populated from 'app_settings'
-        sheet_url: ''
-    },
-    activeTab: 'dashboard',
-    currentInvoiceTab: 'pending',
-    currentDataTab: 'all',
-    currentCustomerFilter: 'all',
-    currentUser: '',
-    currentUserRole: 'User', // Default role
-    editingRecordId: null,
-    alertCallback: null
-};
+// --- App State Initialized Above ---
 
 // --- Custom Alert System ---
 function showAlert(title, message, icon = '🔔', showCancel = false, isPrompt = false, callback = null) {
@@ -603,6 +604,10 @@ window.handleLogin = handleLogin;
 window.showToast = showToast;
 
 async function handleLogin() {
+    if (!appState) {
+        console.error("AppState not initialized yet.");
+        return;
+    }
     const user = document.getElementById('login-username').value.trim().toUpperCase();
     const pass = document.getElementById('login-password').value;
     
@@ -636,29 +641,21 @@ async function handleLogin() {
     }
 
     if (appState.currentUser) {
-        document.getElementById('current-user-name').innerText = appState.currentUser;
-        if (document.getElementById('login-remember').checked) {
-            localStorage.setItem('taskflow_user', appState.currentUser);
-        } else {
-            localStorage.removeItem('taskflow_user');
-        }
+        try {
+            document.body.classList.remove('is-logged-out');
+            const ls = document.getElementById('login-screen');
+            if (ls) ls.classList.add('hidden');
         
-        document.body.classList.remove('is-logged-out'); 
-        document.getElementById('login-screen').classList.add('hidden');
-        document.getElementById('main-nav').classList.remove('hidden'); 
-        document.getElementById('main-content').classList.remove('hidden');
-        
-        // Show success toast with greeting
-        showToast(`Welcome, ${appState.currentUser}! Login successful.`, 'success');
-
-        // Hide Admin tabs if not Admin
-        document.querySelectorAll('.sub-nav-link').forEach(btn => {
-            if (btn.id.startsWith('set-btn-') && btn.id !== 'set-btn-account') {
-                btn.style.display = (appState.currentUserRole === 'Admin') ? 'flex' : 'none';
-            }
-        });
-
-        initApp();
+            const mn = document.getElementById('main-nav');
+            if (mn) mn.classList.remove('hidden');
+            const mc = document.getElementById('main-content');
+            if (mc) mc.classList.remove('hidden');
+            const un = document.getElementById('current-user-name');
+            if (un) un.innerText = appState.currentUser;
+            
+            showToast(`Welcome, ${appState.currentUser}!`, 'success');
+            initApp();
+        } catch (e) { console.error(e); document.body.classList.remove('is-logged-out'); }
     } else {
         showToast('Hatalı şifre. Lütfen tekrar deneyiniz.', 'error');
     }
