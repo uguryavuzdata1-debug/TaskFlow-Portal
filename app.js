@@ -683,30 +683,55 @@ async function updateAccount() {
 }
 
 async function addPersonnel() {
-    const name = document.getElementById('new-personnel-name').value.trim().toUpperCase();
-    const roleName = document.getElementById('new-personnel-role').value;
+    const nameInput = document.getElementById('new-personnel-name');
+    const passInput = document.getElementById('new-personnel-pass');
+    const roleSelect = document.getElementById('new-personnel-role');
+    
+    if (!nameInput || !passInput || !roleSelect) return;
+
+    const name = nameInput.value.trim();
+    const pass = passInput.value.trim();
+    const roleName = roleSelect.value;
     const email = document.getElementById('new-personnel-email')?.value || `${name.toLowerCase()}@taskflow.com`;
     
-    if (!name) return;
+    if (!name || !pass) {
+        showAlert('Hata', 'Lütfen isim ve şifre giriniz.', '❌');
+        return;
+    }
     
     try {
-        // 1. Get Role ID
-        const { data: roleData } = await sbClient.from('permissions').select('id').eq('role_name', roleName).single();
-        if (!roleData) throw new Error('Role not found');
+        // 1. Get or Create Role ID
+        let { data: roleData } = await sbClient.from('permissions').select('id').eq('role_name', roleName).single();
+        
+        if (!roleData) {
+            console.log(`Role ${roleName} not found, creating...`);
+            const { data: newRole, error: roleErr } = await sbClient.from('permissions').insert([{ 
+                role_name: roleName, 
+                access_level: roleName === 'Admin' ? 100 : 10 
+            }]).select().single();
+            
+            if (roleErr) throw roleErr;
+            roleData = newRole;
+        }
 
-        // 2. Insert User
+        // 2. Insert User with Password
         const { error } = await sbClient.from('users').insert([{
             email: email,
             full_name: name,
-            role_id: roleData.id
+            role_id: roleData.id,
+            password: pass
         }]);
 
         if (error) throw error;
 
-        document.getElementById('new-personnel-name').value = '';
+        nameInput.value = '';
+        passInput.value = '';
         showAlert('Başarılı', `${name} personeli eklendi!`, '✅');
         initApp();
-    } catch (e) { showAlert('Hata', e.message, '❌'); }
+    } catch (e) { 
+        console.error("Personnel Add Error:", e);
+        showAlert('Hata', e.message, '❌'); 
+    }
 }
 
 function renderPersonnelManagement() {
