@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TaskFlow Portal – Management Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <!-- Supabase JS Library -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="is-logged-out">
+
+<!-- LOGIN SCREEN -->
+<div id="login-screen" class="login-screen">
+  <div class="login-card">
+    <div class="login-logo">IKATaskFlow</div>
+    <div class="field" style="text-align: left; margin-bottom: 1.5rem;">
+      <label>Username</label>
+      <input type="text" id="login-username" placeholder="admin">
+    </div>
+    <div class="field" style="text-align: left; margin-bottom: 2rem;">
+      <label>Password</label>
+      <input type="password" id="login-password" placeholder="••••••••">
+    </div>
+    <button class="btn btn-primary" style="width: 100%; padding: 12px;" onclick="handleLogin()">Sign In</button>
+  </div>
+</div>
+
+<nav class="nav hidden" id="main-nav">
+  <div class="nav-brand" onclick="showTab('dashboard')">TaskFlow</div>
+  <div class="nav-links">
+    <button class="nav-link active" onclick="showTab('dashboard')" id="btn-dashboard">Dashboard</button>
+    <button class="nav-link" onclick="showTab('invoices')" id="btn-invoices">Invoices</button>
+    <button class="nav-link" onclick="showTab('dataview')" id="btn-dataview">Data View</button>
+    <button class="nav-link" onclick="showTab('customers')" id="btn-customers">Customers</button>
+    <button class="nav-link" onclick="showTab('settings')" id="btn-settings">Settings</button>
+  </div>
+</nav>
+
+<main class="container hidden" id="main-content">
+  
+  <!-- DASHBOARD SECTION -->
+  <section id="section-dashboard" class="section active">
+    
+    <!-- DASHBOARD HOME VIEW -->
+    <div id="dashboard-home">
+      <div class="hero" style="background: linear-gradient(135deg, #1f2937 0%, #111827 100%); border-radius: 20px; color: white; padding: 4rem 2rem; margin-bottom: 2rem; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
+        <h1 style="color: white; font-size: 2.8rem; margin-bottom: 0.75rem; font-weight: 800; letter-spacing: -0.02em;">Welcome to TaskFlow</h1>
+        <p style="color: rgba(255,255,255,0.8); font-size: 1.2rem; margin-bottom: 2.5rem; max-width: 600px; margin-left: auto; margin-right: auto;">Manage your services, track CRM tickets, and simplify your invoicing workflow with precision.</p>
+        
+        <button class="btn" onclick="toggleMainForm('category')" style="background: #ffffff; color: #111827; font-size: 1.1rem; font-weight: 700; padding: 1.1rem 3.5rem; border-radius: 50px; border: none; cursor: pointer; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); display: inline-flex; align-items: center; gap: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
+          <span style="font-size: 1.4rem;">➕</span> CREATE NEW TICKET
+        </button>
+      </div>
+    </div>
+
+    <!-- CATEGORY SELECTION VIEW (Hidden initially) -->
+    <div id="dashboard-category-selection" style="display:none; animation: fadeIn 0.4s ease;">
+      <div class="flex-between" style="margin-bottom: 2rem; align-items: center;">
+        <h2 style="font-size: 1.5rem; color: var(--primary);">🎯 Select Service Category</h2>
+        <button class="btn" onclick="toggleMainForm('home')" style="background: var(--bg-hover); color: var(--text-muted); border:none; padding: 8px 15px;">Back to Dashboard</button>
+      </div>
+      <div class="tiles-grid">
+        <div class="tile" onclick="selectCategory('S1')">
+          <div class="tile-icon" style="background: var(--blue-soft);"><img src="assets/icons/s1.png" alt="Menu"></div>
+          <div class="tile-title">MENU UPDATE</div>
+          <div class="tile-desc">Update menu items, prices, or layouts.</div>
+        </div>
+        <div class="tile" onclick="selectCategory('S2')">
+          <div class="tile-icon" style="background: var(--teal-soft);"><img src="assets/icons/s2.png" alt="Card"></div>
+          <div class="tile-title">CREDIT CARD</div>
+          <div class="tile-desc">Setup or troubleshoot card terminals.</div>
+        </div>
+        <div class="tile" onclick="selectCategory('S3')">
+          <div class="tile-icon" style="background: var(--coral-soft);"><img src="assets/icons/s3.png" alt="Reset"></div>
+          <div class="tile-title">DATA RESET</div>
+          <div class="tile-desc">Database reset or sales data cleanup.</div>
+        </div>
+        <div class="tile" onclick="selectCategory('S4')">
+          <div class="tile-icon" style="background: var(--amber-soft);"><img src="assets/icons/s4.png" alt="Service"></div>
+          <div class="tile-title">SERVICE</div>
+          <div class="tile-desc">General hardware or software maintenance.</div>
+        </div>
+        <div class="tile" onclick="selectCategory('S5')">
+          <div class="tile-icon" style="background: var(--purple-soft);"><img src="assets/icons/s5.png" alt="Other"></div>
+          <div class="tile-title">OTHER</div>
+          <div class="tile-desc">Unlisted issues or custom requests.</div>
+        </div>
+        <div class="tile" onclick="selectCategory('S6')">
+          <div class="tile-icon" style="background: #f3f4f6;"><img src="assets/icons/s6.png" alt="Till"></div>
+          <div class="tile-title">TILL SETUP</div>
+          <div class="tile-desc">Full installation of new or used till systems.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- UNIFIED ENTRY FORM (Hidden initially) -->
+    <div id="dashboard-form-container" class="card" style="display:none; border-top: 5px solid var(--primary); animation: slideUp 0.4s ease;">
+      <div class="flex-between" style="margin-bottom: 1.5rem; align-items: center;">
+        <h2 style="font-size: 1.5rem; color: var(--primary);">📋 Create New Ticket</h2>
+        <button class="btn" onclick="toggleMainForm('category')" style="background: var(--bg-hover); color: var(--text-muted); border:none; padding: 8px 15px;">Cancel & Go Back</button>
+      </div>
+      
+      <form id="master-form">
+        <!-- PART 1: ADMINISTRATIVE INFO -->
+        <div class="grid-4">
+          <div class="field">
+            <label>Staff (Created By)</label>
+            <select id="f-user">
+              <option>UGUR YAVUZ</option>
+              <option>AHMET BALTACI</option>
+              <option>UGUR ISIKCEVAHIR</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Database ID</label>
+            <input type="text" id="f-db-id" readonly placeholder="Auto-generated">
+          </div>
+          <div class="field">
+            <label>CRM Ticket No</label>
+            <input type="text" id="f-crm-ticket" placeholder="Paste CRM Ticket...">
+          </div>
+          <div class="field">
+            <label>Timestamp</label>
+            <input type="text" id="f-timestamp" readonly style="background: var(--bg-hover);">
+          </div>
+        </div>
+
+        <!-- PART 2: CLIENT INFO -->
+        <div class="grid-3 mt-2">
+          <div class="field">
+            <label>Company ID</label>
+            <input type="text" id="f-company-id" placeholder="CID-XXXX">
+          </div>
+          <div class="field">
+            <label>Company Name</label>
+            <input type="text" id="f-company" placeholder="Search customer..." list="vtiger-customer-list" onchange="autoFillCustomerInfo()">
+            <datalist id="vtiger-customer-list"></datalist>
+          </div>
+          <div class="field">
+            <label>Postcode</label>
+            <input type="text" id="f-postcode" placeholder="e.g. SW1A 1AA">
+          </div>
+        </div>
+
+        <!-- PART 3: SERVICE CATEGORY -->
+        <div class="grid-2 mt-2">
+          <div class="field">
+            <label>Service Category</label>
+            <select id="f-service-type" onchange="updateDynamicFields()">
+              <option value="S1">MENU UPDATE</option>
+              <option value="S2">CREDIT CARD</option>
+              <option value="S3">DATA RESET</option>
+              <option value="S4">SERVICE</option>
+              <option value="S5">OTHER</option>
+              <option value="S6">TILL SETUP</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Sub Service</label>
+            <select id="f-sub-service">
+              <!-- Populated via JS -->
+            </select>
+          </div>
+        </div>
+
+        <!-- PART 4: WORK DETAILS -->
+        <div class="grid-3 mt-2">
+          <div class="field">
+            <label>Start Time</label>
+            <input type="time" id="f-start-time" onchange="calculateDuration()">
+          </div>
+          <div class="field">
+            <label>End Time</label>
+            <input type="time" id="f-end-time" onchange="calculateDuration()">
+          </div>
+          <div class="field">
+            <label>Duration (min)</label>
+            <input type="text" id="f-duration" readonly placeholder="0" style="background: var(--bg-hover);">
+          </div>
+        </div>
+
+        <div id="dynamic-fields-container" class="mt-2">
+          <!-- Description / Notes will go here via JS -->
+        </div>
+
+        <!-- PART 5: PAYMENT & BILLING -->
+        <div class="mt-3">
+          <p class="card-title" style="margin-bottom: 1.5rem;">PAYMENT & BILLING</p>
+          <div class="grid-3">
+            <div class="field">
+              <label>Service Mode</label>
+              <select id="f-payment-status">
+                <option value="Chargeable">Chargeable</option>
+                <option value="Contract">Service Contract</option>
+                <option value="Free">FREE (No Charge)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Estimated Price</label>
+              <div class="price-wrap">
+                <span>£</span>
+                <input type="number" id="f-est-price" placeholder="0.00" step="0.01">
+              </div>
+            </div>
+            <div class="field">
+              <label>Final Price (£)</label>
+              <div class="price-wrap">
+                <span>£</span>
+                <input type="number" id="f-price" placeholder="0.00" step="0.01">
+              </div>
+            </div>
+          </div>
+
+          <!-- PART 6: SERVICE REFERENCE -->
+          <div class="grid-2 mt-2">
+            <div class="field">
+              <label>SERVICE NUMBER</label>
+              <input type="text" id="f-invoice-no" placeholder="SRV-XXXX" readonly style="background: var(--bg-hover);">
+            </div>
+            <div class="field">
+              <label>SERVICE DATE</label>
+              <input type="date" id="f-invoice-date" readonly style="background: var(--bg-hover);">
+            </div>
+        </div>
+
+        <!-- PART 7: INVOICE DETAILS (OPTIONAL) - HIDDEN IN FORM AS PER REQUEST -->
+        <div id="form-invoice-details" style="display: none;">
+          <p class="card-title" style="margin-bottom: 1.5rem;">INVOICE DETAILS (Optional)</p>
+          <div class="grid-3">
+            <div class="field">
+              <label>INVOICE NUMBER</label>
+              <input type="text" id="f-real-invoice-no" placeholder="INV-XXXX">
+            </div>
+            <div class="field">
+              <label>INVOICE DATE</label>
+              <input type="date" id="f-real-invoice-date">
+            </div>
+            <div class="field">
+              <label>INVOICE NOTE</label>
+              <input type="text" id="f-real-invoice-note" placeholder="Internal billing note...">
+            </div>
+          </div>
+        </div>
+
+        <div class="flex-end mt-2">
+          <button type="button" class="btn" onclick="resetForm()">Clear Form</button>
+          <button type="submit" class="btn btn-primary">Process Transaction</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <!-- SETTINGS SECTION -->
+  <section id="section-settings" class="section">
+    <div class="hero">
+      <h1>Application Settings</h1>
+      <p>Configure external integrations and system preferences.</p>
+    </div>
+
+    <div class="card" style="max-width: 600px;">
+      <div class="card-header">
+        <h3 class="card-title">Google Sheets Integration</h3>
+      </div>
+      <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 1.5rem;">
+        Paste your Google Apps Script Web App URL below to enable real-time synchronization.
+      </p>
+      
+      <div class="field">
+        <label>Google Web App URL</label>
+        <input type="text" id="setting-sheet-url" placeholder="https://script.google.com/macros/s/.../exec">
+      </div>
+
+      <div class="flex-end mt-2">
+        <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+      </div>
+
+      <hr style="margin: 2rem 0; border: none; border-top: 1px solid var(--border-color);">
+
+      <div class="card-header">
+        <h3 class="card-title">CRM Integration</h3>
+      </div>
+      <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 1.5rem;">
+        Synchronize customer database and service contracts from vTiger CRM.
+      </p>
+      <button class="btn btn-primary" onclick="syncVTigerCustomers()" id="btn-sync-vtiger" style="width: 100%; justify-content: center; background: var(--secondary);">
+        🔄 Sync Customers from CRM
+      </button>
+
+      <hr style="margin: 2rem 0; border: none; border-top: 1px solid var(--border-color);">
+
+      <div class="card-header">
+        <h3 class="card-title">Data Maintenance</h3>
+      </div>
+      <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 1.5rem;">
+        Synchronize all existing records with Google Sheets for the first time.
+      </p>
+      
+      <div id="sync-progress" style="display:none; margin-bottom: 1rem;">
+        <div style="height: 8px; background: var(--bg-hover); border-radius: 4px; overflow: hidden;">
+          <div id="sync-progress-bar" style="height: 100%; background: var(--primary); width: 0%; transition: width 0.3s;"></div>
+        </div>
+        <div id="sync-status-text" style="font-size: 12px; margin-top: 5px; color: var(--text-muted);">Syncing 0/0...</div>
+      </div>
+
+      <button class="btn" id="btn-sync-all" onclick="syncAllHistoricData()" style="width: 100%; justify-content: center; display: flex; gap: 8px; align-items: center;">
+        <span>🔄</span> Sync All Historic Data to Sheets
+      </button>
+
+      <div style="margin-top: 1rem; padding: 1rem; border: 1px solid #fee2e2; background: #fff1f2; border-radius: 12px;">
+        <p style="color: #991b1b; font-size: 13px; font-weight: 600; margin-bottom: 8px;">⚠️ Danger Zone</p>
+        <button class="btn" onclick="dangerResetAllData()" style="width: 100%; background: #ef4444; border: none; color: white;">
+          Clear All Records (Reset App)
+        </button>
+      </div>
+
+      <hr style="margin: 2rem 0; border: none; border-top: 1px solid var(--border-color);">
+
+      <!-- Price Tariff Management -->
+      <div class="card-header">
+        <h3 class="card-title">Price Tariff Management</h3>
+      </div>
+      <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 1.5rem;">
+        Set default estimated prices for each service category.
+      </p>
+      
+      <div class="grid-2" style="gap: 15px;">
+        <div class="field">
+          <label>Menu Update: Set Menu (£)</label>
+          <input type="number" id="p-S1-SetMenu" placeholder="35.00" step="0.01">
+        </div>
+        <div class="field">
+          <label>Menu Update: Base Price (£)</label>
+          <input type="number" id="p-S1-Base" placeholder="125.00" step="0.01">
+        </div>
+        <div class="field">
+          <label>Menu Update: Extra Hourly (£)</label>
+          <input type="number" id="p-S1-Hourly" placeholder="25.00" step="0.01">
+        </div>
+        <div class="field">
+          <label>Credit Card Setup (£)</label>
+          <input type="number" id="p-S2" placeholder="125.00" step="0.01">
+        </div>
+        <div class="field">
+          <label>Data Reset Service (£)</label>
+          <input type="number" id="p-S3" placeholder="125.00" step="0.01">
+        </div>
+        <div class="field">
+          <label>General Service (£)</label>
+          <input type="number" id="p-S4" placeholder="65.00" step="0.01">
+        </div>
+        <div class="field">
+          <label>Till Setup (£)</label>
+          <input type="number" id="p-S6" placeholder="0.00" step="0.01">
+        </div>
+      </div>
+
+      <div class="flex-end mt-2">
+        <button class="btn btn-primary" onclick="saveSettings()">Save Pricing & Integration</button>
+      </div>
+
+      <hr style="margin: 2rem 0; border: none; border-top: 1px solid var(--border-color);">
+
+      <!-- Personnel Management -->
+      <div class="card-header">
+        <h3 class="card-title">Personnel Management</h3>
+      </div>
+      <div style="display: flex; gap: 8px; margin-bottom: 1rem;">
+        <input type="text" id="new-personnel-name" placeholder="Enter name" style="flex: 1; padding: 10px; border: 1px solid var(--border-color); border-radius: 8px;">
+        <button class="btn btn-primary" onclick="addPersonnel()">Add</button>
+      </div>
+      <div id="personnel-list" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 1.5rem;"></div>
+
+      <hr style="margin: 2rem 0; border: none; border-top: 1px solid var(--border-color);">
+
+      <!-- Service Management -->
+      <div class="card-header">
+        <h3 class="card-title">Sub-Service Management</h3>
+      </div>
+      <div class="field" style="margin-bottom: 1rem;">
+        <label>Select Main Service</label>
+        <select id="manage-service-select" onchange="renderSubServiceManagement()" style="padding: 10px; border-radius: 8px;">
+          <option value="S1">MENU UPDATE</option>
+          <option value="S2">CREDIT CARD</option>
+          <option value="S3">DATA RESET</option>
+          <option value="S4">SERVICE</option>
+          <option value="S5">OTHER</option>
+          <option value="S6">TILL SETUP</option>
+        </select>
+      </div>
+      <div style="display: flex; gap: 8px; margin-bottom: 1rem;">
+        <input type="text" id="new-subservice-name" placeholder="Enter sub-service description" style="flex: 1; padding: 10px; border: 1px solid var(--border-color); border-radius: 8px;">
+        <button class="btn btn-primary" onclick="addSubService()">Add Option</button>
+      </div>
+      <div id="subservice-management-list" style="display: flex; flex-direction: column; gap: 4px;"></div>
+    </div>
+  </section>
+
+  <!-- DATA VIEW SECTION -->
+  <section id="section-dataview" class="section">
+    <div class="hero">
+      <h1>Data View</h1>
+      <p>Analyze and filter all system records by category.</p>
+    </div>
+
+    <!-- Sub-Tabs Navigation for Data View -->
+    <div class="sub-nav" style="display: flex; gap: 0.8rem; margin-bottom: 2rem; background: var(--bg-card); padding: 0.5rem; border-radius: 12px; border: 1px solid var(--border-color); width: fit-content; flex-wrap: wrap;">
+      <button class="sub-nav-link active" onclick="showDataSubTab('all')" id="data-btn-all" style="padding: 0.5rem 1.2rem; border-radius: 8px; border:none; background:transparent; cursor:pointer; font-weight:500; font-size: 12px; color:var(--text-muted); transition: all 0.2s;">ALL RECORDS</button>
+      <button class="sub-nav-link" onclick="showDataSubTab('S1')" id="data-btn-S1" style="padding: 0.5rem 1.2rem; border-radius: 8px; border:none; background:transparent; cursor:pointer; font-weight:500; font-size: 12px; color:var(--text-muted); transition: all 0.2s;">MENU UPDATE</button>
+      <button class="sub-nav-link" onclick="showDataSubTab('S2')" id="data-btn-S2" style="padding: 0.5rem 1.2rem; border-radius: 8px; border:none; background:transparent; cursor:pointer; font-weight:500; font-size: 12px; color:var(--text-muted); transition: all 0.2s;">CREDIT CARD</button>
+      <button class="sub-nav-link" onclick="showDataSubTab('S3')" id="data-btn-S3" style="padding: 0.5rem 1.2rem; border-radius: 8px; border:none; background:transparent; cursor:pointer; font-weight:500; font-size: 12px; color:var(--text-muted); transition: all 0.2s;">DATA RESET</button>
+      <button class="sub-nav-link" onclick="showDataSubTab('S4')" id="data-btn-S4" style="padding: 0.5rem 1.2rem; border-radius: 8px; border:none; background:transparent; cursor:pointer; font-weight:500; font-size: 12px; color:var(--text-muted); transition: all 0.2s;">SERVICE</button>
+      <button class="sub-nav-link" onclick="showDataSubTab('S5')" id="data-btn-S5" style="padding: 0.5rem 1.2rem; border-radius: 8px; border:none; background:transparent; cursor:pointer; font-weight:500; font-size: 12px; color:var(--text-muted); transition: all 0.2s;">OTHER</button>
+      <button class="sub-nav-link" onclick="showDataSubTab('S6')" id="data-btn-S6" style="padding: 0.5rem 1.2rem; border-radius: 8px; border:none; background:transparent; cursor:pointer; font-weight:500; font-size: 12px; color:var(--text-muted); transition: all 0.2s;">TILL SETUP</button>
+    </div>
+
+    <!-- Search Area -->
+    <div style="margin-bottom: 2rem; width: 100%; display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
+      <div class="field" style="flex: 2; min-width: 300px;">
+        <label style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px; display: block;">Keywords</label>
+        <input type="text" id="dataview-search" placeholder="Search in this category..." 
+               style="width: 100%; padding: 12px 16px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-main);"
+               oninput="renderDataTable()">
+      </div>
+      <div class="field" style="flex: 1; min-width: 150px;">
+        <label style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px; display: block;">Start Date</label>
+        <input type="date" id="dataview-start-date" 
+               style="width: 100%; padding: 12px 16px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-main);"
+               onchange="renderDataTable()">
+      </div>
+      <div class="field" style="flex: 1; min-width: 150px;">
+        <label style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px; display: block;">End Date</label>
+        <input type="date" id="dataview-end-date" 
+               style="width: 100%; padding: 12px 16px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-main);"
+               onchange="renderDataTable()">
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Ticket ID</th>
+            <th>Company</th>
+            <th>Type</th>
+            <th>Status</th>
+            <th>Amount</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="data-table-body">
+          <!-- Data injected via JS -->
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- CUSTOMERS SECTION -->
+  <section id="section-customers" class="section">
+    <div class="hero">
+      <h1>Customer Management</h1>
+      <p>Manage your client database and corporate information.</p>
+    </div>
+
+    <!-- Search Area -->
+    <div style="margin-bottom: 2rem; width: 100%;">
+      <div class="field" style="display: flex; gap: 10px; align-items: center;">
+        <input type="text" id="customer-search" placeholder="Search customer name, ID or postcode..." 
+               style="width: 100%; flex: 1; padding: 12px 16px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-main);"
+               oninput="renderCustomersTable()">
+        
+        <div style="display: flex; align-items: center; gap: 10px; background: var(--bg-card); padding: 8px 12px; border-radius: 12px; border: 1px solid var(--border-color);">
+          <label style="font-size: 13px; color: var(--text-muted); white-space: nowrap;">Show:</label>
+          <select id="customer-page-size" onchange="renderCustomersTable()" style="background: transparent; border: none; color: var(--text-main); font-weight: 600; cursor: pointer; outline: none;">
+            <option value="25">25</option>
+            <option value="50">50</option>
+            <option value="75">75</option>
+            <option value="100">100</option>
+            <option value="150">150</option>
+            <option value="all">ALL</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Date Added</th>
+            <th>Customer ID</th>
+            <th>Company Name</th>
+            <th>Postcode</th>
+            <th>Service Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="customers-table-body">
+          <tr>
+            <td colspan="6" style="text-align:center; padding: 2rem; color: var(--text-hint);">
+               Customers will be matched and rendered here.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- INVOICES SECTION -->
+  <section id="section-invoices" class="section">
+    <div class="hero">
+      <h1>Invoicing Module</h1>
+      <p>Manage pending, held, and completed billing records.</p>
+    </div>
+
+    <!-- Search / Filter Area -->
+    <div style="margin-bottom: 1.5rem; width: 100%;">
+      <div class="field">
+        <input type="text" id="invoice-search" placeholder="Search invoices (Company, SRV#, Postcode...)" 
+               style="width: 100%; padding: 12px 16px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-main);"
+               oninput="renderInvoicesTable()">
+      </div>
+    </div>
+
+    <!-- Sub-Tabs Navigation -->
+    <div class="sub-nav" style="display: flex; gap: 1rem; margin-bottom: 2rem; background: var(--bg-card); padding: 0.5rem; border-radius: 12px; border: 1px solid var(--border-color); width: fit-content;">
+      <button class="sub-nav-link active" onclick="showSubTab('pending')" id="sub-btn-pending" style="padding: 0.5rem 1.5rem; border-radius: 8px; border:none; background:transparent; cursor:pointer; font-weight:500; color:var(--text-muted); transition: all 0.2s;">
+        <span class="status-dot dot-red"></span> Pending (<span id="count-pending">0</span>)
+      </button>
+      <button class="sub-nav-link" onclick="showSubTab('hold')" id="sub-btn-hold" style="padding: 0.5rem 1.5rem; border-radius: 8px; border:none; background:transparent; cursor:pointer; font-weight:500; color:var(--text-muted); transition: all 0.2s;">
+        <span class="status-dot dot-orange"></span> Hold (<span id="count-hold">0</span>)
+      </button>
+      <button class="sub-nav-link" onclick="showSubTab('completed')" id="sub-btn-completed" style="padding: 0.5rem 1.5rem; border-radius: 8px; border:none; background:transparent; cursor:pointer; font-weight:500; color:var(--text-muted); transition: all 0.2s;">
+        <span class="status-dot dot-green"></span> Completed (<span id="count-completed">0</span>)
+      </button>
+      <button class="sub-nav-link" onclick="showSubTab('all')" id="sub-btn-all" style="padding: 0.5rem 1.5rem; border-radius: 8px; border:none; background:transparent; cursor:pointer; font-weight:500; color:var(--text-muted); transition: all 0.2s;">
+        <span class="status-dot" style="background:#64748b;"></span> ALL (<span id="count-all">0</span>)
+      </button>
+    </div>
+
+    <!-- Sub-Section: Pending -->
+    <div id="sub-section-pending" class="sub-section active">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Service Date</th>
+              <th>SRV Number</th>
+              <th>Company</th>
+              <th>Amount</th>
+              <th>Inv. Date/No</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="invoice-pending-table-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Sub-Section: Hold -->
+    <div id="sub-section-hold" class="sub-section" style="display:none;">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Service Date</th>
+              <th>SRV Number</th>
+              <th>Company</th>
+              <th>Amount</th>
+              <th>Note</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="invoice-hold-table-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Sub-Section: Completed -->
+    <div id="sub-section-completed" class="sub-section" style="display:none;">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Service Date</th>
+              <th>SRV Number</th>
+              <th>Company</th>
+              <th>Amount</th>
+              <th>Invoice Info</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="invoice-completed-table-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Sub-Section: ALL -->
+    <div id="sub-section-all" class="sub-section" style="display:none;">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Service Date</th>
+              <th>SRV Number</th>
+              <th>Company</th>
+              <th>Amount</th>
+              <th>Current Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="invoice-all-table-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- DETAILS MODAL -->
+<div id="details-modal" class="modal-overlay hidden">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2 id="modal-title">Record Details</h2>
+      <button class="close-btn" onclick="closeModal()">&times;</button>
+    </div>
+    <div class="modal-body" id="modal-details-content">
+      <!-- Dynamic Content -->
+    </div>
+    <div class="modal-footer" id="modal-footer">
+      <button class="btn" id="modal-edit-btn">Edit Record</button>
+      <button class="btn btn-primary" onclick="closeModal()" id="modal-close-btn">Close</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,32 +1,45 @@
-# TaskFlow Portal
+# TaskFlow Portal – Modern Management Dashboard
 
-A modern, high-performance service management dashboard built with HTML, Vanilla CSS, and JavaScript, powered by Supabase.
+Professional management portal for service tracking, CRM integration, and automated invoicing.
 
-## Features
-- **Dynamic Ticket Creation**: Step-by-step service category selection with realistic 3D icons.
-- **Smart Form Automation**: Automatic generation of Service Numbers and Dates with field locking.
-- **Supabase Integration**: Real-time data persistence and robust backend management.
-- **Service Categories**:
-  - Menu Updates
-  - Credit Card Setup
-  - Data Reset
-  - Hardware/Software Service
-  - Till Setup
-- **Responsive Design**: Premium dark/light themed UI with smooth animations.
+## 🚀 Overview
+TaskFlow is a high-performance, build-free administrative dashboard designed for service-oriented businesses. It integrates directly with **Supabase** for data persistence and provides a seamless workflow from ticket creation to invoicing.
 
-## Deployment on GitHub Pages
-This project is configured for easy deployment on GitHub Pages.
+## 🛠 Technology Stack
+- **Frontend**: Vanilla HTML5, CSS3 (Modern UI Tokens), JavaScript (ES6+)
+- **Database**: Supabase (PostgreSQL)
+- **Styling**: Custom Design System with Inter Font, CSS Variables, and Glassmorphism effects.
+- **Architecture**: Single Page Application (SPA) logic in `app.js`.
 
-1. Create a new repository on GitHub.
-2. Push the files in this directory to the repository.
-3. Go to **Settings > Pages**.
-4. Select the `main` branch and `/root` folder.
-5. Save and wait for the URL to be generated.
+## 📁 Key Files
+- `index.html`: Main application structure and UI components.
+- `app.js`: Core logic, state management, and Supabase integration.
+- `style.css`: Modern UI design system and component styling.
+- `vtiger_bridge.js`: Integration script for local CRM synchronization.
 
-## Technical Details
-- **Frontend**: HTML5, CSS3 (Vanilla), JavaScript (ES6+)
-- **Backend**: Supabase (PostgreSQL)
-- **Icons**: Custom 3D isometric assets in `/assets/icons/`
+## 🎨 Branding & Colors
+- **Primary Blue:** `#1b4376` (Used for logins, buttons, and accents)
+- **Secondary Orange:** `#d87617` (Used for main navigation bar)
+- **Logo:** `ika2.PNG`
+
+## Recent Modernization (May 2026)
+- **Compact UI:** Standardized dikey boşluklar ve daraltılmış navigasyon çubuğu.
+- **Brand Cleanup:** Üst menüden metinler kaldırıldı, sadece logo ve ikonlar (Settings hariç metin odaklı) bırakıldı.
+- **Remember Me:** Giriş ekranı oturum hatırlama mantığı ve role-based yetkilendirme akışı düzeltildi.
+- **Admin Tools:** Personnel ve Service Management panelleri genişletildi; şifre sıfırlama ve kategori/alt-hizmet ekleme özellikleri eklendi.
+- **Visual Consistency:** Tüm sayfa başlıkları ve açıklamaları standart font ve boyutlara (`28px` / `15px`) çekildi.
+
+## 💡 Key Features
+- **Dashboard**: Quick category-based ticket creation.
+- **Invoicing Module**: Dual-tab (Pending/Invoiced) tracking with full record editing.
+- **Data View**: Advanced filtering by category, date, and payment status with live revenue stats.
+- **Customer Directory**: Synchronized client list from Supabase with status tracking.
+- **Custom Alert System**: Premium centered modals replacing browser native dialogs.
+
+## 🛠 Installation & Usage
+1. No build step required.
+2. Open `index.html` in any modern browser.
+3. Ensure the Supabase credentials in `app.js` are correctly configured.
 
 ---
-*Created by Antigravity AI for TaskFlow Management.*
+*Created by Antigravity for TaskFlow.*

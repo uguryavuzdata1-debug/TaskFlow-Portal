@@ -1,0 +1,48 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Cormorant+Garamond:ital,wght@1,400;1,500;1,600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+  --font-serif: 'Cormorant Garamond', serif;
+
+  --color-dashboard-bg: #F1F3F4;
+  --color-dashboard-ink: #202124;
+  --color-dashboard-line: #DADCE0;
+  --color-dashboard-accent: #1967D2;
+  --color-dashboard-success: #1E8E3E;
+  --color-dashboard-warning: #F9AB00;
+  --color-dashboard-error: #D93025;
+}
+
+@layer base {
+  body {
+    @apply bg-dashboard-bg text-dashboard-ink font-sans antialiased;
+  }
+}
+
+@layer components {
+  .sidebar-link {
+    @apply flex items-center gap-3 px-6 py-3 text-sm font-medium transition-all duration-200 opacity-60 hover:opacity-100;
+  }
+  
+  .sidebar-link-active {
+    @apply bg-white text-dashboard-accent opacity-100 border-r-4 border-dashboard-accent;
+  }
+  
+  .sidebar-link:not(.sidebar-link-active):hover {
+    @apply bg-gray-200/50;
+  }
+
+  .grid-border {
+    @apply border-dashboard-line;
+  }
+
+  .data-cell {
+    @apply font-mono text-xs tracking-tight;
+  }
+
+  .status-badge {
+    @apply px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider;
+  }
+}

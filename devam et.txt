@@ -1,0 +1,29 @@
+app.js dosyasının çekirdek mantığını yeni tablo yapısına göre güncelledim. Artık veriler app_settings yerine users, services ve sub_services tablolarından çekiliyor.
+
+Önemli Not: initApp fonksiyonu artık bu yeni tablolardan veri bekliyor. Eğer SQL kodlarını henüz çalıştırmadıysanız uygulama hata verebilir.
+
+Şimdi app.js içindeki Yönetim (Admin) fonksiyonlarını (addPersonnel, addSubService, resetUserPassword vb.) yeni tablolara veri yazacak şekilde güncelliyorum. Bu sayede ayarlar panelinden yaptığınız değişiklikler doğrudan yeni tablolara yansıyacak.
+
+[MODIFY] 
+
+app.js
+ - Yönetim Fonksiyonları Güncellemesi...
+app.js dosyasındaki yönetim fonksiyonlarını yeni tablo yapısına göre güncelliyorum. Artık her bir işlem (personel ekleme, şifre sıfırlama, hizmet kategorisi oluşturma vb.) doğrudan ilgili Supabase tablosuna yazılacak.
+
+Yapılan Değişiklikler:
+Hesap Güncelleme: Artık users tablosundaki e-posta ve isim bilgilerini güncelliyor.
+Personel Yönetimi: Yeni personelleri users tablosuna ekliyor ve yetkilerini atıyor.
+Hizmet Yönetimi: Ana kategoriler services, alt hizmetler ise sub_services tablolarına kaydediliyor.
+Giriş Mantığı: ADMIN ADMIN girişi için geçici bir bypass ekledim (e-posta adresi admin@taskflow.com olarak eşleşecek şekilde).
+İşlemi tamamlıyorum.
+
+Loading.
+Pending messages
+
+https://uguryavuzdata1-debug.github.io/TaskFlow-Portal/
+Create New Ticket credi cart icin bu bolum kayip
+Create New Ticket
+tilol setupta
+https://uguryavuzdata1-debug.github.io/TaskFlow-Portal/
+resmini verdigim alan da kayip
+kaldigimiz yerden ve isteklerimi kaydet sonra yapariz

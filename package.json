@@ -1,5 +1,9 @@
 {
   "dependencies": {
-    "pg": "^8.20.0"
+    "@supabase/supabase-js": "^2.105.4",
+    "axios": "^1.16.0",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1"
   }
 }
