@@ -18,6 +18,7 @@ try {
             return Promise.resolve(mockResponse).then(onFullfilled); 
         }
     };
+    sbClient = mockQuery;
 }
 // --- Global Exports (Ensures UI availability even if initApp takes time) ---
 window.handleLogin = handleLogin;
@@ -395,7 +396,7 @@ function exportToCSV() {
     let data = appState.tickets;
     if (appState.currentDataTab !== 'all') data = data.filter(t => t.mainService === appState.currentDataTab);
     if (payment !== 'all') data = data.filter(t => t.paymentStatus === payment);
-    if (search) data = data.filter(t => t.company.toLowerCase().includes(search) || t.dbId.toLowerCase().includes(search));
+    if (search) data = data.filter(t => (t.company || '').toLowerCase().includes(search) || (t.dbId || '').toLowerCase().includes(search));
     if (start) data = data.filter(t => new Date(t.timestamp) >= new Date(start));
     if (end) { const dEnd = new Date(end); dEnd.setHours(23,59,59); data = data.filter(t => new Date(t.timestamp) <= dEnd); }
 
