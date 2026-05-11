@@ -141,12 +141,12 @@ async function initApp() {
     try {
         // 1. Fetch Users and Roles
         try {
-            const { data: userData } = await sbClient.from('users').select('*, roles(role_name, access_level)');
+            const { data: userData } = await sbClient.from('users').select('*, permissions(role_name, access_level)');
             if (userData) {
                 appState.settings.users_auth = {};
                 appState.settings.personnel = [];
                 userData.forEach(u => {
-                    const role = (u.roles && u.roles.role_name) || 'User';
+                    const role = (u.permissions && u.permissions.role_name) || 'User';
                     const name = u.full_name || u.email || 'UNKNOWN';
                     appState.settings.users_auth[u.email] = {
                         id: u.id,
@@ -612,25 +612,26 @@ async function handleLogin() {
     
     // Master bypass for ADMIN (Temporary until Auth is fully linked)
     if (user === 'ADMIN' && (pass === 'admin' || pass === '1234')) {
+        console.log("Master bypass triggered");
         appState.currentUser = 'ADMIN';
         appState.currentUserRole = 'Admin';
     } else {
-    const auth = appState.settings.users_auth || {};
-    let userData = auth[user] || auth[user.toLowerCase()];
+        const auth = appState.settings.users_auth || {};
+        let userData = auth[user] || auth[user.toLowerCase()] || Object.values(auth).find(u => u.email.toUpperCase() === user);
 
-    if (!userData) {
-        showToast('User not found.', 'error');
-        return;
-    }
+        if (!userData) {
+            console.error("User not found in auth list:", user);
+            showToast('User not found.', 'error');
+            return;
+        }
 
-    // Check password from database
-    if (pass !== userData.password) {
-        showToast('Invalid password.', 'error');
-        return;
-    }
-    
-    appState.currentUser = userData.email;
-    appState.currentUserRole = userData.role;
+        if (pass !== userData.password) {
+            showToast('Invalid password.', 'error');
+            return;
+        }
+        
+        appState.currentUser = userData.email;
+        appState.currentUserRole = userData.role;
     }
 
     if (appState.currentUser) {
