@@ -141,14 +141,19 @@ async function initApp() {
     try {
         // 1. Fetch Users and Roles
         try {
-            const { data: userData } = await sbClient.from('users').select('*, permissions(role_name, access_level)');
+            const { data: userData } = await sbClient.from('users').select('*, roles(role_name, access_level)');
             if (userData) {
                 appState.settings.users_auth = {};
                 appState.settings.personnel = [];
                 userData.forEach(u => {
-                    const role = (u.permissions && u.permissions.role_name) || 'User';
-                    const name = u.full_name || u.email.split('@')[0].toUpperCase();
-                    appState.settings.users_auth[name] = { email: u.email, role: role, id: u.id };
+                    const role = (u.roles && u.roles.role_name) || 'User';
+                    const name = u.full_name || u.email || 'UNKNOWN';
+                    appState.settings.users_auth[u.email] = {
+                        id: u.id,
+                        email: u.email,
+                        password: u.password,
+                        role: role
+                    };
                     appState.settings.personnel.push(name);
                 });
             }
@@ -610,22 +615,22 @@ async function handleLogin() {
         appState.currentUser = 'ADMIN';
         appState.currentUserRole = 'Admin';
     } else {
-        const auth = appState.settings.users_auth || {};
-        let userData = auth[user];
+    const auth = appState.settings.users_auth || {};
+    let userData = auth[user] || auth[user.toLowerCase()];
 
-        if (!userData) {
-            showToast('User not found.', 'error');
-            return;
-        }
+    if (!userData) {
+        showToast('User not found.', 'error');
+        return;
+    }
 
-        // Basic check - In production use Supabase Auth
-        if (pass !== '1234') { // Default password for now
-            showToast('Invalid password.', 'error');
-            return;
-        }
-        
-        appState.currentUser = user;
-        appState.currentUserRole = userData.role;
+    // Check password from database
+    if (pass !== userData.password) {
+        showToast('Invalid password.', 'error');
+        return;
+    }
+    
+    appState.currentUser = userData.email;
+    appState.currentUserRole = userData.role;
     }
 
     if (appState.currentUser) {
