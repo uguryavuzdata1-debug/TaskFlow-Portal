@@ -28,31 +28,23 @@ let appState = {
 
 let sbClient;
 try {
-    if (typeof supabase === 'undefined') {
-        throw new Error("Supabase library not loaded. Check your internet or CDN link.");
-    }
     sbClient = supabase.createClient(SB_URL, SB_KEY);
-    console.log("[INIT] Supabase connection established.");
 } catch (e) {
     console.error("Supabase could not be initialized. Using offline mode.", e);
-    showToast("Supabase bağlantısı kurulamadı! Çevrimdışı modda çalışılıyor.", "error");
     // Robust Mock sbClient to prevent chain-call crashes
     const mockResponse = { data: [], error: null };
     const mockQuery = {
-        from: function() { return this; },
         select: function() { return this; },
         update: function() { return this; },
         upsert: function() { return this; },
         order: function() { return this; },
         eq: function() { return this; },
-        single: function() { return this; },
         then: function(onFullfilled) { 
             return Promise.resolve(mockResponse).then(onFullfilled); 
         }
     };
     sbClient = mockQuery;
 }
-
 // --- Global Exports (Ensures UI availability even if initApp takes time) ---
 window.handleLogin = handleLogin;
 window.logout = logout;
@@ -104,7 +96,14 @@ window.editCardCompany = editCardCompany;
 window.deleteCardCompany = deleteCardCompany;
 window.editOS = editOS;
 window.editCCLocal = editCCLocal;
-
+window.renderCPUManagement = renderCPUManagement;
+window.addCPU = addCPU;
+window.editCPU = editCPU;
+window.deleteCPU = deleteCPU;
+window.renderTillModelManagement = renderTillModelManagement;
+window.addTillModel = addTillModel;
+window.editTillModel = editTillModel;
+window.deleteTillModel = deleteTillModel;
 
 // --- App State Initialized Above ---
 
@@ -209,42 +208,19 @@ async function initApp() {
             }
         } catch (e) { console.error("Error fetching records:", e); }
 
-        // 5. Fetch Vtiger CRM Organizations & Service Contracts
+        // 5. Fetch Vtiger CRM Organizations (Using flexible column names)
         try {
-            console.log("[INIT] Fetching customers from Supabase (Limit 5000)...");
-            const { data: orgData, error: orgError } = await sbClient.from('VtigerCRM_Organizations').select('*').limit(5000);
-            const { data: scData, error: scError } = await sbClient.from('VtigerCRM_ServiceContracts').select('*').limit(5000);
-
-            
-            if (orgError) {
-                console.error("[INIT] Organizations Error:", orgError);
-                throw orgError;
-            }
-            
-            const contractMap = {};
-            if (scData) {
-                console.log(`[INIT] Loaded ${scData.length} service contracts.`);
-                scData.forEach(sc => {
-                    if (sc.organization_id) contractMap[sc.organization_id] = sc.status;
-                });
-            }
-
-            if (orgData) {
-                appState.customers = orgData.map(c => ({
-                    'CUSTOMER ID': c.organization_number || c.id || '',
-                    'COMPANY': c.organization_name || '',
-                    'POSTCODE': c.billing_postal_code || '',
-                    'SERVICE STATUS': (contractMap[c.id] === 'In Progress' || contractMap[c.id] === 'Active') ? 'Contract' : 'No Contract'
+            const { data: cData, error: cError } = await sbClient.from('VtigerCRM_Organizations').select('*');
+            if (cError) throw cError;
+            if (cData) {
+                appState.customers = cData.map(c => ({
+                    'CUSTOMER ID': c.company_id || c.Organization_ID || c.id || '',
+                    'COMPANY': c.company_name || c.Company_Name || c.company || '',
+                    'POSTCODE': c.postcode || c.Postcode || '',
+                    'SERVICE STATUS': c.status || c.Status || 'No Contract'
                 }));
-                console.log(`[INIT] Successfully loaded ${appState.customers.length} customers.`);
-            } else {
-                console.warn("[INIT] No organization data returned.");
             }
-        } catch (e) { 
-            console.error("Error fetching customers from Supabase:", e);
-            showToast("Müşteri verileri yüklenemedi. Lütfen konsolu kontrol edin.", "error");
-        }
-
+        } catch (e) { console.error("Error fetching customers:", e); }
 
         // 6. Fetch App Settings
         try {
@@ -330,14 +306,20 @@ function showDataSubTab(tabId) {
 
 function showSettingsSubTab(tabId) {
     document.querySelectorAll('.settings-pane').forEach(p => p.classList.add('hidden'));
-    document.querySelectorAll('.sidebar-link').forEach(btn => {
+    document.querySelectorAll('#section-settings .sub-nav-link').forEach(btn => {
         btn.classList.remove('active');
+        btn.style.background = 'transparent';
+        btn.style.color = '#64748b';
+        btn.style.boxShadow = 'none';
     });
     const pane = document.getElementById(`set-pane-${tabId}`);
     if (pane) pane.classList.remove('hidden');
     const btn = document.getElementById(`set-btn-${tabId}`);
     if (btn) {
         btn.classList.add('active');
+        btn.style.background = 'white';
+        btn.style.color = 'var(--primary)';
+        btn.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.1)';
     }
 
     if (tabId === 'stats') updateDataStats(); // Refresh stats when opening stats pane
@@ -374,7 +356,7 @@ function renderDataTable() {
     updateDataStats(filtered);
 
     tbody.innerHTML = filtered.map(t => `
-        <tr style="border-bottom: 1px solid var(--border-color);">
+        <tr>
             <td>${new Date(t.timestamp).toLocaleDateString()}</td>
             <td><strong style="color:var(--primary)">${t.dbId}</strong></td>
             <td title="${t.postcode}"><strong>${t.company}</strong></td>
@@ -383,8 +365,8 @@ function renderDataTable() {
             <td><strong>£${parseFloat(t.price).toFixed(2)}</strong></td>
             <td style="text-align: right;">
                 <div style="display: flex; gap: 10px; justify-content: flex-end;">
-                    <button class="btn-icon" onclick="showDetails('${t.id}')" title="View Details" style="background:none; border:none; cursor:pointer; font-size:1.1rem; color:#1b4376;">👁️</button>
-                    <button class="btn-icon" onclick="editInvoice('${t.id}')" title="Edit Record" style="background:none; border:none; cursor:pointer; font-size:1.1rem; color:#1b4376;">✎</button>
+                    <button class="btn-icon" onclick="showDetails('${t.id}')" title="View Details" style="background:none; border:none; cursor:pointer; font-size:1.1rem; color:#94a3b8;">👁️</button>
+                    <button class="btn-icon" onclick="editInvoice('${t.id}')" title="Edit Record" style="background:none; border:none; cursor:pointer; font-size:1.1rem; color:#94a3b8;">✎</button>
                 </div>
             </td>
         </tr>
@@ -484,27 +466,17 @@ function renderCustomersTable() {
 
     if (search) filtered = filtered.filter(c => (c['COMPANY'] || '').toLowerCase().includes(search) || (c['CUSTOMER ID'] || '').toLowerCase().includes(search));
     
-    // Apply display limit
-    const limitVal = document.getElementById('customer-limit-filter')?.value || '100';
-    const totalFiltered = filtered.length;
-    if (limitVal !== 'all') {
-        const limit = parseInt(limitVal);
-        filtered = filtered.slice(0, limit);
-    }
-
     // Update stats
     const statCount = document.getElementById('stat-customers-count');
-    if (statCount) statCount.innerText = limitVal === 'all' ? totalFiltered : `${filtered.length} / ${totalFiltered}`;
-
+    if (statCount) statCount.innerText = filtered.length;
 
     tbody.innerHTML = filtered.map(c => `
-        <tr style="border-bottom: 1px solid var(--border-color);">
-            <td style="padding: 16px 20px;"><strong style="color:var(--primary)">${c['CUSTOMER ID'] || 'N/A'}</strong></td>
+        <tr>
+            <td style="padding: 16px 20px;"><strong>${c['CUSTOMER ID'] || 'N/A'}</strong></td>
             <td style="padding: 16px 20px;"><strong>${c['COMPANY'] || 'N/A'}</strong></td>
             <td style="padding: 16px 20px;">${c['POSTCODE'] || '0'}</td>
-            <td style="padding: 16px 20px;"><span class="badge ${c['SERVICE STATUS'] === 'Contract' ? 'badge-success' : 'badge-warning'}" style="${c['SERVICE STATUS'] === 'Contract' ? 'background:#10b981; color:white;' : ''}">${c['SERVICE STATUS'] || 'No Contract'}</span></td>
-
-            <td style="padding: 16px 20px; text-align: right;"><button class="btn" style="background:#f1f5f9; color:#1b4376; border:none; font-weight:700;" onclick="filterByCustomer('${c['COMPANY']}')">History</button></td>
+            <td style="padding: 16px 20px;"><span class="badge ${c['SERVICE STATUS'] === 'Contract' ? 'badge-success' : 'badge-warning'}">${c['SERVICE STATUS'] || 'No Contract'}</span></td>
+            <td style="padding: 16px 20px; text-align: right;"><button class="btn" onclick="filterByCustomer('${c['COMPANY']}')">History</button></td>
         </tr>
     `).join('');
 }
@@ -670,14 +642,6 @@ async function handleLogin() {
 
     if (appState.currentUser) {
         try {
-            // Handle "Remember Me"
-            const rememberMe = document.getElementById('login-remember').checked;
-            if (rememberMe) {
-                localStorage.setItem('taskflow_user', appState.currentUser);
-            } else {
-                localStorage.removeItem('taskflow_user');
-            }
-
             document.body.classList.remove('is-logged-out');
             const ls = document.getElementById('login-screen');
             if (ls) ls.classList.add('hidden');
@@ -935,15 +899,7 @@ function logout() {
     setTimeout(() => window.location.reload(), 1000);
 }
 
-function selectCategory(cat) { 
-    resetForm(); 
-    const el = document.getElementById('f-service-type');
-    el.value = cat; 
-    el.disabled = true; // Lock the category when coming from a tile
-    updateDynamicFields(); 
-    toggleMainForm('form'); 
-}
-
+function selectCategory(cat) { resetForm(); document.getElementById('f-service-type').value = cat; updateDynamicFields(); toggleMainForm('form'); }
 function toggleMainForm(s) { ['dashboard-home', 'dashboard-category-selection', 'dashboard-form-container'].forEach(v => { const el = document.getElementById(v); if (el) el.style.display = 'none'; }); if (s === 'category') document.getElementById('dashboard-category-selection').style.display = 'block'; else if (s === 'form') document.getElementById('dashboard-form-container').style.display = 'block'; else document.getElementById('dashboard-home').style.display = 'block'; }
 function updateDynamicFields() {
     const main = document.getElementById('f-service-type').value;
@@ -1064,50 +1020,17 @@ function autoFillCustomerInfo() {
     const company = companyInput.value;
     const customer = (appState.customers || []).find(c => (c.COMPANY || '') === company);
     if (customer) {
-        const statusEl = document.getElementById('f-status');
-        const paymentEl = document.getElementById('f-payment-status');
-        const statusVal = customer['SERVICE STATUS'] || 'No Contract';
-        
         document.getElementById('f-company-id').value = customer['CUSTOMER ID'] || '';
         document.getElementById('f-postcode').value = customer['POSTCODE'] || '';
-        statusEl.value = statusVal;
+        document.getElementById('f-status').value = customer['SERVICE STATUS'] || 'No Contract';
         
-        // Apply green color if Contract
-        if (statusVal === 'Contract') {
-            statusEl.style.setProperty('background', '#10b981', 'important');
-            statusEl.style.setProperty('color', 'white', 'important');
-            statusEl.style.fontWeight = '800';
-            
-            paymentEl.value = 'Contract';
-            paymentEl.style.setProperty('background', '#10b981', 'important');
-            paymentEl.style.setProperty('color', 'white', 'important');
-            paymentEl.style.fontWeight = '800';
+        if (customer['SERVICE STATUS'] === 'Contract') {
+            document.getElementById('f-payment-status').value = 'Contract';
         } else {
-            statusEl.style.setProperty('background', '#f8fafc', 'important');
-            statusEl.style.setProperty('color', '#111827', 'important');
-            statusEl.style.fontWeight = '500';
-            
-            paymentEl.value = 'Chargeable';
-            paymentEl.style.setProperty('background', '#f8fafc', 'important');
-            paymentEl.style.setProperty('color', '#111827', 'important');
-            paymentEl.style.fontWeight = '500';
+            document.getElementById('f-payment-status').value = 'Chargeable';
         }
-
-    }
-}function updatePaymentStyle(el) {
-    if (el.value === 'Contract') {
-        el.style.setProperty('background', '#10b981', 'important');
-        el.style.setProperty('color', 'white', 'important');
-        el.style.fontWeight = '800';
-    } else {
-        el.style.setProperty('background', '#f8fafc', 'important');
-        el.style.setProperty('color', '#111827', 'important');
-        el.style.fontWeight = '500';
     }
 }
-
-window.updatePaymentStyle = updatePaymentStyle;
-
 
 function resetForm() {
     const form = document.getElementById('master-form'); if (form) form.reset();
@@ -1116,32 +1039,14 @@ function resetForm() {
     document.getElementById('f-invoice-no').value = `SRV-${nextId}`;
     document.getElementById('f-timestamp').value = new Date().toLocaleString(); 
     document.getElementById('f-invoice-date').value = new Date().toISOString().split('T')[0];
-    
-    const statusEl = document.getElementById('f-status');
-    statusEl.value = ''; 
-    statusEl.style.setProperty('background', '#f8fafc', 'important');
-    statusEl.style.setProperty('color', '#111827', 'important');
-    statusEl.style.fontWeight = '500';
-    
-    const paymentEl = document.getElementById('f-payment-status');
-    paymentEl.value = 'Chargeable';
-    paymentEl.style.setProperty('background', '#f8fafc', 'important');
-    paymentEl.style.setProperty('color', '#111827', 'important');
-    paymentEl.style.fontWeight = '500';
-
+    document.getElementById('f-status').value = ''; // Clear status field
     
     // Auto-fill logged in user and disable
-
-
     document.getElementById('f-user').innerHTML = `<option value="${appState.currentUser}">${appState.currentUser}</option>`;
     document.getElementById('f-user').disabled = true;
     
-    // Enable category field (it might be locked by selectCategory)
-    document.getElementById('f-service-type').disabled = false;
-    
     updateDynamicFields();
 }
-
 document.getElementById('master-form').addEventListener('submit', async (e) => {
     e.preventDefault(); const btn = e.target.querySelector('button[type="submit"]'); btn.innerText = 'Saving...'; btn.disabled = true;
     let description = document.getElementById('f-desc').value;
@@ -1394,7 +1299,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('main-content').classList.remove('hidden');
         
         // Re-apply role-based UI restrictions
-        document.querySelectorAll('.sidebar-link').forEach(btn => {
+        document.querySelectorAll('.sub-nav-link').forEach(btn => {
             if (btn.id.startsWith('set-btn-') && btn.id !== 'set-btn-account') {
                 btn.style.display = (appState.currentUserRole === 'Admin') ? 'flex' : 'none';
             }
