@@ -8,6 +8,15 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Serve frontend static files
+const path = require('path');
+app.use(express.static(path.join(__dirname)));
+
+// Catch-all: serve index.html for any non-API route
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+
 // Configuration from .env
 const VTIGER_URL = process.env.VTIGER_URL || 'http://192.168.1.129/vtigercrm/webservice.php';
 const USERNAME = process.env.VTIGER_USER || 'ugur';
