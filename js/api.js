@@ -1,3 +1,24 @@
+// --- DESCRIPTION METADATA SERIALIZER ---
+function parseMetadata(desc) {
+    if (!desc) return { metadata: {}, details: '' };
+    const match = desc.match(/^\[METADATA: ({.*?})\]\n([\s\S]*)$/);
+    if (match) {
+        try {
+            return {
+                metadata: JSON.parse(match[1]),
+                details: match[2]
+            };
+        } catch(e) {}
+    }
+    return {
+        metadata: {},
+        details: desc
+    };
+}
+function serializeMetadata(metadata, details) {
+    return `[METADATA: ${JSON.stringify(metadata)}]\n${details}`;
+}
+
 // --- Initialization ---
 async function initApp() {
     try {
@@ -11,17 +32,28 @@ async function initApp() {
                 appState.settings.personnel = [];
                 userData.forEach(u => {
                     const roleObj = roleData ? roleData.find(r => r.id === u.role_id) : null;
-                    const role = roleObj ? roleObj.role_name : 'User';
-                    const name = u.full_name || u.email || 'UNKNOWN';
-                    appState.settings.users_auth[u.email] = {
+                    const role = roleObj ? roleObj.role_name : (u.role || 'User');
+                    const name = u.full_name || u.username || 'UNKNOWN';
+                    const username = u.username || (u.full_name ? u.full_name.toLowerCase().replace(/\s+/g, '') : u.id);
+                    const userObj = {
                         id: u.id,
-                        email: u.email,
-                        password: u.password,
+                        username: username,
+                        password: u.password || '1234',
                         role: role,
                         role_id: u.role_id,
                         full_name: u.full_name || name
                     };
-                    appState.settings.personnel.push(name);
+                    appState.settings.users_auth[username] = userObj;
+                    appState.settings.users_auth[username.toLowerCase()] = userObj;
+                    appState.settings.users_auth[name] = userObj;
+                    appState.settings.users_auth[name.toLowerCase()] = userObj;
+                    if (u.email) {
+                        appState.settings.users_auth[u.email] = userObj;
+                        appState.settings.users_auth[u.email.toLowerCase()] = userObj;
+                    }
+                    if (appState.settings.personnel.indexOf(name) === -1) {
+                        appState.settings.personnel.push(name);
+                    }
                 });
             }
         } catch (e) { console.error("Error fetching users/roles:", e); }
@@ -29,9 +61,10 @@ async function initApp() {
         // 2. Fetch Services and Pricing
         try {
             const { data: srvData } = await sbClient.from('services').select('*');
-            appState.settings.services = LOCAL_SERVICES;
+            appState.settings.services = [];
             appState.settings.pricing = {};
             if (srvData && srvData.length > 0) {
+                appState.settings.services = srvData;
                 srvData.forEach(s => {
                     const bp = parseFloat(s.base_price);
                     if (!isNaN(bp)) {
@@ -44,27 +77,16 @@ async function initApp() {
                     }
                 });
             } else {
-                console.warn("[INIT] Services table is empty/missing, using local default pricing.");
-                LOCAL_SERVICES.forEach(s => {
-                    appState.settings.pricing[s.name] = s.name === 'S1' ? 125.00 : (s.name === 'S2' ? 125.00 : (s.name === 'S3' ? 125.00 : (s.name === 'S4' ? 65.00 : 0.00)));
-                    if (s.name === 'S1') {
-                        appState.settings.pricing.S1_Base = 125.00;
-                        appState.settings.pricing.S1_Hourly = 25.00;
-                    }
-                });
+                console.warn("[INIT] Services table is empty/missing, no default services loaded.");
             }
         } catch (e) { 
-            console.error("Error fetching services, using default pricing:", e); 
-            appState.settings.services = LOCAL_SERVICES;
+            console.error("Error fetching services:", e); 
+            appState.settings.services = [];
             appState.settings.pricing = {};
-            LOCAL_SERVICES.forEach(s => {
-                appState.settings.pricing[s.name] = s.name === 'S1' ? 125.00 : (s.name === 'S2' ? 125.00 : (s.name === 'S3' ? 125.00 : (s.name === 'S4' ? 65.00 : 0.00)));
-                if (s.name === 'S1') {
-                    appState.settings.pricing.S1_Base = 125.00;
-                    appState.settings.pricing.S1_Hourly = 25.00;
-                }
-            });
         }
+
+        // 3. Set Static Sub-Services (If needed, fetch from DB. For now keeping empty or leaving as is if not in DB. Assuming we don't want local fallback here if they meant strictly db).
+        appState.settings.sub_services = typeof LOCAL_SUB_SERVICES !== 'undefined' ? LOCAL_SUB_SERVICES : {};
 
         // 3. Set Static Sub-Services
         appState.settings.sub_services = LOCAL_SUB_SERVICES;
@@ -73,44 +95,159 @@ async function initApp() {
         try {
             const { data: recData } = await sbClient.from('records').select('*');
             if (recData && recData.length > 0) {
-                appState.tickets = recData.map(r => ({
-                    id: r.id, 
-                    dbId: (r.ID || r.db_id || r.id || 'N/A').toString().split('-')[0].substring(0, 5).toUpperCase(), 
-                    crmTicket: r['CRM TICKET'] || r.crm_ticket || 'N/A', 
-                    timestamp: r.TIMESTAMP || r.timestamp || r['INV DATE'] || r.created_at || new Date().toISOString(),
-                    company: r.COMPANY || r.company_name, 
-                    companyId: r.COMPANY_ID || r.company_id, 
-                    postcode: r.POSTCODE || r.postcode,
-                    user: r.USER || r.staff_user, 
-                    mainService: r['MAIN SERVICE'] || r.service_type, 
-                    subService: r['SUB SERVICE'] || r.sub_service || '',
-                    startTime: r['START TIME'] || r.start_time, 
-                    endTime: r['END TIME'] || r.end_time, 
-                    duration: r.DURATION || r.duration,
-                    price: r.PRICE || r.price, 
-                    paymentStatus: r['PAYMENT STATUS'] || r.payment_status, 
-                    description: r.DESCRIPTION || r.description,
-                    status: r.STATUS || r.status, 
-                    invoiced: r.invoiced === true || !!(r['INV NO'] && r['INV NO'].trim()) || !!(r.invoice_no && r.invoice_no.trim()), 
-                    invoiceDate: r['INV DATE'] || r.invoice_date, 
-                    invoiceNo: r['INV NO'] || r.invoice_no
-                }));
+                appState.tickets = recData.map(r => {
+                    const parsed = parseMetadata(r.DESCRIPTION || r.description || '');
+                    const priceVal = parseFloat(r.PRICE || r.price || 0);
+                    return {
+                        id: r.id, 
+                        dbId: (r.ID || r.db_id || r.id || 'N/A').toString().split('-')[0].substring(0, 5).toUpperCase(), 
+                        crmTicket: r['CRM TICKET'] || r.crm_ticket || 'N/A', 
+                        timestamp: r.TIMESTAMP || r.timestamp || r['INV DATE'] || r.created_at || new Date().toISOString(),
+                        company: r.COMPANY || r.company_name, 
+                        companyId: r.COMPANY_ID || r.company_id, 
+                        postcode: r.POSTCODE || r.postcode,
+                        user: r.USER || r.staff_user, 
+                        mainService: r['MAIN SERVICE'] || r.service_type, 
+                        subService: r['SUB SERVICE'] || r.sub_service || '',
+                        startTime: r['START TIME'] || r.start_time, 
+                        endTime: r['END TIME'] || r.end_time, 
+                        duration: r.DURATION || r.duration,
+                        price: priceVal, 
+                        paymentStatus: r['PAYMENT STATUS'] || r.payment_status, 
+                        description: parsed.details, 
+                        rawDescription: r.DESCRIPTION || r.description || '',
+                        status: r.STATUS || r.status, 
+                        invoiced: r.invoiced === true || (r.STATUS !== 'Pending' && r.STATUS !== 'Logged'), 
+                        invoiceDate: r['INV DATE'] || r.invoice_date, 
+                        invoiceNo: r['INV NO'] || r.invoice_no,
+                        vat: parsed.metadata.vat !== undefined ? parsed.metadata.vat : (priceVal * 0.20),
+                        invoiceNotes: parsed.metadata.invoiceNotes || '',
+                        estimatedPrice: parsed.metadata.estimatedPrice || 0,
+                        department: parsed.metadata.department || ''
+                    };
+                });
             }
         } catch (e) { console.error("Error fetching records:", e); }
 
+        // 4b. Fetch Dedicated Turso Tickets (Paginated)
+        try {
+            let tckData = [];
+            let lastSize = 1000;
+            let offset = 0;
+            while (lastSize === 1000) {
+                const { data, error } = await sbClient.from('vt_tickets').select('*').range(offset, offset + 999);
+                if (error) break;
+                if (data && data.length > 0) {
+                    tckData = tckData.concat(data);
+                    lastSize = data.length;
+                    offset += 1000;
+                } else {
+                    break;
+                }
+            }
+            if (tckData.length > 0) {
+                const mappedTursoTickets = tckData.map(t => ({
+                    id: t.id,
+                    dbId: String(t.id).slice(-5),
+                    crmTicket: t.ticket_no || t.id,
+                    timestamp: t.createdtime || new Date().toISOString(),
+                    company: t.company || t.customer_name || '',
+                    companyId: t.parent_id || '',
+                    user: t.assigned_user_id || '',
+                    mainService: t.ticket_title || 'General Support',
+                    subService: '',
+                    status: 'Completed', // vt_tickets are always considered completed here
+                    price: 0,
+                    description: t.description || '',
+                    rawDescription: t.description || '',
+                    solution: t.solution || '',
+                    invoiced: true // So it hides from pending appointments/invoices queues if needed
+                }));
+                appState.tickets = (appState.tickets || []).concat(mappedTursoTickets);
+                appState.tursoTickets = mappedTursoTickets;
+            }
+        } catch(e) { console.warn("[INIT] Turso tickets fetch error:", e); }
+
+        // 4c. Fetch Dedicated Turso Quotes (Paginated)
+        try {
+            let quoData = [];
+            let lastSize = 1000;
+            let offset = 0;
+            while (lastSize === 1000) {
+                const { data, error } = await sbClient.from('vt_quotes').select('*').range(offset, offset + 999);
+                if (error) break;
+                if (data && data.length > 0) {
+                    quoData = quoData.concat(data);
+                    lastSize = data.length;
+                    offset += 1000;
+                } else {
+                    break;
+                }
+            }
+            if (quoData.length > 0) {
+                appState.quotes = quoData.map(q => ({
+                    id: q.id,
+                    quote_no: q.quote_no || q.id,
+                    subject: q.subject || 'Equipment & Service Quotation',
+                    quotestage: q.quotestage || 'Draft',
+                    validtill: q.validtill || '',
+                    createdtime: q.createdtime || '',
+                    hdnGrandTotal: parseFloat(q.hdnGrandTotal) || 0,
+                    total: parseFloat(q.hdnGrandTotal) || 0,
+                    details: q.details || '',
+                    company: q.customer_name || '',
+                    account_id: q.account_id || '',
+                    assigned_to: q.assigned_user_id || ''
+                }));
+            }
+        } catch(e) { console.warn("[INIT] Turso quotes fetch error:", e); }
+
         // 5. Fetch Vtiger CRM Organizations & Service Contracts
         try {
-            console.log("[INIT] Fetching customers from Supabase (Paginating)...");
+            console.log("[INIT] Fetching customers from Turso DB...");
             
-            let orgData = [];
+            // --- Fallback chain: try multiple table/view names ---
+            const TABLE_CANDIDATES = ['vt_customers', 'Organizations', 'VtigerCRM_Organizations', 'customers'];
+            let orgData = null;
+            let usedTable = '';
+
+            for (const tableName of TABLE_CANDIDATES) {
+                try {
+                    console.log(`[INIT] Trying table: "${tableName}"...`);
+                    const { data, error } = await sbClient.from(tableName)
+                        .select('*')
+                        .limit(1);
+                    
+                    if (error) {
+                        console.warn(`[INIT] Table "${tableName}" returned error:`, error.message, error.code);
+                        continue;
+                    }
+                    if (data !== null) {
+                        console.log(`[INIT] ✓ Table "${tableName}" is accessible (probe returned ${data.length} rows).`);
+                        usedTable = tableName;
+                        break;
+                    }
+                } catch (probeErr) {
+                    console.warn(`[INIT] Table "${tableName}" probe failed:`, probeErr.message);
+                }
+            }
+
+            if (!usedTable) {
+                console.error("[INIT] ✗ No accessible customer table found. Tried:", TABLE_CANDIDATES.join(', '));
+                showToast("Customer table not accessible in Turso DB.", "error");
+                throw new Error("No accessible customer table found.");
+            }
+
+            // --- Paginated fetch from the working table ---
+            orgData = [];
             let lastOrgSize = 1000;
             let orgOffset = 0;
             while (lastOrgSize === 1000) {
-                const { data, error } = await sbClient.from('VtigerCRM_Organizations')
+                const { data, error } = await sbClient.from(usedTable)
                     .select('*')
                     .range(orgOffset, orgOffset + 999);
                 if (error) {
-                    console.error("[INIT] Organizations Error:", error);
+                    console.error(`[INIT] ${usedTable} pagination error at offset ${orgOffset}:`, error);
                     throw error;
                 }
                 if (data && data.length > 0) {
@@ -121,51 +258,100 @@ async function initApp() {
                     break;
                 }
             }
+            console.log(`[INIT] Fetched ${orgData.length} organizations from "${usedTable}".`);
 
+            // --- Fetch service contracts for status mapping ---
             let scData = [];
-            let lastScSize = 1000;
-            let scOffset = 0;
-            while (lastScSize === 1000) {
-                const { data, error } = await sbClient.from('VtigerCRM_ServiceContracts')
-                    .select('*')
-                    .range(scOffset, scOffset + 999);
-                if (error) {
-                    console.error("[INIT] Contracts Error:", error);
-                    throw error;
+            try {
+                let lastScSize = 1000;
+                let scOffset = 0;
+                while (lastScSize === 1000) {
+                    const { data, error } = await sbClient.from('service_contracts')
+                        .select('*')
+                        .range(scOffset, scOffset + 999);
+                    if (error) {
+                        console.warn("[INIT] service_contracts error:", error.message);
+                        break;
+                    }
+                    if (data && data.length > 0) {
+                        scData = scData.concat(data);
+                        lastScSize = data.length;
+                        scOffset += 1000;
+                    } else {
+                        break;
+                    }
                 }
-                if (data && data.length > 0) {
-                    scData = scData.concat(data);
-                    lastScSize = data.length;
-                    scOffset += 1000;
-                } else {
-                    break;
-                }
+            } catch(scErr) {
+                console.warn("[INIT] Could not fetch service_contracts:", scErr.message);
             }
             
             const contractMap = {};
-            if (scData) {
+            if (scData.length > 0) {
                 console.log(`[INIT] Loaded ${scData.length} service contracts.`);
                 scData.forEach(sc => {
                     if (sc.organization_id) contractMap[sc.organization_id] = sc.status;
                 });
             }
 
-            if (orgData) {
-                appState.customers = orgData.map(c => ({
-                    'CUSTOMER ID': c.organization_number || c.id || '',
-                    'COMPANY': c.organization_name || '',
-                    'POSTCODE': c.billing_postal_code || '',
-                    'ADDRESS': c.billing_address || '',
-                    'CITY': c.billing_city || '',
-                    'SERVICE STATUS': (contractMap[c.id] === 'In Progress' || contractMap[c.id] === 'Active') ? 'Contract' : 'No Contract'
-                }));
-                console.log(`[INIT] Successfully loaded ${appState.customers.length} customers.`);
+            // --- Map org data to appState.customers ---
+            if (orgData.length > 0) {
+                // Detect column naming style (Vtiger view vs simple table)
+                const sample = orgData[0];
+                const hasVtigerColumns = 'organization_name' in sample;
+                
+                if (hasVtigerColumns) {
+                    appState.customers = orgData.map(c => ({
+                        'CUSTOMER ID': c.organization_number || c.id || '',
+                        'DB_ID': c.id || '',
+                        'COMPANY': c.organization_name || '',
+                        'ADDRESS': c.billing_address || '',
+                        'CITY': c.billing_city || '',
+                        'POSTCODE': c.billing_postal_code || '',
+                        'PHONE': c.primary_phone || c.phone || '',
+                        'PRIMARY PHONE': c.primary_phone || c.phone || '',
+                        'CONTACT': c.contact_name || '',
+                        'PRIMARY CONTACT': c.contact_name || '',
+                        'OWNERSHIP': c.ownership || '',
+                        'SERVICE STATUS': (contractMap[c.id] === 'In Progress' || contractMap[c.id] === 'Active') ? 'Contract' : 'No Contract'
+                    }));
+                } else {
+                    // Fallback: direct column mapping for a simpler 'customers' table
+                    appState.customers = orgData.map(c => ({
+                        'CUSTOMER ID': c.customer_id || c.id || '',
+                        'DB_ID': c.id || '',
+                        'COMPANY': c.company || c.company_name || c.name || '',
+                        'ADDRESS': c.address || '',
+                        'CITY': c.city || '',
+                        'POSTCODE': c.postcode || c.postal_code || '',
+                        'PHONE': c.phone || '',
+                        'PRIMARY PHONE': c.phone || '',
+                        'CONTACT': c.contact || c.contact_name || '',
+                        'PRIMARY CONTACT': c.contact || c.contact_name || '',
+                        'OWNERSHIP': c.ownership || '',
+                        'SERVICE STATUS': c.status || c.service_status || 'No Contract'
+                    }));
+                }
+                                // Deduplicate by COMPANY name
+                const uniqueCustomers = [];
+                const seenCompanies = new Set();
+                
+                for (let i = appState.customers.length - 1; i >= 0; i--) {
+                    const c = appState.customers[i];
+                    const compKey = (c.COMPANY || '').trim().toLowerCase();
+                    if (!seenCompanies.has(compKey)) {
+                        seenCompanies.add(compKey);
+                        uniqueCustomers.unshift(c);
+                    }
+                }
+                appState.customers = uniqueCustomers;
+                console.log(`[INIT] ✓ Successfully loaded ${appState.customers.length} customers into appState.`);
             } else {
-                console.warn("[INIT] No organization data returned.");
+                console.warn("[INIT] Organization table was accessible but returned 0 rows.");
+                showToast("Customer table is empty. Run the CRM sync to populate data.", "warning");
             }
         } catch (e) { 
-            console.error("Error fetching customers from Supabase:", e);
-            showToast("Müşteri verileri yüklenemedi. Lütfen konsolu kontrol edin.", "error");
+            console.error("Error fetching customers from Turso DB:", e);
+            showToast("Customer data could not be loaded. Please check the console.", "error");
         }
 
 
@@ -190,22 +376,23 @@ async function initApp() {
                 const { data, error } = await sbClient.from(table).select('*').order('name', { ascending: true });
                 if (error) {
                     if (error.message.includes('not found') || error.code === '42P01') {
-                        console.warn(`Table "${table}" is missing in Supabase.`);
+                        console.warn(`Table "${table}" is missing in Turso DB.`);
                     } else { throw error; }
                 }
                 if (data && data.length > 0) {
                     appState.settings[table] = data;
                 } else {
-                    console.log(`Table "${table}" is empty or missing. Falling back to default seed.`);
-                    appState.settings[table] = defaultSeeds[table].map((v, idx) => ({ id: idx, name: v }));
+                    console.log(`Table "${table}" is empty or missing. Not falling back to demo records.`);
+                    appState.settings[table] = [];
                 }
             } catch (e) { 
-                console.error(`Error fetching ${table}, using defaults:`, e); 
-                appState.settings[table] = defaultSeeds[table].map((v, idx) => ({ id: idx, name: v }));
+                console.error(`Error fetching ${table}, not using defaults:`, e); 
+                appState.settings[table] = [];
             }
         }
         
-        // Auto-seed if empty
+        // Auto-seed if empty (DISABLED to prevent test records)
+        /*
         if (await seedDatabaseIfNeeded()) {
             for (const table of hwTables) {
                 try {
@@ -214,13 +401,15 @@ async function initApp() {
                 } catch (e) {}
             }
         }
+        */
 
         renderAll();
         updateDataStats();
+        window.lastDataFetchTime = Date.now();
 
         if (!appState.settings.services || appState.settings.services.length === 0) {
             console.warn("[INIT] No services found. Database might be empty or RLS is blocking access.");
-            showToast("Servis listesi boş! Veritabanı boş olabilir veya RLS engelliyor.", "error");
+            showToast("Service list is empty! Database may be empty or RLS is blocking.", "error");
         }
     } catch (err) { console.error("Critical Init Error:", err); }
 }
@@ -301,11 +490,11 @@ async function updateUserRole(userId, roleId) {
             addSystemLog('UPDATE ROLE', `User ID: ${userId} role changed to Role ID: ${roleId}`);
         }
 
-        showToast('Yetki/Rol başarıyla güncellendi.', 'success');
+        showToast('Role updated successfully.', 'success');
         initApp();
     } catch (e) {
         console.error(e);
-        showAlert('Hata', 'Rol güncellenemedi: ' + e.message, '❌');
+        showAlert('Hata', 'Role could not be updated: ' + e.message, '❌');
     }
 }
 
@@ -444,9 +633,9 @@ async function handleHWAction(table, action, data) {
         if (error) {
             let msg = error.message;
             if (msg.includes('row-level security') || error.code === '42501') {
-                msg = `Güvenlik Hatası: "${table}" tablosuna erişim yetkiniz yok. Lütfen Supabase -> Table Editor -> ${table} -> RLS Settings kısmından RLS'i kapatın veya bir politika ekleyin.`;
+                msg = `Güvenlik Hatası: "${table}" table. Please disable RLS or add a policy in Turso DB Console. -> ${table} -> RLS Settings kısmından RLS'i kapatın veya bir politika ekleyin.`;
             } else if (msg.includes('not found') || error.code === '42P01') {
-                msg = `Veritabanı Hatası: "${table}" tablosu Supabase'de bulunamadı. Lütfen SQL Editor ile tabloyu oluşturun.`;
+                msg = `Veritabanı Hatası: "${table}" table not found in Turso DB. Please create the table.`;
             }
             throw new Error(msg);
         }
@@ -487,7 +676,7 @@ window.renderAccountSettings = renderAccountSettings;
 window.savePricingSettings = savePricingSettings;
 window.saveAccountSettings = saveAccountSettings;
 window.exportData = exportData;
-window.backupDatabase = () => showAlert('Info', 'Database backup started... Check Supabase logs.', '☁️');
+window.backupDatabase = () => showAlert('Info', 'Database backup started... Check Turso DB logs.', '☁️');
 
 // --- Missing Handlers Implementation ---
 async function savePricingSettings() {
@@ -640,7 +829,7 @@ async function seedDatabaseIfNeeded() {
     } catch (e) {
         console.error("Error seeding services:", e);
         if (e.message && (e.message.includes('row-level security') || e.code === '42501')) {
-            showToast("Hata: 'services' tablosuna erişim RLS tarafından engellendi.", "error");
+            showToast("Hata: 'services' table blocked by RLS.", "error");
         }
     }
     // Standard hardware/dictionary tables
@@ -698,17 +887,23 @@ function renderAccountSettings() {
     const userEmail = appState.currentUser;
     const auth = appState.settings.users_auth || {};
     const uData = auth[userEmail] || Object.values(auth).find(u => u.email === userEmail || u.full_name === userEmail);
+    
+    // Kullanıcının mevcut verilerini ayarlar paneline doldurur
     if (uData) {
-        document.getElementById('acc-name').value = uData.full_name || '';
-        document.getElementById('acc-pass').value = uData.password || '';
+        document.getElementById('acc-new-name').value = uData.full_name || '';
+        document.getElementById('acc-new-pass').value = ''; // Güvenlik gereği şifreyi boş gösteriyoruz
+        document.getElementById('acc-new-avatar').value = uData.avatar_url || '';
     }
 }
 
 async function updateAccountProfile() {
-    const newName = document.getElementById('acc-name').value.trim();
-    const newPass = document.getElementById('acc-pass').value.trim();
-    if (!newName || !newPass) {
-        showToast('Name and Password cannot be empty.', 'error');
+    // Formdaki yeni verileri alıyoruz
+    const newName = document.getElementById('acc-new-name').value.trim();
+    const newPass = document.getElementById('acc-new-pass').value.trim();
+    const newAvatar = document.getElementById('acc-new-avatar').value.trim();
+    
+    if (!newName) {
+        showToast('Name field cannot be empty.', 'error');
         return;
     }
     
@@ -722,19 +917,65 @@ async function updateAccountProfile() {
     }
 
     try {
-        await sbClient.from('users').update({ full_name: newName, password: newPass }).eq('id', uData.id);
+        // Güncellenecek verileri hazırlıyoruz
+        const updateData = { full_name: newName };
+        
+        if (newPass) {
+            updateData.password_hash = newPass; // Turso'daki yeni sütun adı
+            // Geriye dönük uyumluluk için eski password alanını da dolduruyoruz
+            updateData.password = newPass; 
+        }
+        
+        if (newAvatar) {
+            updateData.avatar_url = newAvatar;
+        }
+
+        // Turso users tablosunu güncelliyoruz
+        const { error } = await sbClient.from('users').update(updateData).eq('id', uData.id);
+        
+        if (error) throw error;
+        
+        // Başarılı olursa lokal (ön yüz) state'i de güncelliyoruz
         uData.full_name = newName;
-        uData.password = newPass;
-        showToast('Profile updated successfully!', 'success');
+        if (newPass) uData.password = newPass;
+        if (newAvatar) uData.avatar_url = newAvatar;
+        appState.currentUserData = uData;
+        
+        // Sağ üstteki kullanıcı menüsündeki ismi ve resmi anında güncelliyoruz
+        const userNameDisplays = [document.getElementById('current-user-name'), document.getElementById('dropdown-full-name')];
+        userNameDisplays.forEach(el => {
+            if(el) el.innerText = newName;
+        });
+        
+        const firstName = newName.split(' ')[0];
+        if (document.getElementById('dropdown-first-name')) document.getElementById('dropdown-first-name').innerText = firstName;
+        
+        if (newAvatar) {
+            const avatarEl = document.getElementById('current-user-avatar');
+            if (avatarEl) {
+                avatarEl.innerHTML = `<img src="${newAvatar}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">`;
+            }
+        }
+
+        showToast('Your profile has been successfully updated!', 'success');
+        
+        // Şifre değiştirilmişse sayfayı yenilemek iyi bir güvenlik pratiğidir
+        if (newPass) {
+            setTimeout(() => {
+                showToast('Logging out because the password was changed...', 'info');
+                if(typeof logout === 'function') logout();
+            }, 1500);
+        }
     } catch(e) {
-        showToast(e.message, 'error');
+        console.error(e);
+        showToast('Update error: ' + e.message, 'error');
     }
 }
 window.updateAccountProfile = updateAccountProfile;
 
 // --- SYSTEM AUDIT LOGS ---
 
-// Stores the system log into localStorage (fallback) and attempts to push to Supabase app_settings
+// Stores the system log into localStorage (fallback) and attempts to push to Turso DB app_settings
 async function addSystemLog(action, details) {
     try {
         const timestamp = new Date().toISOString();
@@ -752,7 +993,7 @@ async function addSystemLog(action, details) {
         if(localLogs.length > 500) localLogs = localLogs.slice(0, 500); // keep last 500
         localStorage.setItem('taskflow_system_logs', JSON.stringify(localLogs));
 
-        // Attempt Supabase backup via app_settings
+        // Attempt Turso DB backup via app_settings
         try {
             // we will fetch the current logs from app_settings, append, and save
             const { data } = await sbClient.from('app_settings').select('data').eq('id', 'System_Logs').single();
@@ -764,7 +1005,7 @@ async function addSystemLog(action, details) {
             if(dbLogs.length > 500) dbLogs = dbLogs.slice(0, 500);
             await sbClient.from('app_settings').upsert({ id: 'System_Logs', data: JSON.stringify(dbLogs) });
         } catch(e) {
-            console.warn("Could not sync log to Supabase:", e);
+            console.warn("Could not sync log to Turso DB:", e);
         }
 
     } catch (err) {
@@ -837,3 +1078,5 @@ async function renderSystemLogs() {
 window.addSystemLog = addSystemLog;
 window.fetchSystemLogs = fetchSystemLogs;
 window.renderSystemLogs = renderSystemLogs;
+
+
