@@ -1,0 +1,717 @@
+/* ==========================================================================
+   NEW GOOGLE CALENDAR STYLES (FULL UPDATED)
+   ========================================================================== */
+
+:root {
+  /* Ana Renkler */
+  --gc-primary: #1b4376;
+  --gc-primary-dark: #11325c;
+  --gc-primary-light: #e6f0fa;
+  --gc-gray-text: #70757a;
+  --gc-border: #dadce0;
+  --gc-hover-bg: #f1f3f4;
+  --gc-today-bg: #e6f0fa;
+  
+  /* Sistem Değişkenleri (Eksik olanlar eklendi) */
+  --border-color: #e2e8f0;
+  --text-muted: #64748b;
+  --secondary: #1e293b;
+  --text-light: #f8fafc;
+  
+  /* Özel Renkler */
+  --gc-now-line-color: #ea4335;
+  --gc-event-shadow: rgba(0, 0, 0, 0.1);
+  --gc-event-shadow-hover: rgba(0, 0, 0, 0.15);
+  --gc-transition-speed: 0.2s;
+  
+  /* Boyutlar */
+  --gc-hour-height: 48px;
+  --gc-gutter-width: 60px;
+  --gc-border-radius: 4px;
+}
+
+/* ─── KOYU TEMA DESTEĞİ ─── */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --gc-primary: #4488f0;
+    --gc-primary-light: #1a2a4a;
+    --gc-gray-text: #9aa0a6;
+    --gc-border: #3c4043;
+    --gc-hover-bg: #2a2c2e;
+    --gc-today-bg: #1a2a4a;
+    --border-color: #3c4043;
+    --text-muted: #9aa0a6;
+    --secondary: #e8eaed;
+    --gc-event-shadow: rgba(0, 0, 0, 0.3);
+    --gc-event-shadow-hover: rgba(0, 0, 0, 0.5);
+  }
+}
+
+/* ─── GENEL RESET VE TEMEL STILLER ─── */
+* {
+  box-sizing: border-box;
+}
+
+.gc-container {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background: var(--bg-primary, #ffffff);
+  color: var(--secondary, #1e293b);
+  height: 100%;
+  position: relative;
+}
+
+/* ─── ANA HAFTALIK GÖRÜNÜM DÜZENLEMELERİ ─── */
+.gc-week-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  flex: 1;
+  position: relative;
+}
+
+.gc-week-days-header {
+  display: flex;
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+  background: var(--bg-primary, #ffffff);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.gc-time-gutter {
+  width: var(--gc-gutter-width, 60px);
+  flex-shrink: 0;
+}
+
+.gc-day-header-cell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 0;
+  border-left: 1px solid var(--border-color, #e2e8f0);
+  transition: background var(--gc-transition-speed, 0.2s);
+}
+
+.gc-day-header-cell:hover {
+  background: var(--gc-hover-bg, #f1f3f4);
+}
+
+.gc-wday {
+  font-size: 11px;
+  color: var(--text-muted, #64748b);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.gc-wdate {
+  font-size: 24px;
+  color: var(--secondary, #1e293b);
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  margin-top: 4px;
+  font-weight: 500;
+  transition: all var(--gc-transition-speed, 0.2s);
+}
+
+.gc-today-circle {
+  background: var(--gc-primary) !important;
+  color: #fff !important;
+  box-shadow: 0 2px 8px rgba(26, 115, 232, 0.3);
+}
+
+.gc-week-body {
+  flex: 1;
+  position: relative;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: block !important;
+}
+
+/* Scrollbar Stilleri */
+.gc-week-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.gc-week-body::-webkit-scrollbar-track {
+  background: var(--bg-primary, #ffffff);
+}
+
+.gc-week-body::-webkit-scrollbar-thumb {
+  background: var(--gc-border, #dadce0);
+  border-radius: 4px;
+}
+
+.gc-week-body::-webkit-scrollbar-thumb:hover {
+  background: var(--gc-gray-text, #70757a);
+}
+
+.gc-week-grid {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.gc-time-row {
+  display: flex;
+  height: var(--gc-hour-height, 48px);
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+  min-height: var(--gc-hour-height, 48px);
+}
+
+.gc-time-label {
+  width: var(--gc-gutter-width, 60px);
+  text-align: right;
+  padding-right: 8px;
+  font-size: 11px;
+  color: var(--text-muted, #64748b);
+  transform: translateY(-8px);
+  font-weight: 500;
+  user-select: none;
+}
+
+.gc-cell {
+  flex: 1;
+  border-left: 1px solid var(--border-color, #e2e8f0);
+  cursor: pointer;
+  transition: background var(--gc-transition-speed, 0.2s);
+  min-height: var(--gc-hour-height, 48px);
+}
+
+.gc-cell:hover {
+  background: rgba(26, 115, 232, 0.04);
+}
+
+.gc-cell:focus-visible {
+  outline: 2px solid var(--gc-primary);
+  outline-offset: -2px;
+  z-index: 1;
+}
+
+.gc-today-bg {
+  background: rgba(232, 240, 254, 0.15);
+}
+
+.gc-today-bg:hover {
+  background: rgba(232, 240, 254, 0.25);
+}
+
+/* ─── ETKİNLİK KARTLARI (EVENT PILLS) ─── */
+.gc-events-layer {
+  position: absolute;
+  top: 0;
+  left: var(--gc-gutter-width, 60px);
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.gc-event-pill {
+  position: absolute;
+  pointer-events: auto;
+  border-radius: var(--gc-border-radius, 4px);
+  padding: 4px 6px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px var(--gc-event-shadow, rgba(0, 0, 0, 0.1));
+  border-left: 3px solid rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s, filter 0.15s;
+  z-index: 5;
+  min-height: 20px;
+  line-height: 1.4;
+}
+
+.gc-event-pill:hover {
+  transform: translateY(-1px) scale(1.02);
+  box-shadow: 0 4px 12px var(--gc-event-shadow-hover, rgba(0, 0, 0, 0.15));
+  filter: brightness(0.95);
+  z-index: 6;
+}
+
+.gc-event-pill:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 1px;
+  box-shadow: 0 0 0 4px var(--gc-primary);
+}
+
+.gc-pill-title {
+  font-weight: 600;
+  font-size: 11px;
+}
+
+.gc-pill-time {
+  font-size: 9px;
+  opacity: 0.85;
+  margin-left: 2px;
+}
+
+/* Çoklu event durumunda taşma */
+.gc-event-pill.multi-event {
+  font-size: 10px;
+  padding: 2px 4px;
+}
+
+.gc-event-pill.more-indicator {
+  background: var(--gc-hover-bg, #f1f3f4);
+  color: var(--text-muted, #64748b);
+  border-left-color: var(--gc-border, #dadce0);
+  text-align: center;
+  font-weight: 600;
+}
+
+/* ─── GERÇEK ZAMAN ÇIZGISI (NOW LINE) ─── */
+#gc-now-line {
+  border-top: 2px solid var(--gc-now-line-color, #ea4335) !important;
+  position: absolute;
+  z-index: 50;
+  pointer-events: none;
+  left: var(--gc-gutter-width, 60px);
+  right: 0;
+  opacity: 1;
+  transition: opacity 0.3s;
+}
+
+#gc-now-line::before {
+  content: '';
+  position: absolute;
+  left: -6px;
+  top: -5px;
+  width: 10px;
+  height: 10px;
+  background-color: var(--gc-now-line-color, #ea4335);
+  border-radius: 50%;
+  box-shadow: 0 0 8px rgba(234, 67, 53, 0.4);
+}
+
+#gc-now-line.hidden {
+  opacity: 0;
+}
+
+/* ─── AYLIK GÖRÜNÜM DÜZENLEMELERİ ─── */
+.gc-month-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  flex: 1;
+  position: relative;
+}
+
+.gc-month-header-row {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+  background: var(--bg-primary, #ffffff);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.gc-month-wday {
+  text-align: center;
+  padding: 12px 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.gc-month-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  grid-auto-rows: minmax(100px, 1fr);
+  position: relative;
+}
+
+.gc-month-cell {
+  border-right: 1px solid var(--border-color, #e2e8f0);
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+  padding: 4px 6px;
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  transition: background var(--gc-transition-speed, 0.2s);
+  min-height: 100px;
+  position: relative;
+}
+
+.gc-month-cell:hover {
+  background: var(--gc-hover-bg, #f1f3f4);
+}
+
+.gc-month-cell:focus-visible {
+  outline: 2px solid var(--gc-primary);
+  outline-offset: -2px;
+  z-index: 1;
+}
+
+.gc-month-cell.other-month {
+  color: var(--text-muted, #64748b);
+  background: var(--bg-secondary, #fafafa);
+}
+
+.gc-month-cell.other-month:hover {
+  background: var(--gc-hover-bg, #f1f3f4);
+}
+
+.gc-month-cell.today {
+  background: var(--gc-today-bg, #e8f0fe);
+}
+
+.gc-month-cell.today:hover {
+  background: rgba(26, 115, 232, 0.12);
+}
+
+.gc-month-day-number {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--secondary, #1e293b);
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  margin-bottom: 2px;
+  transition: all var(--gc-transition-speed, 0.2s);
+}
+
+.gc-month-cell.today .gc-month-day-number {
+  background: var(--gc-primary, #1a73e8);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(26, 115, 232, 0.3);
+}
+
+.gc-month-cell.other-month .gc-month-day-number {
+  color: var(--text-muted, #64748b);
+}
+
+.gc-month-events {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+  flex: 1;
+}
+
+.gc-month-event {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  color: #fff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+  min-height: 18px;
+  line-height: 1.3;
+  border-left: 2px solid rgba(0, 0, 0, 0.15);
+}
+
+.gc-month-event:hover {
+  transform: translateX(2px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  filter: brightness(0.95);
+}
+
+.gc-month-event:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 1px;
+  box-shadow: 0 0 0 3px var(--gc-primary);
+}
+
+.gc-month-event.more {
+  background: var(--gc-hover-bg, #f1f3f4);
+  color: var(--text-muted, #64748b);
+  font-weight: 600;
+  text-align: center;
+  border-left-color: var(--gc-border, #dadce0);
+}
+
+/* ─── RESPONSIVE DÜZENLEMELER ─── */
+@media (max-width: 768px) {
+  :root {
+    --gc-gutter-width: 40px;
+    --gc-hour-height: 40px;
+  }
+
+  .gc-wdate {
+    font-size: 18px;
+    width: 32px;
+    height: 32px;
+  }
+
+  .gc-wday {
+    font-size: 10px;
+  }
+
+  .gc-time-label {
+    font-size: 9px;
+    transform: translateY(-6px);
+  }
+
+  .gc-event-pill {
+    font-size: 10px;
+    padding: 2px 4px;
+  }
+
+  .gc-pill-title {
+    font-size: 9px;
+  }
+
+  .gc-pill-time {
+    font-size: 8px;
+  }
+
+  .gc-month-cell {
+    min-height: 60px;
+    padding: 2px 4px;
+  }
+
+  .gc-month-day-number {
+    font-size: 12px;
+    width: 26px;
+    height: 26px;
+  }
+
+  .gc-month-event {
+    font-size: 8px;
+    padding: 1px 4px;
+    min-height: 14px;
+  }
+
+  #gc-now-line::before {
+    width: 8px;
+    height: 8px;
+    top: -4px;
+    left: -5px;
+  }
+}
+
+@media (max-width: 480px) {
+  :root {
+    --gc-gutter-width: 30px;
+    --gc-hour-height: 36px;
+  }
+
+  .gc-wdate {
+    font-size: 14px;
+    width: 28px;
+    height: 28px;
+  }
+
+  .gc-wday {
+    font-size: 8px;
+  }
+
+  .gc-day-header-cell {
+    padding: 4px 0;
+  }
+
+  .gc-time-label {
+    font-size: 8px;
+    padding-right: 4px;
+    transform: translateY(-4px);
+  }
+
+  .gc-event-pill {
+    font-size: 8px;
+    padding: 1px 3px;
+    border-left-width: 2px;
+  }
+
+  .gc-pill-title {
+    font-size: 7px;
+  }
+
+  .gc-pill-time {
+    font-size: 7px;
+  }
+
+  .gc-month-cell {
+    min-height: 40px;
+    padding: 1px 2px;
+  }
+
+  .gc-month-day-number {
+    font-size: 10px;
+    width: 22px;
+    height: 22px;
+  }
+
+  .gc-month-event {
+    font-size: 7px;
+    padding: 1px 3px;
+    min-height: 12px;
+  }
+
+  .gc-month-wday {
+    font-size: 8px;
+    padding: 6px 0;
+  }
+
+  #gc-now-line::before {
+    width: 6px;
+    height: 6px;
+    top: -3px;
+    left: -4px;
+  }
+}
+
+/* ─── Erişilebilirlik İyileştirmeleri ─── */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Yüksek kontrast modu için */
+@media (prefers-contrast: high) {
+  :root {
+    --gc-border: #000000;
+    --border-color: #000000;
+    --gc-gray-text: #000000;
+    --text-muted: #000000;
+  }
+  
+  .gc-today-circle,
+  .gc-month-cell.today .gc-month-day-number {
+    background: #000000 !important;
+    color: #ffffff !important;
+  }
+  
+  #gc-now-line {
+    border-top-color: #ff0000 !important;
+  }
+}
+
+/* ─── YAZICI DOSTU ─── */
+@media print {
+  .gc-week-body {
+    overflow: visible !important;
+  }
+  
+  .gc-event-pill {
+    break-inside: avoid;
+    box-shadow: none !important;
+    border: 1px solid #ccc;
+  }
+  
+  #gc-now-line {
+    display: none !important;
+  }
+  
+  .gc-cell:hover {
+    background: none !important;
+  }
+  
+  .gc-month-cell:hover {
+    background: none !important;
+  }
+}
+
+/* Mini Calendar Custom Stylings */
+.gc-mini-days {
+  display: grid !important;
+  grid-template-columns: repeat(7, 1fr) !important;
+  gap: 4px !important;
+  text-align: center;
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+.gc-mini-day {
+  width: 28px !important;
+  height: 28px !important;
+  line-height: 28px !important;
+  border-radius: 50% !important;
+  margin: auto !important;
+  cursor: pointer;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  color: var(--secondary, #1e293b) !important;
+  font-weight: 500;
+  background: transparent;
+}
+
+.gc-mini-day:hover {
+  background: var(--gc-hover-bg, #f1f3f4) !important;
+}
+
+.gc-mini-day.gc-mini-other {
+  color: var(--text-muted, #64748b) !important;
+  opacity: 0.5;
+}
+
+.gc-mini-day.today {
+  background: var(--gc-primary, #1b4376) !important;
+  color: #ffffff !important;
+  font-weight: bold !important;
+}
+
+.gc-mini-day.selected-week {
+  background: var(--gc-primary-light, #e6f0fa) !important;
+  color: var(--gc-primary, #1b4376) !important;
+}
+
+.gc-mini-day.selected-day {
+  border: 2px solid var(--gc-primary, #1b4376) !important;
+  font-weight: bold !important;
+}
+
+/* Sidebar and Width Fixes */
+.gc-sidebar {
+  display: none !important;
+}
+
+.gc-container {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+/* Sunday Highlight Styling */
+.gc-day-header-cell.gc-sunday .gc-wday,
+.gc-day-header-cell.gc-sunday .gc-wdate {
+  color: #ef4444 !important;
+}
+
+.gc-cell.gc-sunday-bg {
+  background-color: rgba(239, 68, 68, 0.02) !important;
+}
+
+.gc-cell.gc-sunday-bg:hover {
+  background-color: rgba(239, 68, 68, 0.06) !important;
+}
+
+.gc-month-wday.gc-sunday {
+  color: #ef4444 !important;
+}
+
+.gc-month-cell.gc-sunday-cell {
+  background-color: rgba(239, 68, 68, 0.02) !important;
+}
+
+.gc-month-cell.gc-sunday-cell:hover {
+  background-color: rgba(239, 68, 68, 0.06) !important;
+}
+
+.gc-month-cell.gc-sunday-cell .gc-month-day-number {
+  color: #ef4444 !important;
+}

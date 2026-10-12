@@ -5,13 +5,250 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TaskFlow Portal – Management Dashboard</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=5">
+  <link rel="stylesheet" href="css/gc_new_calendar.css?v=5">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <!-- Libraries -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
+<style>
+
+  /* TICKEALLDAL STYLES */
+  :root {
+    --ink:var(--ink); --paper:var(--paper); --steel:var(--steel); --amber:var(--amber);
+    --line:var(--line); --green:var(--green); --clay:var(--clay); --card:var(--card);
+  }
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(10,15,25,0.7);
+    display: flex; align-items: center; justify-content: center; z-index: 9500;
+  }
+  .modal-overlay.hidden { display: none !important; }
+
+  .ticket{
+    background:var(--paper, #ffffff); border:1px solid var(--ink); border-radius:6px;
+    box-shadow:4px 4px 0 rgba(29,36,48,0.12);
+    position:relative; overflow:hidden;
+    margin: auto;
+    width: 100%; max-width: 600px;
+    max-width: 550px;
+    font-family:'IBM Plex Sans',sans-serif;
+  }
+  .ticket-head{
+    display:flex; justify-content:space-between; align-items:flex-start;
+    padding:1rem 1.1rem 0.8rem; border-bottom:1px dashed var(--line);
+  }
+  .ticket-head .job-no{ font-family:'IBM Plex Mono',monospace; font-size:0.7rem; color:var(--steel);}
+  .ticket-head h2{ margin:0.15rem 0 0; font-size:1.05rem; font-weight:600; color:var(--ink);}
+  .stamp{
+    font-family:'IBM Plex Mono',monospace; font-size:0.65rem; font-weight:600;
+    border:1.5px solid currentColor; padding:2px 8px; border-radius:20px;
+    transform:rotate(-3deg); white-space:nowrap;
+  }
+  .stamp.pending{ color:var(--amber); }
+  .stamp.confirmed{ color:var(--green); }
+  .stamp.new{ color:var(--clay); }
+
+  .ticket-body{ padding:1rem 1.1rem;}
+
+  .field-row{ display:grid; grid-template-columns:1fr 1fr; gap:0.7rem; margin-bottom:0.7rem;}
+  .ticket-field{ display:flex; flex-direction:column; gap:3px;}
+  .ticket-field.full{ grid-column:1/-1;}
+  .ticket-field label{
+    font-size:0.68rem; color:var(--steel); font-weight:500;
+  }
+  .ticket-field .val, .ticket-field input, .ticket-field select, .ticket-field textarea {
+    font-family:'IBM Plex Mono',monospace; font-size:0.82rem; color:var(--ink);
+    background:var(--card); border:1px solid rgba(100, 116, 139, 0.2); border-radius:3px;
+    padding:0.4rem 0.5rem; width:100%; box-sizing: border-box;
+  }
+  .ticket-field .val{ background:var(--paper); border-style:dashed; min-height: 2.2rem; display:flex; align-items:center; border-width: 1px;}
+  .ticket-field input:read-only{ background:var(--paper); color:var(--steel); border-style:dashed; border-color: rgba(100, 116, 139, 0.2);}
+  .ticket-field select{ font-family:'IBM Plex Sans',sans-serif; }
+
+  .meta-line{
+    display:flex; gap:1.2rem; font-size:0.72rem; color:var(--steel);
+    padding-top:0.6rem; border-top:1px solid var(--line); margin-top:0.3rem;
+  }
+  .meta-line b{ color:var(--ink); font-weight:600;}
+
+  .ticket-foot{
+    display:flex; gap:0.5rem; flex-wrap:wrap; padding:0.9rem 1.1rem 1.1rem; justify-content: flex-end;
+  }
+  .ticket-btn{
+    font-family:'IBM Plex Sans',sans-serif; font-size:0.78rem; font-weight:600;
+    padding:0.5rem 0.85rem; border-radius:3px; border:1.5px solid var(--ink);
+    background:transparent; color:var(--ink); cursor:pointer;
+  }
+  .ticket-btn.primary{ background:var(--ink); color:var(--paper); }
+  .ticket-btn.danger{ border-color:var(--clay); color:var(--clay); }
+  .ticket-btn.ghost{ border-color:var(--line); color:var(--steel); }
+
+  .day-list{ padding:0.4rem 1.1rem 1rem; display:flex; flex-direction:column;}
+  .hour-slot{
+    display:grid; grid-template-columns:52px 1fr; gap:0.7rem;
+    padding:0.55rem 0; border-bottom:1px solid var(--line);
+  }
+  .hour-slot:last-child{ border-bottom:none;}
+  .hour-slot .hr{ font-family:'IBM Plex Mono',monospace; font-size:0.72rem; color:var(--steel); padding-top:2px;}
+  .job-chip{
+    display:flex; justify-content:space-between; align-items:center;
+    background:var(--paper); border-left:3px solid var(--amber); border-radius:2px;
+    padding:0.4rem 0.6rem; font-size:0.78rem; color: var(--ink);
+  }
+  .job-chip.empty{ border-left-color:var(--line); color:var(--steel); font-style:italic; background:transparent;}
+  .job-chip .co{ font-weight:600;}
+  .job-chip .pc{ font-family:'IBM Plex Mono',monospace; font-size:0.7rem; color:var(--steel);}
+  .add-slot{
+    font-family:'IBM Plex Mono',monospace; font-size:0.72rem; color:var(--steel);
+    border:1px dashed var(--line); border-radius:2px; padding:0.35rem 0.6rem;
+    text-align:center; cursor:pointer;
+  }
+
+  .perf{
+    position:absolute; top:0; bottom:0; width:14px; left:0;
+    background-image:radial-gradient(circle at 7px 0, transparent 6px, var(--card) 6px);
+    background-size:14px 18px; background-repeat:repeat-y;
+  }
+  .ticket{ padding-left:14px; }
+
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:var(--ink); --card:var(--ink); --ink:var(--paper); --line:var(--ink); --steel:var(--steel);
+    }
+    .ticket-field .val, .ticket-field input:read-only{ background:var(--ink); }
+    .ticket-field input, .ticket-field select, .ticket-field textarea { background:var(--ink); color:var(--ink); border-color:var(--line);}
+    .job-chip{ background:var(--ink);}
+    .ticket-btn.primary{ color:var(--paper);}
+    .ticket-head h2{ color:var(--ink); }
+  }
+
+
+  /* LOG PANEL STYLES */
+  .toolbar{
+    display:flex; flex-wrap:wrap; gap:0.6rem; align-items:center;
+    background:var(--card); border:1px solid var(--ink); border-radius:2px;
+    padding:0.7rem 0.9rem; margin-bottom:1.1rem; box-shadow:3px 3px 0 rgba(29,36,48,0.10);
+  }
+  .toolbar input, .toolbar select{
+    font-family:'IBM Plex Mono',monospace; font-size:0.78rem; color:var(--ink);
+    background:var(--card); border:1px solid var(--line); border-radius:3px; padding:0.4rem 0.55rem;
+  }
+  .toolbar input[type="text"]{ flex:1; min-width:160px; }
+  
+  .ledger{
+    background:var(--card); border:1px solid var(--ink); border-radius:2px;
+    box-shadow:4px 4px 0 rgba(29,36,48,0.12); overflow:hidden;
+  }
+  .ledger-head{
+    display:grid; grid-template-columns:120px 100px 140px 1fr;
+    padding:0.6rem 1rem; border-bottom:1px dashed var(--line);
+    font-family:'IBM Plex Mono',monospace; font-size:0.68rem; color:var(--steel);
+  }
+  .ledger-row{
+    display:grid; grid-template-columns:120px 100px 140px 1fr;
+    padding:0.65rem 1rem; border-bottom:1px solid var(--line); align-items:start; gap:0.4rem;
+  }
+  .ledger-row:last-child{ border-bottom:none; }
+  .ledger-row:nth-child(even){ background:rgba(0,0,0,0.015); }
+  .ledger-ts{ font-family:'IBM Plex Mono',monospace; font-size:0.74rem; color:var(--steel); }
+  .ledger-user{ font-size:0.8rem; font-weight:600; }
+  .ledger-tag{
+    font-family:'IBM Plex Mono',monospace; font-size:0.65rem; font-weight:600;
+    border-radius:20px; padding:2px 8px; border:1.5px solid currentColor;
+    justify-self:start; white-space:nowrap;
+  }
+  .ledger-tag.create{ color:var(--green); }
+  .ledger-tag.update{ color:var(--blue); }
+  .ledger-tag.delete{ color:var(--clay); }
+  .ledger-tag.auth{ color:var(--amber); }
+  .ledger-detail{ font-size:0.8rem; color:var(--ink); line-height:1.4; }
+  .ledger-detail .obj{ font-family:'IBM Plex Mono',monospace; font-size:0.72rem; color:var(--steel); }
+
+  .ledger-foot{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:0.7rem 1rem; font-family:'IBM Plex Mono',monospace; font-size:0.7rem; color:var(--steel);
+  }
+
+  @media (max-width:640px){
+    .ledger-head{ display:none; }
+    .ledger-row{ grid-template-columns:1fr; gap:0.25rem; padding:0.75rem 1rem;}
+    .ledger-row .ledger-ts{ order:1; }
+    .ledger-row .ledger-user{ order:2; }
+    .ledger-row .ledger-tag{ order:3; margin-top:2px;}
+    .ledger-row .ledger-detail{ order:4; margin-top:4px;}
+  }
+
+  @media (prefers-color-scheme: dark){
+    .toolbar input, .toolbar select{ background:var(--ink); color:var(--ink); border-color:var(--line);}
+    .ledger-row:nth-child(even){ background:rgba(255,255,255,0.02); }
+  }
+
+
+  /* INVOICES SECTION STYLES */
+  .invoice-wrap{ max-width:1040px; margin:0 auto; padding:2rem 1.5rem 4rem; }
+  .invoice-wrap .eyebrow{ font-family:'IBM Plex Mono',monospace; font-size:0.72rem; color:var(--steel); margin-bottom:0.5rem;}
+  .invoice-wrap h1{ font-size:clamp(1.5rem,3vw,2rem); margin:0 0 0.35rem; font-weight:700; letter-spacing:-0.01em; color:var(--ink);}
+  .invoice-wrap .sub{ color:var(--steel); font-size:0.9rem; margin:0 0 1.4rem; max-width:62ch; line-height:1.5;}
+
+  .kpis{ display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:0.9rem; margin-bottom:1.3rem;}
+  .kpi{ background:var(--card); border:1px solid var(--ink); border-radius:2px; padding:0.85rem 1rem; box-shadow:3px 3px 0 rgba(29,36,48,0.10);}
+  .kpi .num{ font-family:'IBM Plex Mono',monospace; font-size:1.4rem; font-weight:600; color:var(--ink); }
+  .kpi .lbl{ font-size:0.72rem; color:var(--steel); margin-top:2px;}
+  .kpi.warn .num{ color:var(--clay); }
+  .kpi.ok .num{ color:var(--green); }
+
+  .view-link{ font-size:0.74rem; font-weight:600; color:var(--blue); text-decoration:none; cursor:pointer;}
+
+
+  /* DASHBOARD SECTION STYLES */
+  .dash-wrap{ max-width:1120px; margin:0 auto; padding:2rem 1.5rem 4rem; }
+  .dash-wrap .eyebrow{ font-family:'IBM Plex Mono',monospace; font-size:0.72rem; color:var(--steel); margin-bottom:0.5rem;}
+  .dash-wrap h1{ font-size:clamp(1.5rem,3vw,2rem); margin:0 0 0.35rem; font-weight:700; letter-spacing:-0.01em; color:var(--ink);}
+  .dash-wrap .sub{ color:var(--steel); font-size:0.9rem; margin:0 0 1.5rem; }
+
+  .dash-kpi-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:1rem; margin-bottom:1.8rem;}
+  .dash-kpi{ background:var(--card); border:1px solid var(--ink); border-radius:2px; padding:1rem 1.1rem;
+    box-shadow:4px 4px 0 rgba(29,36,48,0.12); position:relative; overflow:hidden;}
+  .dash-kpi .stub{ position:absolute; top:0; right:0; width:34px; height:34px; border-left:1px dashed var(--line); border-bottom:1px dashed var(--line);}
+  .dash-kpi .lbl{ font-family:'IBM Plex Mono',monospace; font-size:0.68rem; color:var(--steel); margin-bottom:0.5rem;}
+  .dash-kpi .num{ font-family:'IBM Plex Mono',monospace; font-size:2rem; font-weight:600; line-height:1;}
+  .dash-kpi .delta{ font-size:0.74rem; margin-top:0.4rem; color:var(--steel);}
+  .dash-kpi .delta.up{ color:var(--green); }
+  .dash-kpi .delta.down{ color:var(--clay); }
+  .dash-kpi.jobs .num{ color:var(--blue); }
+  .dash-kpi.overdue .num{ color:var(--clay); }
+  .dash-kpi.revenue .num{ color:var(--green); }
+  .dash-kpi.pending .num{ color:var(--amber); }
+
+  .board{ display:grid; grid-template-columns:1.3fr 1fr; gap:1.4rem; }
+  @media(max-width:820px){ .board{ grid-template-columns:1fr; } }
+
+  .dash-panel{ background:var(--card); border:1px solid var(--ink); border-radius:2px;
+    box-shadow:4px 4px 0 rgba(29,36,48,0.12); overflow:hidden;}
+  .dash-panel-head{ display:flex; justify-content:space-between; align-items:center; padding:0.8rem 1.1rem;
+    border-bottom:1px dashed var(--line);}
+  .dash-panel-head h2{ margin:0; font-size:0.95rem; font-weight:600; color:var(--ink);}
+  .dash-panel-head a{ font-size:0.74rem; color:var(--blue); text-decoration:none; font-weight:600; cursor:pointer;}
+
+  .dash-job-item{ display:grid; grid-template-columns:52px 1fr auto; gap:0.7rem; align-items:center;
+    padding:0.65rem 1.1rem; border-bottom:1px solid var(--line); color:var(--ink);}
+  .dash-job-item:last-child{ border-bottom:none; }
+  .dash-job-item .hr{ font-family:'IBM Plex Mono',monospace; font-size:0.72rem; color:var(--steel);}
+  .dash-job-item .co{ font-weight:600; font-size:0.85rem;}
+  .dash-job-item .pc{ font-family:'IBM Plex Mono',monospace; font-size:0.7rem; color:var(--steel);}
+  .dash-tag{ font-family:'IBM Plex Mono',monospace; font-size:0.62rem; font-weight:600; border-radius:20px;
+    padding:2px 7px; border:1.5px solid currentColor; white-space:nowrap;}
+  .dash-tag.confirmed{ color:var(--green);}
+  .dash-tag.pending{ color:var(--amber);}
+
+  .feed-item{ padding:0.6rem 1.1rem; border-bottom:1px solid var(--line); font-size:0.8rem; line-height:1.4; color:var(--ink);}
+  .feed-item:last-child{ border-bottom:none;}
+  .feed-item .ts{ font-family:'IBM Plex Mono',monospace; font-size:0.68rem; color:var(--steel); display:block; margin-bottom:2px;}
+
+
+</style>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
 <body class="is-logged-out">
 
@@ -72,109 +309,279 @@
         <i data-lucide="clock-4" class="nav-icon"></i> Appointments
     </button>
 
+    <button class="nav-link" onclick="showTab('admin')" id="btn-admin">
+        <i data-lucide="shield" class="nav-icon"></i> Admin Panel
+    </button>
 </div>
-  <div class="user-profile" id="user-display-area" style="display: flex; align-items: center; gap: 8px;">
-      <div class="nav-icon-btn-group">
-        <button id="btn-settings" onclick="showTab('settings')" class="nav-icon-btn" data-tooltip="Settings">
-          <i data-lucide="settings" style="width: 18px; height: 18px;"></i>
-          <span class="nav-icon-text">Settings</span>
+  <div class="user-profile-dropdown-wrapper">
+    <div class="user-profile-trigger" id="user-display-area" onclick="toggleUserProfileDropdown()">
+      <span class="user-name-text" id="current-user-name" style="font-size: 15px;">User</span>
+      <i data-lucide="chevron-down" style="width: 16px; height: 16px;"></i>
+    </div>
+    
+    <div class="user-profile-dropdown hidden" id="user-profile-dropdown">
+      <div class="dropdown-caret"></div>
+      <div class="dropdown-body">
+        <div class="dropdown-user-info">
+          <div class="dropdown-avatar-box">
+             <i data-lucide="user" style="width: 40px; height: 40px; color: var(--ink);"></i>
+          </div>
+          <div class="dropdown-user-details">
+            <h4 id="dropdown-full-name">Ugur Yavuz</h4>
+            <p id="dropdown-first-name">Ugur</p>
+            <span id="dropdown-role">Technical SupportTeam</span>
+          </div>
+        </div>
+      </div>
+      <div class="dropdown-footer">
+        <button onclick="showTab('preferences'); toggleUserProfileDropdown();" class="dropdown-btn">
+          <i data-lucide="user-cog" style="width: 16px; height: 16px;"></i> Profile & Password
         </button>
-        <button onclick="logout()" class="nav-icon-btn nav-icon-btn-danger" data-tooltip="Logout">
-          <i data-lucide="log-out" style="width: 18px; height: 18px;"></i>
-          <span class="nav-icon-text">Logout</span>
+        <button onclick="logout()" class="dropdown-btn dropdown-btn-right">
+          <i data-lucide="power" style="width: 16px; height: 16px;"></i> Sign Out
         </button>
       </div>
+    </div>
   </div>
 </nav>
 
 
 <main class="container hidden" id="main-content">
   
+  <!-- MY PREFERENCES SECTION -->
+  <!-- User profile page - shows info and allows editing name, email, avatar and password -->
+  
+  <!-- INVOICES SECTION -->
+<section id="section-preferences" class="section">
+    <div class="card" style="max-width: 700px; margin: 0 auto; padding: 1.5rem;">
+      <h2 class="card-title" style="margin-bottom: 20px; border-bottom: 1px solid var(--paper); padding-bottom: 12px; font-size: 16px; text-transform: uppercase; letter-spacing: 1px;">My Profile & Preferences</h2>
+
+      <!-- Profile header: avatar + name/role -->
+      <div style="display:flex; gap:20px; margin-bottom:24px; align-items:center;">
+
+        <!-- Avatar: shows image if set, otherwise shows first letter -->
+        <div id="pref-avatar-box" onclick="togglePrefPanel('avatar')" title="Change Avatar"
+             style="width:80px;height:80px;background:var(--amber);display:flex;align-items:center;
+                    justify-content:center;border-radius:50%;cursor:pointer;overflow:hidden;
+                    font-size:28px;font-weight:700;color:var(--card);position:relative;flex-shrink:0;">
+          <span id="pref-avatar-letter">A</span>
+          <img id="pref-avatar-img" src="" style="display:none;width:100%;height:100%;object-fit:cover;border-radius:50%;">
+          <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.35);
+                      text-align:center;padding:3px;font-size:10px;color:var(--card);">✏️</div>
+        </div>
+
+        <div>
+          <h3 style="font-size:18px;font-weight:600;color:var(--ink);margin-bottom:2px;" id="settings-display-fullname">—</h3>
+          <p style="font-size:13px;color:var(--steel);margin-bottom:2px;" id="settings-display-role">—</p>
+          <span style="font-size:12px;color:var(--green);font-weight:600;" id="settings-display-status">Active</span>
+        </div>
+      </div>
+
+      <!-- Action buttons -->
+      <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;">
+        <button onclick="togglePrefPanel('avatar')" class="btn btn-outline"
+                style="display:flex;align-items:center;gap:6px;font-size:13px;padding:8px 14px;">
+          <i data-lucide="image" style="width:14px;height:14px;"></i> Change Avatar
+        </button>
+        <button onclick="togglePrefPanel('name')" class="btn btn-outline"
+                style="display:flex;align-items:center;gap:6px;font-size:13px;padding:8px 14px;">
+          <i data-lucide="edit-2" style="width:14px;height:14px;"></i> Change Display Name
+        </button>
+        <button onclick="togglePrefPanel('password')" class="btn btn-outline"
+                style="display:flex;align-items:center;gap:6px;font-size:13px;padding:8px 14px;">
+          <i data-lucide="key" style="width:14px;height:14px;"></i> Change Password
+        </button>
+      </div>
+
+      <!-- Avatar change panel (hidden by default) -->
+      <div id="pref-panel-avatar" class="hidden"
+           style="background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:14px;">
+        <h4 style="margin-bottom:8px;color:var(--blue);font-size:13px;display:flex;align-items:center;gap:6px;">
+          <i data-lucide="image" style="width:15px;height:15px;"></i> Change Avatar Photo
+        </h4>
+        <p style="font-size:11px;color:var(--steel);margin-bottom:10px;">
+          Paste a direct image URL (e.g. https://i.imgur.com/xyz.jpg)
+        </p>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="text" id="pref-avatar-url" placeholder="https://..."
+                 style="flex:1;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;">
+          <button onclick="savePrefAvatar()" class="btn btn-primary" style="font-size:13px;padding:8px 14px;white-space:nowrap;">Save</button>
+          <button onclick="togglePrefPanel('avatar')" class="btn btn-secondary" style="font-size:13px;padding:8px 14px;">Cancel</button>
+        </div>
+      </div>
+
+      <!-- Display name change panel (hidden by default) -->
+      <div id="pref-panel-name" class="hidden"
+           style="background:var(--paper);border:1px solid var(--green);border-radius:10px;padding:16px;margin-bottom:14px;">
+        <h4 style="margin-bottom:10px;color:var(--green);font-size:13px;display:flex;align-items:center;gap:6px;">
+          <i data-lucide="edit-2" style="width:15px;height:15px;"></i> Change Display Name
+        </h4>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="text" id="pref-new-name" placeholder="Full name"
+                 style="flex:1;padding:8px 12px;border:1px solid var(--green);border-radius:8px;font-size:13px;">
+          <button onclick="savePrefName()" class="btn btn-primary" style="font-size:13px;padding:8px 14px;white-space:nowrap;">Save</button>
+          <button onclick="togglePrefPanel('name')" class="btn btn-secondary" style="font-size:13px;padding:8px 14px;">Cancel</button>
+        </div>
+      </div>
+
+      <!-- Password change panel (hidden by default) -->
+      <div id="pref-panel-password" class="hidden"
+           style="background:var(--amber);border:1px solid var(--amber);border-radius:10px;padding:16px;margin-bottom:14px;">
+        <h4 style="margin-bottom:10px;color:var(--amber);font-size:13px;display:flex;align-items:center;gap:6px;">
+          <i data-lucide="key" style="width:15px;height:15px;"></i> Change Password
+        </h4>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <input type="password" id="pref-new-pass" placeholder="New password"
+                 style="padding:8px 12px;border:1px solid var(--amber);border-radius:8px;font-size:13px;">
+          <input type="password" id="pref-confirm-pass" placeholder="Confirm new password"
+                 style="padding:8px 12px;border:1px solid var(--amber);border-radius:8px;font-size:13px;">
+          <div style="display:flex;gap:8px;">
+            <button onclick="savePrefPassword()" class="btn btn-primary" style="font-size:13px;padding:8px 14px;">Save Password</button>
+            <button onclick="togglePrefPanel('password')" class="btn btn-secondary" style="font-size:13px;padding:8px 14px;">Cancel</button>
+          </div>
+          <p style="font-size:11px;color:var(--steel);margin-top:4px;">💡 Default password is <strong>1234</strong>. You can change your password anytime without interruption.</p>
+        </div>
+      </div>
+
+      <!-- User info table (User Name, First Name, Email are editable) -->
+      <div style="background:var(--card);border:1px solid var(--paper);border-radius:8px;overflow:hidden;margin-top:4px;">
+
+        <!-- User Name (editable) -->
+        <div style="display:flex;align-items:center;padding:10px 16px;border-bottom:1px solid var(--paper);">
+          <span style="font-weight:600;color:var(--steel);width:140px;font-size:13px;">User Name</span>
+          <span id="settings-username" style="flex:1;color:var(--ink);font-size:13px;">—</span>
+          <button onclick="togglePrefPanel('name')" title="Edit"
+                  style="background:none;border:none;cursor:pointer;color:var(--blue);padding:2px 6px;">
+            <i data-lucide="edit-2" style="width:14px;height:14px;"></i>
+          </button>
+        </div>
+
+        <!-- First Name (editable — opens name panel) -->
+        <div style="display:flex;align-items:center;padding:10px 16px;border-bottom:1px solid var(--paper);">
+          <span style="font-weight:600;color:var(--steel);width:140px;font-size:13px;">First Name</span>
+          <span id="settings-firstname" style="flex:1;color:var(--ink);font-size:13px;">—</span>
+          <button onclick="togglePrefPanel('name')" title="Edit"
+                  style="background:none;border:none;cursor:pointer;color:var(--blue);padding:2px 6px;">
+            <i data-lucide="edit-2" style="width:14px;height:14px;"></i>
+          </button>
+        </div>
+
+        <!-- Primary Email (editable) -->
+        <div style="display:flex;align-items:center;padding:10px 16px;border-bottom:1px solid var(--paper);">
+          <span style="font-weight:600;color:var(--steel);width:140px;font-size:13px;">Primary Email</span>
+          <span id="settings-email" style="flex:1;color:var(--ink);font-size:13px;">—</span>
+          <button onclick="togglePrefPanel('email')" title="Edit"
+                  style="background:none;border:none;cursor:pointer;color:var(--blue);padding:2px 6px;">
+            <i data-lucide="edit-2" style="width:14px;height:14px;"></i>
+          </button>
+        </div>
+
+        <!-- Email change panel (hidden by default) -->
+        <div id="pref-panel-email" class="hidden"
+             style="background:var(--paper);border-top:1px solid var(--line);padding:14px 16px;">
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="email" id="pref-new-email" placeholder="New email address"
+                   style="flex:1;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;">
+            <button onclick="savePrefEmail()" class="btn btn-primary" style="font-size:13px;padding:8px 14px;white-space:nowrap;">Save</button>
+            <button onclick="togglePrefPanel('email')" class="btn btn-secondary" style="font-size:13px;padding:8px 14px;">Cancel</button>
+          </div>
+        </div>
+
+        <!-- Role (read-only) -->
+        <div style="display:flex;align-items:center;padding:10px 16px;border-bottom:1px solid var(--paper);">
+          <span style="font-weight:600;color:var(--steel);width:140px;font-size:13px;">Role</span>
+          <span id="settings-role" style="flex:1;color:var(--ink);font-size:13px;">—</span>
+        </div>
+
+        <!-- Admin (read-only) -->
+        <div style="display:flex;align-items:center;padding:10px 16px;border-bottom:1px solid var(--paper);">
+          <span style="font-weight:600;color:var(--steel);width:140px;font-size:13px;">Admin</span>
+          <span id="settings-admin" style="flex:1;color:var(--ink);font-size:13px;">No</span>
+        </div>
+
+        <!-- Status (read-only) -->
+        <div style="display:flex;align-items:center;padding:10px 16px;">
+          <span style="font-weight:600;color:var(--steel);width:140px;font-size:13px;">Status</span>
+          <span id="settings-status" style="flex:1;color:var(--green);font-weight:600;font-size:13px;">Active</span>
+        </div>
+
+      </div>
+    </div>
+  
+    </section>
+
   <!-- DASHBOARD SECTION -->
   <section id="section-dashboard" class="section active">
     <!-- DASHBOARD HOME VIEW -->
+    
     <div id="dashboard-home">
-        <div class="dashboard-hero">
-            <h1 id="hero-greeting">Good afternoon, John 👋</h1>
-            <p>Manage your services, track CRM tickets, and simplify your invoicing workflow.</p>
-        </div>
-        
-        <div class="kpi-grid" style="margin-bottom: 2rem;">
-            <div class="kpi-card" onclick="showTab('waiting')">
-                <div class="kpi-header">
-                    <span class="kpi-label">Open Tickets</span>
-                    <i data-lucide="ticket" class="kpi-icon text-primary"></i>
-                </div>
-                <div class="kpi-value" id="kpi-tickets">0</div>
-            </div>
-            <div class="kpi-card" onclick="showTab('customers')">
-                <div class="kpi-header">
-                    <span class="kpi-label">Active Customers</span>
-                    <i data-lucide="users" class="kpi-icon text-success"></i>
-                </div>
-                <div class="kpi-value" id="kpi-customers">0</div>
-            </div>
-            <div class="kpi-card" onclick="showTab('invoices')">
-                <div class="kpi-header">
-                    <span class="kpi-label">Pending Invoices</span>
-                    <i data-lucide="receipt" class="kpi-icon text-danger"></i>
-                </div>
-                <div class="kpi-value" id="kpi-invoices">0</div>
-            </div>
-        </div>
+        <div class="dash-wrap">
+          <h1 id="hero-greeting">Good Morning 👋</h1>
+          <div class="dash-kpi-grid">
+            <div class="dash-kpi jobs" onclick="showTab('waiting')" style="cursor:pointer;"><div class="stub"></div><div class="lbl">OPEN TICKETS</div><div class="num" id="kpi-tickets">0</div><div class="delta">Appointments</div></div>
+            <div class="dash-kpi pending" onclick="showTab('invoices')" style="cursor:pointer;"><div class="stub"></div><div class="lbl">PENDING INVOICES</div><div class="num" id="kpi-invoices">0</div><div class="delta">Open invoice</div></div>
+            <div class="dash-kpi overdue"><div class="stub"></div><div class="lbl">ACTIVE CUSALLR</div><div class="num" id="kpi-customers">0</div><div class="delta down">Registered business</div></div>
+            <div class="dash-kpi revenue" onclick="toggleMainForm('category')" style="cursor:pointer; background:var(--ink);"><div class="stub" style="border-color:var(--steel);"></div><div class="lbl" style="color:var(--steel);">NEW APPOINTMENT</div><div class="num" style="color:var(--paper); font-family:'IBM Plex Sans',sans-serif; font-size:1.4rem; padding-top:0.4rem;">Create +</div><div class="delta" style="color:var(--steel);">Start a new ticket</div></div>
+          </div>
 
-        <div style="text-align: center; padding: 3rem 0; background: white; border-radius: 24px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
-            <h2 style="color: #111827; font-size: 2rem; margin-bottom: 1rem; font-weight: 800;">Ready to start?</h2>
-            <p style="color: #64748b; margin-bottom: 2rem;">Click below to create a new service ticket for a customer.</p>
-            <div style="display: flex; gap: 15px; justify-content: center;">
-              <button class="btn" onclick="toggleMainForm('category')" style="background: var(--primary); color: white; font-size: 1.1rem; font-weight: 700; padding: 1.1rem 2.5rem; border-radius: 50px; border: none; cursor: pointer; transition: all 0.3s; display: inline-flex; align-items: center; gap: 12px; box-shadow: 0 10px 15px -3px rgba(216, 118, 23, 0.3);">
-                <i data-lucide="plus-circle" style="width: 22px; height: 22px;"></i> CREATE NEW TICKET
-              </button>
-              <button class="btn" onclick="createAppointmentForSlot()" style="background: #1e293b; color: white; font-size: 1.1rem; font-weight: 700; padding: 1.1rem 3.5rem; border-radius: 50px; border: none; cursor: pointer; transition: all 0.3s; display: inline-flex; align-items: center; gap: 12px; box-shadow: 0 10px 15px -3px rgba(30, 41, 59, 0.3);">
-                <i data-lucide="calendar-plus" style="width: 22px; height: 22px;"></i> BOOK APPOINTMENT
-              </button>
+          <div class="board">
+            <div class="dash-panel">
+              <div class="dash-panel-head"><h2>Today's Schedule</h2><a onclick="showTab('calendar')">Open Calendar →</a></div>
+              <div style="padding:1rem; text-align:center; color:var(--steel); font-size:0.85rem;">No scheduled appointments for today.</div>
             </div>
+
+            <div class="dash-panel">
+              <div class="dash-panel-head"><h2>Recent Activity</h2><a onclick="showTab('settings')">View All →</a></div>
+              <div style="padding:1rem; text-align:center; color:var(--steel); font-size:0.85rem;">No recent activity to display.</div>
+            </div>
+          </div>
         </div>
     </div>
+
 
     <!-- CATEGORY SELECTION VIEW -->
     <div id="dashboard-category-selection" style="display:none; animation: fadeIn 0.4s ease;">
       <div class="flex-between" style="margin-bottom: 2rem; align-items: center; display: flex; justify-content: space-between;">
-        <h2 class="card-title">Select Service Category</h2>
+        <h2 class="card-title">Select Service Department</h2>
         <button class="btn btn-cancel" onclick="toggleMainForm('home')" style="display: inline-flex; align-items: center; gap: 8px;">
           <i data-lucide="arrow-left" style="width: 16px; height: 16px;"></i> Back to Dashboard
         </button>
       </div>
       <div class="tiles-grid">
-        <div class="tile" onclick="selectCategory('S1')">
+        <div class="tile" onclick="selectCategory('S1', 'MENU UPDATE')">
           <div class="tile-icon" style="background: var(--blue-soft);"><i data-lucide="file-text" style="color: var(--blue-text); width: 24px; height: 24px;"></i></div>
           <div class="tile-title">MENU UPDATE</div>
           <div class="tile-desc">Update menu items, prices, or layouts.</div>
         </div>
-        <div class="tile" onclick="selectCategory('S2')">
+        <div class="tile" onclick="selectCategory('S6', 'PROGRAMMING')">
+          <div class="tile-icon" style="background: var(--paper);"><i data-lucide="code-2" style="color: var(--blue); width: 24px; height: 24px;"></i></div>
+          <div class="tile-title">PROGRAMMING</div>
+          <div class="tile-desc">Configure or update till databases.</div>
+        </div>
+        <div class="tile" onclick="selectCategory('S6', 'IMAGING')">
+          <div class="tile-icon" style="background: var(--paper);"><i data-lucide="monitor" style="color: var(--green); width: 24px; height: 24px;"></i></div>
+          <div class="tile-title">IMAGING</div>
+          <div class="tile-desc">Operating system installations and system images.</div>
+        </div>
+        <div class="tile" onclick="selectCategory('S2', 'CREDIT CARD')">
           <div class="tile-icon" style="background: var(--teal-soft);"><i data-lucide="credit-card" style="color: var(--teal-text); width: 24px; height: 24px;"></i></div>
           <div class="tile-title">CREDIT CARD</div>
           <div class="tile-desc">Setup or troubleshoot card terminals.</div>
         </div>
-        <div class="tile" onclick="selectCategory('S3')">
+        <div class="tile" onclick="selectCategory('S3', 'DATA RESET')">
           <div class="tile-icon" style="background: var(--coral-soft);"><i data-lucide="refresh-cw" style="color: var(--coral-text); width: 24px; height: 24px;"></i></div>
           <div class="tile-title">DATA RESET</div>
           <div class="tile-desc">Database reset or sales data cleanup.</div>
         </div>
-        <div class="tile" onclick="selectCategory('S4')">
+        <div class="tile" onclick="selectCategory('S4', 'SERVICE')">
           <div class="tile-icon" style="background: var(--amber-soft);"><i data-lucide="wrench" style="color: var(--amber-text); width: 24px; height: 24px;"></i></div>
           <div class="tile-title">SERVICE</div>
           <div class="tile-desc">General hardware or software maintenance.</div>
         </div>
-        <div class="tile" onclick="selectCategory('S5')">
+        <div class="tile" onclick="selectCategory('S5', 'OTHER')">
           <div class="tile-icon" style="background: var(--purple-soft);"><i data-lucide="sparkles" style="color: var(--purple-text); width: 24px; height: 24px;"></i></div>
           <div class="tile-title">OTHER</div>
           <div class="tile-desc">Unlisted issues or custom requests.</div>
-        </div>
-        <div class="tile" onclick="selectCategory('S6')">
-          <div class="tile-icon" style="background: #f3f4f6;"><i data-lucide="monitor" style="color: #4b5563; width: 24px; height: 24px;"></i></div>
-          <div class="tile-title">TILL SETUP</div>
-          <div class="tile-desc">Full installation of new or used till systems.</div>
         </div>
       </div>
     </div>
@@ -189,100 +596,150 @@
       </div>
       
       <form id="master-form">
-        <!-- PART 1: ADMINISTRATIVE INFO -->
-        <div class="grid-4">
-          <div class="field">
-            <label>Staff (Created By)</label>
-            <select id="f-user"></select>
-          </div>
-          <div class="field">
-            <label>Database ID</label>
-            <input type="text" id="f-db-id" readonly placeholder="Auto-generated">
-          </div>
-          <div class="field">
-            <label>CRM Ticket No</label>
-            <input type="text" id="f-crm-ticket" placeholder="Paste CRM Ticket No...">
-          </div>
-          <div class="field">
-            <label>Timestamp</label>
-            <input type="text" id="f-timestamp" readonly style="background: #f8fafc;">
+        <!-- Hidden/Calculated fields -->
+        <input type="hidden" id="f-db-id">
+        <input type="hidden" id="f-invoice-no">
+        <input type="hidden" id="f-invoice-date">
+        <select id="f-service-type" style="display: none;"></select>
+
+        <!-- SECTION 1: Ticket Information -->
+        <div class="form-section-card">
+          <h3 class="form-section-title">Ticket Information</h3>
+          <div class="grid-3">
+            <div class="field">
+              <label>CRM Ticket Number <span style="color:red">*</span></label>
+              <input type="text" id="f-crm-ticket" placeholder="Enter CRM Ticket No..." required>
+            </div>
+            <div class="field">
+              <label>Created By</label>
+              <div id="f-user-display" style="padding: 10px 14px; background: var(--card); border: 1px solid var(--steel); border-radius: 8px; font-weight: 600; color: var(--ink);">-</div>
+              <select id="f-user" style="display: none;"></select>
+            </div>
+            <div class="field">
+              <label>Timestamp</label>
+              <input type="text" id="f-timestamp" readonly style="background: var(--card); border: none; box-shadow: none; font-weight: 500; color: var(--steel); padding-left: 0;">
+            </div>
           </div>
         </div>
 
-        <!-- PART 2: CLIENT INFO -->
-        <div class="grid-4 mt-2">
-          <div class="field">
-            <label>Customer Number (Company ID)</label>
-            <input type="text" id="f-company-id" placeholder="CID-XXXX" readonly style="background: #f8fafc;">
+        <!-- SECTION 2: Customer Details -->
+        <div class="form-section-card mt-2">
+          <h3 class="form-section-title">Customer</h3>
+          <div class="grid-1">
+            <div class="field" style="margin-bottom: 15px;">
+              <label>Search Customer <span style="color:red">*</span></label>
+              <div style="position: relative;">
+                <input type="text" id="f-customer-search" placeholder="Search Company Name, Customer Number or Postcode..." list="vtiger-customer-list" required style="padding-right: 35px;" oninput="autoFillCustomerInfo()">
+                <i data-lucide="search" style="position: absolute; right: 12px; top: 12px; width: 16px; height: 16px; color: var(--steel);"></i>
+              </div>
+            </div>
           </div>
-          <div class="field">
-            <label>Company Name</label>
-            <input type="text" id="f-company" placeholder="Search customer..." list="vtiger-customer-list" onchange="autoFillCustomerInfo()">
+
+          <div class="grid-3">
+            <div class="field">
+              <label>Company Name</label>
+              <input type="text" id="f-company" readonly placeholder="Auto-filled" style="background: var(--card);">
+            </div>
+            <div class="field">
+              <label>Customer Number</label>
+              <input type="text" id="f-company-id" readonly placeholder="Auto-filled" style="background: var(--card);">
+            </div>
+            <div class="field">
+              <label>Postcode</label>
+              <input type="text" id="f-postcode" readonly placeholder="Auto-filled" style="background: var(--card);">
+            </div>
           </div>
-          <div class="field">
-            <label>Postcode</label>
-            <input type="text" id="f-postcode" placeholder="e.g. SW1A 1AA">
+
+          <div class="grid-3 mt-2">
+            <div class="field">
+              <label>Phone Number</label>
+              <input type="text" id="f-phone" readonly placeholder="Auto-filled" style="background: var(--card);">
+            </div>
+            <div class="field">
+              <label>Owner / Member Of</label>
+              <input type="text" id="f-owner" readonly placeholder="Auto-filled" style="background: var(--card);">
+            </div>
+            <div class="field">
+              <label>Contract Status</label>
+              <div style="display: flex; align-items: center; min-height: 40px;">
+                <span id="f-status-badge" class="badge" style="background: var(--steel); color: white; padding: 6px 12px; border-radius: 50px; font-weight: 700; font-size: 12px;">NO CUSALLR</span>
+              </div>
+              <input type="hidden" id="f-status" placeholder="Checking...">
+            </div>
           </div>
-          <div class="field">
-            <label>Service Status</label>
-            <input type="text" id="f-status" placeholder="Checking..." readonly style="background: #f8fafc;">
+
+          <div class="grid-1 mt-2">
+            <div class="field">
+              <label>Address</label>
+              <input type="text" id="f-address" readonly placeholder="Auto-filled from CRM..." style="background: var(--card);">
+            </div>
           </div>
         </div>
 
-        <!-- PART 3: SERVICE CATEGORY -->
-        <div class="grid-2 mt-2">
-          <div class="field">
-            <label>Service Category</label>
-            <select id="f-service-type" onchange="updateDynamicFields()">
-              <option value="S1">MENU UPDATE</option>
-              <option value="S2">CREDIT CARD</option>
-              <option value="S3">DATA RESET</option>
-              <option value="S4">SERVICE</option>
-              <option value="S5">OTHER</option>
-              <option value="S6">TILL SETUP</option>
-            </select>
+        <!-- SECTION 3: Service Details -->
+        <div class="form-section-card mt-2">
+          <h3 class="form-section-title">Service</h3>
+          <div class="grid-3">
+            <div class="field">
+              <label>Department</label>
+              <input type="text" id="f-department" readonly style="background: var(--card); font-weight: 700; color: var(--blue);">
+            </div>
+            <div class="field">
+              <label>Service Category</label>
+              <input type="text" id="f-service-type-display" readonly style="background: var(--card); font-weight: 700; color: var(--blue);">
+            </div>
+            <div class="field">
+              <label>Sub Service <span style="color:red">*</span></label>
+              <select id="f-sub-service" required></select>
+            </div>
           </div>
-          <div class="field">
-            <label>Sub Service</label>
-            <select id="f-sub-service"></select>
+
+          <div class="grid-3 mt-2">
+            <div class="field">
+              <label>Start Time</label>
+              <select id="f-start-time" onchange="calculateDuration()"></select>
+            </div>
+            <div class="field">
+              <label>End Time</label>
+              <select id="f-end-time" onchange="calculateDuration()"></select>
+            </div>
+            <div class="field">
+              <label>Duration (min)</label>
+              <input type="text" id="f-duration" readonly placeholder="0" style="background: var(--card); font-weight: 700; color: var(--ink);">
+            </div>
+          </div>
+
+          <div id="dynamic-fields-container" class="mt-2"></div>
+        </div>
+
+        <!-- SECTION 4: Work Details -->
+        <div class="form-section-card mt-2">
+          <h3 class="form-section-title">Work Details</h3>
+          <div id="desc-field-container">
+            <!-- Textarea will be appended here by dynamic fields renderer, or kept directly -->
           </div>
         </div>
 
-        <!-- PART 4: WORK DETAILS -->
-        <div class="grid-3 mt-2">
-          <div class="field">
-            <label>Start Time</label>
-            <select id="f-start-time" onchange="calculateDuration()"></select>
-          </div>
-          <div class="field">
-            <label>End Time</label>
-            <select id="f-end-time" onchange="calculateDuration()"></select>
-          </div>
-          <div class="field">
-            <label>Duration (min)</label>
-            <input type="text" id="f-duration" readonly placeholder="0" style="background: #f8fafc;">
-          </div>
-        </div>
-
-        <div id="dynamic-fields-container" class="mt-2"></div>
-
-        <!-- PART 5: PAYMENT & BILLING -->
-        <div style="margin-top: 35px;">
-          <p class="card-title" style="margin-bottom: 1.5rem;">PAYMENT & BILLING</p>
+        <!-- SECTION 5: Billing & Pricing -->
+        <div class="form-section-card mt-2">
+          <h3 class="form-section-title">Billing</h3>
           <div class="grid-3">
             <div class="field">
               <label>Service Mode</label>
-              <select id="f-payment-status" onchange="updatePaymentStyle(this)">
+              <div style="display: flex; align-items: center; min-height: 40px;">
+                <span id="f-payment-badge" class="badge" style="background: var(--steel); color: white; padding: 6px 12px; border-radius: 50px; font-weight: 700; font-size: 12px;">PENDING</span>
+              </div>
+              <select id="f-payment-status" onchange="updatePaymentStyle(this)" style="display: none;">
                 <option value="Chargeable">Chargeable</option>
-                <option value="Contract">Service Contract</option>
-                <option value="Free">FREE (No Charge)</option>
+                <option value="Contract">Contract</option>
+                <option value="Free">Free</option>
               </select>
             </div>
             <div class="field">
               <label>Estimated Price</label>
               <div class="price-wrap">
                 <span>£</span>
-                <input type="number" id="f-est-price" placeholder="0.00" step="0.01">
+                <input type="number" id="f-est-price" placeholder="0.00" readonly style="background: var(--card);">
               </div>
             </div>
             <div class="field">
@@ -293,25 +750,14 @@
               </div>
             </div>
           </div>
-
-          <!-- PART 6: SERVICE REFERENCE -->
-          <div class="grid-2 mt-2">
-            <div class="field">
-              <label>SERVICE NUMBER</label>
-              <input type="text" id="f-invoice-no" placeholder="SRV-XXXX" readonly style="background: #f8fafc;">
-            </div>
-            <div class="field">
-              <label>SERVICE DATE</label>
-              <input type="date" id="f-invoice-date" readonly style="background: #f8fafc;">
-            </div>
         </div>
 
-        <div class="flex-end mt-2" style="display: flex; justify-content: flex-end; gap: 10px;">
-          <button type="button" class="btn" onclick="resetForm()" style="display: inline-flex; align-items: center; gap: 8px;">
+        <div class="flex-end mt-3" style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+          <button type="button" class="btn btn-outline" onclick="resetForm()" style="display: inline-flex; align-items: center; gap: 8px; border-radius: 8px;">
             <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i> Clear Form
           </button>
-          <button type="submit" class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 8px;">
-            <i data-lucide="check" style="width: 16px; height: 16px;"></i> Process Transaction
+          <button type="submit" class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 8px; padding: 10px 24px; border-radius: 8px;">
+            <i data-lucide="check" style="width: 16px; height: 16px;"></i> Save Ticket
           </button>
         </div>
       </form>
@@ -395,12 +841,12 @@
       
       <div class="table-wrap" style="max-height: 600px; overflow-y: auto;">
         <table style="width: 100%; border-collapse: collapse;">
-          <thead style="position: sticky; top: 0; background: #f8fafc; z-index: 5;">
-            <tr style="text-align: left; border-bottom: 2px solid #e2e8f0;">
-              <th style="padding: 12px 15px; font-size: 11px; text-transform: uppercase; color: #64748b;">Timestamp</th>
-              <th style="padding: 12px 15px; font-size: 11px; text-transform: uppercase; color: #64748b;">User</th>
-              <th style="padding: 12px 15px; font-size: 11px; text-transform: uppercase; color: #64748b;">Action</th>
-              <th style="padding: 12px 15px; font-size: 11px; text-transform: uppercase; color: #64748b;">Details</th>
+          <thead style="position: sticky; top: 0; background: var(--card); z-index: 5;">
+            <tr style="text-align: left; border-bottom: 2px solid var(--paper);">
+              <th style="padding: 12px 15px; font-size: 11px; text-transform: uppercase; color: var(--steel);">Timestamp</th>
+              <th style="padding: 12px 15px; font-size: 11px; text-transform: uppercase; color: var(--steel);">User</th>
+              <th style="padding: 12px 15px; font-size: 11px; text-transform: uppercase; color: var(--steel);">Action</th>
+              <th style="padding: 12px 15px; font-size: 11px; text-transform: uppercase; color: var(--steel);">Details</th>
             </tr>
           </thead>
           <tbody id="system-logs-table-body">
@@ -416,7 +862,7 @@
       <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 30px; margin-top: 15px;">
         <!-- Left Side: Pricing Inputs -->
         <div>
-          <h4 style="font-size: 14px; font-weight: 700; color: var(--primary); margin-bottom: 20px; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; display: flex; align-items: center; gap: 8px;">
+          <h4 style="font-size: 14px; font-weight: 700; color: var(--primary); margin-bottom: 20px; border-bottom: 2px solid var(--paper); padding-bottom: 10px; display: flex; align-items: center; gap: 8px;">
             <i data-lucide="edit-3" style="width: 16px; height: 16px;"></i> Edit Tariff Rates
           </h4>
           <div class="grid-2" style="gap: 15px; margin-bottom: 25px;">
@@ -435,13 +881,13 @@
         </div>
 
         <!-- Right Side: Policy Rules Info Sheet -->
-        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 25px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);">
-          <h4 style="font-size: 14px; font-weight: 700; color: #1e293b; margin-bottom: 15px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px;">
+        <div style="background: var(--card); border: 1px solid var(--paper); border-radius: 16px; padding: 25px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);">
+          <h4 style="font-size: 14px; font-weight: 700; color: var(--ink); margin-bottom: 15px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--paper); padding-bottom: 10px;">
             <i data-lucide="file-text" style="color: var(--primary); width: 16px; height: 16px;"></i> Standard Tariff Terms
           </h4>
-          <div style="font-size: 12px; line-height: 1.6; color: #475569;">
+          <div style="font-size: 12px; line-height: 1.6; color: var(--steel);">
             <div style="margin-bottom: 15px;">
-              <strong style="color: #0f172a; display: block; margin-bottom: 4px;">📂 Without Service Agreement:</strong>
+              <strong style="color: var(--ink); display: block; margin-bottom: 4px;">📂 Without Service Agreement:</strong>
               <ul style="margin: 0; padding-left: 18px;">
                 <li>Credit Card: <strong>£125</strong> per device (PaymentSave excluded).</li>
                 <li>Set Menus: Starting from <strong>£35</strong> per page.</li>
@@ -452,7 +898,7 @@
             </div>
 
             <div style="margin-bottom: 15px;">
-              <strong style="color: #0f172a; display: block; margin-bottom: 4px;">🤝 With Service Agreement:</strong>
+              <strong style="color: var(--ink); display: block; margin-bottom: 4px;">🤝 With Service Agreement:</strong>
               <ul style="margin: 0; padding-left: 18px;">
                 <li>Entitled to up to <strong>four (4) free menu updates</strong> per year.</li>
                 <li>Free online fault detection only for customer hardware.</li>
@@ -461,7 +907,7 @@
             </div>
 
             <div style="margin-bottom: 15px;">
-              <strong style="color: #0f172a; display: block; margin-bottom: 4px;">⏰ Menu Operations & Hours:</strong>
+              <strong style="color: var(--ink); display: block; margin-bottom: 4px;">⏰ Menu Operations & Hours:</strong>
               <ul style="margin: 0; padding-left: 18px;">
                 <li>First 1 hour included in base price (<strong>£125</strong>).</li>
                 <li>Exceeding 1 hour is charged <strong>£25 per extra hour</strong>.</li>
@@ -470,7 +916,7 @@
               </ul>
             </div>
 
-            <div style="border-top: 1px dashed #cbd5e1; padding-top: 10px; font-style: italic; color: #64748b; font-size: 11px;">
+            <div style="border-top: 1px dashed var(--steel); padding-top: 10px; font-style: italic; color: var(--steel); font-size: 11px;">
               *All other services are evaluated per transaction and invoiced separately.
             </div>
           </div>
@@ -482,7 +928,7 @@
     <div id="set-pane-users" class="settings-pane card hidden" style="max-width: 800px; margin: 0 auto;">
       <div class="card-header"><h3 class="card-title">User & Personnel Management</h3></div>
       <div id="personnel-management-container">
-        <div style="display: flex; gap: 8px; margin-bottom: 2rem; background: #f8fafc; padding: 1.5rem; border-radius: 16px; border: 1px solid #e2e8f0; align-items: flex-end;">
+        <div style="display: flex; gap: 8px; margin-bottom: 2rem; background: var(--card); padding: 1.5rem; border-radius: 16px; border: 1px solid var(--paper); align-items: flex-end;">
           <div class="field" style="flex: 1;"><label>User Name</label><input type="text" id="new-personnel-name" placeholder="John Doe" style="padding: 12px; border-radius: 10px;"></div>
           <div class="field" style="width: 150px;"><label>Role</label><select id="new-personnel-role" style="padding: 12px; border-radius: 10px;"><option value="User">User</option><option value="Accounting">Accounting</option><option value="Admin">Admin</option></select></div>
           <div class="field" style="width: 150px;"><label>Password</label><input type="text" id="new-personnel-pass" value="1234" style="padding: 12px; border-radius: 10px;"></div>
@@ -513,7 +959,7 @@
       <div style="padding: 1.5rem;">
         <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 1.5rem;">Add or remove operating system versions for Till Setup (S6) form.</p>
         <div style="display: flex; gap: 8px; margin-bottom: 1.5rem;">
-          <input type="text" id="new-os-name" placeholder="e.g. Win11 Pro 24H2" style="flex: 1; padding: 12px; border: 1px solid #e2e8f0; border-radius: 10px;">
+          <input type="text" id="new-os-name" placeholder="e.g. Win11 Pro 24H2" style="flex: 1; padding: 12px; border: 1px solid var(--paper); border-radius: 10px;">
           <button class="btn btn-primary" onclick="addOS()" style="border-radius: 12px;">Add OS</button>
         </div>
         <div id="os-management-list" style="display: flex; flex-direction: column; gap: 8px;">
@@ -530,7 +976,7 @@
       <div style="padding: 1.5rem;">
         <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 1.5rem;">Add or remove local setting options for Credit Card (S2) form.</p>
         <div style="display: flex; gap: 8px; margin-bottom: 1.5rem;">
-          <input type="text" id="new-cc-local-name" placeholder="e.g. Positive Credit Card" style="flex: 1; padding: 12px; border: 1px solid #e2e8f0; border-radius: 10px;">
+          <input type="text" id="new-cc-local-name" placeholder="e.g. Positive Credit Card" style="flex: 1; padding: 12px; border: 1px solid var(--paper); border-radius: 10px;">
           <button class="btn btn-primary" onclick="addCCLocal()" style="border-radius: 12px;">Add Option</button>
         </div>
         <div id="cc-local-management-list" style="display: flex; flex-direction: column; gap: 8px;">
@@ -545,7 +991,7 @@
       <div style="padding: 1.5rem;">
         <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 1.5rem;">Add or remove card company options for Credit Card (S2) form.</p>
         <div style="display: flex; gap: 8px; margin-bottom: 1.5rem;">
-          <input type="text" id="new-card-company-name" placeholder="e.g. PaymentSense" style="flex: 1; padding: 12px; border: 1px solid #e2e8f0; border-radius: 10px;">
+          <input type="text" id="new-card-company-name" placeholder="e.g. PaymentSense" style="flex: 1; padding: 12px; border: 1px solid var(--paper); border-radius: 10px;">
           <button class="btn btn-primary" onclick="addCardCompany()" style="border-radius: 12px;">Add Company</button>
         </div>
         <div id="card-company-management-list" style="display: flex; flex-direction: column; gap: 8px;">
@@ -560,7 +1006,7 @@
       <div style="padding: 1.5rem;">
         <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 1.5rem;">Add or remove CPU options for Till Setup (S6) form.</p>
         <div style="display: flex; gap: 8px; margin-bottom: 1.5rem;">
-          <input type="text" id="new-cpu-name" placeholder="e.g. i7" style="flex: 1; padding: 12px; border: 1px solid #e2e8f0; border-radius: 10px;">
+          <input type="text" id="new-cpu-name" placeholder="e.g. i7" style="flex: 1; padding: 12px; border: 1px solid var(--paper); border-radius: 10px;">
           <button class="btn btn-primary" onclick="addCPU()" style="border-radius: 12px;">Add CPU</button>
         </div>
         <div id="cpu-management-list" style="display: flex; flex-direction: column; gap: 8px;">
@@ -575,7 +1021,7 @@
       <div style="padding: 1.5rem;">
         <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 1.5rem;">Add or remove Till models for Till Setup (S6) form.</p>
         <div style="display: flex; gap: 8px; margin-bottom: 1.5rem;">
-          <input type="text" id="new-till-model-name" placeholder="e.g. iMin Falcon" style="flex: 1; padding: 12px; border: 1px solid #e2e8f0; border-radius: 10px;">
+          <input type="text" id="new-till-model-name" placeholder="e.g. iMin Falcon" style="flex: 1; padding: 12px; border: 1px solid var(--paper); border-radius: 10px;">
           <button class="btn btn-primary" onclick="addTillModel()" style="border-radius: 12px;">Add Model</button>
         </div>
         <div id="till-model-management-list" style="display: flex; flex-direction: column; gap: 8px;">
@@ -584,16 +1030,31 @@
       </div>
     </div>
 
-    <!-- Account Pane -->
+    <!-- Account Pane (My Account) -->
+    <!-- User profilini to update for used sekme -->
     <div id="set-pane-account" class="settings-pane card hidden" style="max-width: 800px; margin: 0 auto;">
-      <div class="card-header"><h3 class="card-title">My Account Settings</h3></div>
-      <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 1.5rem;">Update your display name and login credentials.</p>
+      <div class="card-header"><h3 class="card-title">My Account Settings (Hesap My Settings)</h3></div>
+      <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 1.5rem;">Update your display name, avatar, and login credentials. (Displayed your name, resminizi ve your password update.)</p>
+      
+      <!-- User bilgileri entry fields -->
       <div class="grid-2" style="gap: 15px;">
-        <div class="field"><label>Update Display Name</label><input type="text" id="acc-new-name" placeholder="Full Name"></div>
-        <div class="field"><label>New Password</label><input type="password" id="acc-new-pass" placeholder="••••••••"></div>
+        <div class="field">
+          <label>Displayed Name (Full Name)</label>
+          <input type="text" id="acc-new-name" placeholder="Tam your name girin">
+        </div>
+        <div class="field">
+          <label>Profil Resmi Linki (Avatar URL)</label>
+          <input type="text" id="acc-new-avatar" placeholder="Resim linki paste (Optional connected)">
+        </div>
+        <div class="field" style="grid-column: span 2;">
+          <label>New Password (New Password)</label>
+          <input type="password" id="acc-new-pass" placeholder="To change if you don't want empty leave">
+        </div>
       </div>
+      
+      <!-- Save butonu (updateAccountProfile fonksiyonunu tetikler) -->
       <div class="flex-end mt-2" style="display: flex; justify-content: flex-end;">
-        <button class="btn btn-primary" onclick="updateAccount()">Save Account Changes</button>
+        <button class="btn btn-primary" onclick="updateAccountProfile()">Save Account Changes (Changes Save)</button>
       </div>
     </div>
 
@@ -603,17 +1064,17 @@
       <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 2rem;">Download your database records in CSV format for local backup or reporting.</p>
       
       <div class="grid-2" style="gap: 20px;">
-        <div class="card" style="margin: 0; padding: 1.5rem; background: #f8fafc; border: 1px solid #e2e8f0;">
+        <div class="card" style="margin: 0; padding: 1.5rem; background: var(--card); border: 1px solid var(--paper);">
           <h4 style="margin-bottom: 10px; font-size: 14px;">Main Database Records</h4>
-          <p style="font-size: 12px; color: #64748b; margin-bottom: 1.5rem;">Export all service records, including pricing and durations.</p>
+          <p style="font-size: 12px; color: var(--steel); margin-bottom: 1.5rem;">Export all service records, including pricing and durations.</p>
           <button class="btn btn-primary" onclick="exportToCSV()" style="width: 100%; justify-content: center;">
             <i data-lucide="download"></i> Export Tickets (.CSV)
           </button>
         </div>
         
-        <div class="card" style="margin: 0; padding: 1.5rem; background: #f8fafc; border: 1px solid #e2e8f0;">
+        <div class="card" style="margin: 0; padding: 1.5rem; background: var(--card); border: 1px solid var(--paper);">
           <h4 style="margin-bottom: 10px; font-size: 14px;">Customer Database</h4>
-          <p style="font-size: 12px; color: #64748b; margin-bottom: 1.5rem;">Export all customer contacts and service contract status.</p>
+          <p style="font-size: 12px; color: var(--steel); margin-bottom: 1.5rem;">Export all customer contacts and service contract status.</p>
           <button class="btn btn-secondary" onclick="exportCustomersToCSV()" style="width: 100%; justify-content: center;">
             <i data-lucide="download"></i> Export Customers (.CSV)
           </button>
@@ -643,11 +1104,11 @@
               <div class="stat-label">Total Records</div>
               <div class="stat-value" id="stat-total-records">0</div>
           </div>
-          <div class="stat-card" style="border-bottom: 3px solid #10b981;">
+          <div class="stat-card" style="border-bottom: 3px solid var(--green);">
               <div class="stat-label">Estimated Revenue</div>
               <div class="stat-value" id="stat-total-revenue">£0.00</div>
           </div>
-          <div class="stat-card" style="border-bottom: 3px solid #f59e0b;">
+          <div class="stat-card" style="border-bottom: 3px solid var(--amber);">
               <div class="stat-label">Chargeable vs Contract</div>
               <div class="stat-value" id="stat-split" style="font-size: 1.2rem;">0 / 0</div>
           </div>
@@ -658,94 +1119,124 @@
   </section>
 
   <!-- DATA VIEW SECTION -->
-  <section id="section-dataview" class="section white-section">
-    <div class="filter-panel">
-      <div class="filter-group">
-        <label>Category</label>
-        <select id="dataview-category-filter" onchange="showDataSubTab(this.value)">
-          <option value="all">ALL CAT</option>
-          <option value="S1">MENU</option>
-          <option value="S2">CARD</option>
+  
+  <section id="section-dataview" class="section">
+    <div class="wrap invoice-wrap">
+      <h1 style="font-size:clamp(1.5rem,3vw,2rem); margin:0 0 1.5rem; font-weight:700; color:var(--ink); letter-spacing:-0.01em;">Service Database</h1>
+      
+      <div class="toolbar" style="display:flex; gap:1rem; flex-wrap:wrap; margin-bottom:1.5rem; border-bottom:1px dashed var(--line); padding-bottom:1rem;">
+        <input type="text" id="dataview-search" placeholder="Search by Company, ID, or description..." oninput="renderDataTable()" style="padding:0.6rem 1rem; border:1px solid var(--ink); background:var(--card); font-family:'IBM Plex Sans',sans-serif; flex:1; min-width:250px; border-radius:2px;">
+        <select id="dataview-category-filter" onchange="showDataSubTab(this.value)" style="padding:0.6rem 1rem; border:1px solid var(--ink); background:var(--card); font-family:'IBM Plex Sans',sans-serif; border-radius:2px;">
+          <option value="all">ALL DEPARTMENTS</option>
+          <option value="S1">MENU UPDATE</option>
+          <option value="S2">CREDIT CARD</option>
           <option value="S4">SERVICE</option>
-          <option value="S6">TILL</option>
+          <option value="S6">PROGRAMMING / TILL</option>
         </select>
-      </div>
-
-      <div class="search-box filter-group">
-        <label>Search Database</label>
-        <div style="position: relative;">
-          <input type="text" id="dataview-search" placeholder="Search by Company, ID, or description..." oninput="renderDataTable()" style="padding-left: 12px !important;">
-        </div>
-      </div>
-
-      <div class="filter-group">
-        <label>From</label>
-        <input type="date" id="dataview-start-date" onchange="renderDataTable()">
-      </div>
-
-      <div class="filter-group">
-        <label>To</label>
-        <input type="date" id="dataview-end-date" onchange="renderDataTable()">
-      </div>
-
-      <div class="filter-group">
-        <label>Status</label>
-        <select id="dataview-payment-filter" onchange="renderDataTable()">
-          <option value="all">ALL STATUS</option>
+        <select id="dataview-payment-filter" onchange="renderDataTable()" style="padding:0.6rem 1rem; border:1px solid var(--ink); background:var(--card); font-family:'IBM Plex Sans',sans-serif; border-radius:2px;">
+          <option value="all">ALL STATUSES</option>
           <option value="Chargeable">Chargeable</option>
           <option value="Contract">Contract</option>
           <option value="Free">Free</option>
         </select>
       </div>
-    </div>
 
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>ID</th>
-            <th>Company</th>
-            <th>Type</th>
-            <th>Status</th>
-            <th>Amount</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody id="data-table-body"></tbody>
-      </table>
-    </div>
-  </section>
-
-  <!-- CUSTOMERS SECTION -->
-  <section id="section-customers" class="section white-section">
-    <div class="crm-header">
-        <div>
-            <h2>Customers</h2>
-            <p>Manage customer accounts and service requests.</p>
+      <div class="ledger" style="margin-bottom:2rem;">
+        <div class="ledger-head" style="grid-template-columns:100px 1.5fr 1fr 100px 100px 80px;">
+            <div>DATE</div><div>COMPANY</div><div>SERVICE INFO</div><div>STATUS</div><div>AMOUNT</div><div></div>
         </div>
-    </div>
-    
-    <div class="crm-search-bar">
-        <i data-lucide="search" class="search-icon"></i>
-        <input type="text" id="customer-search-saas" placeholder="Search customers, invoices or tickets..." oninput="filterCustomersSaaS(this.value)">
-    </div>
-    
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>CUSTOMER ID</th>
-            <th>COMPANY</th>
-            <th>POSTCODE</th>
-            <th>SERVICE STATUS</th>
-            <th style="text-align: right;">ACTIONS</th>
-          </tr>
-        </thead>
-        <tbody id="customers-table-body"></tbody>
-      </table>
+
+        <!-- ACTUAL TBODY FOR JS TO RENDER INTO -->
+        <div id="data-table-body"></div>
+      </div>
     </div>
   </section>
+
+
+  <!-- CUSALLRS SECTION -->
+  
+  <section id="section-customers" class="section">
+    <div class="wrap" style="max-width:1200px; margin:0 auto; padding:2rem 1.5rem 4rem;">
+      <h1 style="font-size:clamp(1.5rem,3vw,2rem); margin:0 0 1.5rem; font-weight:700; color:var(--ink); letter-spacing:-0.01em;">Customer Directory</h1>
+
+      <!-- Search + Filters Bar -->
+      <div style="display:flex; flex-wrap:wrap; gap:0.75rem; align-items:center; border:1px solid var(--ink); background:var(--card); padding:1rem 1.25rem; margin-bottom:1.5rem; box-shadow:4px 4px 0 rgba(29,36,48,0.08);">
+        
+        <!-- Search Input -->
+        <div style="display:flex; align-items:center; flex:1; min-width:220px; border:1px solid var(--ink); background:var(--paper); position:relative;">
+          <i data-lucide="search" style="width:16px;height:16px;position:absolute;left:0.65rem;color:var(--steel);"></i>
+          <input type="text" id="customer-search" placeholder="Search name, phone, postcode, city..." 
+            style="flex:1; padding:0.6rem 2.5rem 0.6rem 2.2rem; border:none; background:transparent; font-family:'IBM Plex Sans',sans-serif; font-size:0.9rem; color:var(--ink); outline:none;">
+          <button id="customer-search-clear" onclick="clearCustomerSearch()" title="Clear search"
+            style="display:none; position:absolute; right:0.5rem; background:none; border:none; cursor:pointer; color:var(--steel); padding:0.25rem; line-height:1;">
+            <i data-lucide="x" style="width:14px;height:14px;"></i>
+          </button>
+        </div>
+
+        <!-- Status Filter -->
+        <div style="display:flex; flex-direction:column; gap:0.2rem;">
+          <label style="font-family:'IBM Plex Mono',monospace; font-size:0.65rem; color:var(--steel); text-transform:uppercase;">Status</label>
+          <select id="customer-status-filter" onchange="applyCustomerFilters()" 
+            style="padding:0.55rem 0.8rem; border:1px solid var(--ink); background:var(--paper); color:var(--ink); font-family:'IBM Plex Sans',sans-serif; font-size:0.85rem; cursor:pointer; min-width:130px;">
+            <option value="all">All Statuses</option>
+            <option value="active">Active Contract</option>
+            <option value="none">No Contract</option>
+          </select>
+        </div>
+
+        <!-- Industry Filter -->
+        <div style="display:flex; flex-direction:column; gap:0.2rem;">
+          <label style="font-family:'IBM Plex Mono',monospace; font-size:0.65rem; color:var(--steel); text-transform:uppercase;">Industry</label>
+          <select id="customer-industry-filter" onchange="applyCustomerFilters()"
+            style="padding:0.55rem 0.8rem; border:1px solid var(--ink); background:var(--paper); color:var(--ink); font-family:'IBM Plex Sans',sans-serif; font-size:0.85rem; cursor:pointer; min-width:150px;">
+            <option value="all">All Industries</option>
+            <option value="Fast Food">Fast Food</option>
+            <option value="Restaurant">Restaurant / Café</option>
+            <option value="Supermarket">Supermarket</option>
+            <option value="Retail">Retail</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+
+        <!-- Sort -->
+        <div style="display:flex; flex-direction:column; gap:0.2rem;">
+          <label style="font-family:'IBM Plex Mono',monospace; font-size:0.65rem; color:var(--steel); text-transform:uppercase;">Sort By</label>
+          <select id="customer-sort-filter" onchange="applyCustomerFilters()"
+            style="padding:0.55rem 0.8rem; border:1px solid var(--ink); background:var(--paper); color:var(--ink); font-family:'IBM Plex Sans',sans-serif; font-size:0.85rem; cursor:pointer; min-width:160px;">
+            <option value="recent">Recently Updated</option>
+            <option value="name">Sort by Name (A–Z)</option>
+            <option value="postcode">Sort by Postcode</option>
+            <option value="city">Sort by City</option>
+          </select>
+        </div>
+
+        <!-- Counter -->
+        <div style="margin-left:auto;">
+          <div id="customer-count-display" style="font-family:'IBM Plex Mono',monospace; font-size:0.75rem; color:var(--steel);">Loading...</div>
+        </div>
+      </div>
+
+      <!-- LIST VIEW TABLE -->
+      <div style="border:1px solid var(--ink); box-shadow:4px 4px 0 rgba(29,36,48,0.08); overflow:hidden;">
+        <!-- Header -->
+        <div style="display:grid; grid-template-columns:130px 1fr 160px 160px 100px; background:var(--ink); color:var(--paper); padding:0.65rem 1rem; font-family:'IBM Plex Mono',monospace; font-size:0.7rem; text-transform:uppercase; letter-spacing:0.05em; gap:0.5rem;">
+          <div>ORG ID</div>
+          <div>ORGANIZATION</div>
+          <div>POSTCODE / CITY</div>
+          <div>SERVICE STATUS</div>
+          <div>ACTIONS</div>
+        </div>
+        <!-- Rows Container -->
+        <div id="customers-list" style="max-height:72vh; overflow-y:auto;">
+          <div style="padding:2rem; text-align:center; font-family:'IBM Plex Mono',monospace; color:var(--steel); font-size:0.8rem;">Loading customer directory...</div>
+        </div>
+      </div>
+
+
+    </div>
+  </section>
+
+
 
   <!-- INVOICES SECTION -->
   <section id="section-invoices" class="section white-section">
@@ -795,12 +1286,25 @@
   </section>
 
   <!-- WAITING JOBS SECTION -->
+  
   <section id="section-waiting" class="section">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-      <h2 style="font-size: 1.5rem; font-weight: 700; color: #1e293b; letter-spacing: -0.02em;">Appointments List</h2>
+    <div class="wrap invoice-wrap">
+      <h1 style="font-size:clamp(1.5rem,3vw,2rem); margin:0 0 1.5rem; font-weight:700; color:var(--ink); letter-spacing:-0.01em;">Appointments List</h1>
+      
+      <div class="toolbar" style="display:flex; justify-content:flex-end; margin-bottom:1.5rem; border-bottom:1px dashed var(--line); padding-bottom:1rem;">
+        <button class="ticket-btn primary" onclick="showTab('dashboard'); toggleMainForm('category');" style="background:var(--ink); color:var(--paper); border:1px solid var(--ink); box-shadow:2px 2px 0 rgba(29,36,48,0.2);">+ Schedule New</button>
+      </div>
+
+      <div class="ledger" style="margin-bottom:2rem;">
+        <div class="ledger-head" style="grid-template-columns:120px 1.5fr 1fr 120px 80px;">
+            <div>ALL</div><div>CUSALLR</div><div>TECHNICIAN</div><div>STATUS</div><div></div>
+        </div>
+        
+        <div id="waiting-tree-container"></div>
+      </div>
     </div>
-    <div id="waiting-tree-container" class="table-wrap"></div>
   </section>
+
 
   <!-- CALENDAR SECTION -->
   <section id="section-calendar" class="section">
@@ -842,6 +1346,332 @@
       </div>
     </div>
   </section>
+
+  
+  <!-- ADMIN PANEL SECTION -->
+  <section id="section-admin" class="section">
+    <div class="wrap" style="max-width:1120px; margin:0 auto; padding:2rem 1.5rem 4rem;">
+      <h1 style="font-size:clamp(1.5rem,3vw,2rem); margin:0 0 1.5rem; font-weight:700; color:var(--ink); letter-spacing:-0.01em;">Admin Panel</h1>
+      
+      <!-- ADMIN TABS -->
+      <div style="display:flex; gap:1.5rem; border-bottom:1px solid var(--ink); margin-bottom:2rem; overflow-x:auto;">
+        <button class="admin-tab-btn active" onclick="showAdminPane('users', this)" style="background:transparent; border:none; border-bottom:3px solid var(--ink); padding:0.8rem 1rem; font-family:'IBM Plex Sans',sans-serif; font-weight:600; font-size:1rem; color:var(--ink); cursor:pointer;">Personnel</button>
+        <button class="admin-tab-btn" onclick="showAdminPane('roles', this)" style="background:transparent; border:none; border-bottom:3px solid transparent; padding:0.8rem 1rem; font-family:'IBM Plex Sans',sans-serif; font-weight:600; font-size:1rem; color:var(--steel); cursor:pointer;">Role Settings & Access</button>
+        <button class="admin-tab-btn" onclick="showAdminPane('logs', this)" style="background:transparent; border:none; border-bottom:3px solid transparent; padding:0.8rem 1rem; font-family:'IBM Plex Sans',sans-serif; font-weight:600; font-size:1rem; color:var(--steel); cursor:pointer;">System Logs</button>
+        <button class="admin-tab-btn" onclick="showAdminPane('performance', this)" style="background:transparent; border:none; border-bottom:3px solid transparent; padding:0.8rem 1rem; font-family:'IBM Plex Sans',sans-serif; font-weight:600; font-size:1rem; color:var(--steel); cursor:pointer;">Performance</button>
+        <button class="admin-tab-btn" onclick="showAdminPane('status', this)" style="background:transparent; border:none; border-bottom:3px solid transparent; padding:0.8rem 1rem; font-family:'IBM Plex Sans',sans-serif; font-weight:600; font-size:1rem; color:var(--steel); cursor:pointer;">System Status</button>
+      </div>
+
+      <!-- PANE 1: USERS -->
+      <div id="admin-pane-users" class="admin-pane">
+          <!-- USER CREATION TICKET -->
+          <div style="background:var(--card); border:1px solid var(--ink); border-radius:2px; padding:1.5rem; margin-bottom:3rem; box-shadow:4px 4px 0 rgba(29,36,48,0.12); position:relative;">
+            <div class="stub" style="position:absolute; top:0; left:0; width:34px; height:100%; border-right:1px dashed var(--line);"></div>
+            <div style="margin-left: 2.5rem;">
+                <h2 style="font-size:1.2rem; font-weight:700; color:var(--ink); margin:0 0 1rem;">Create New Personnel</h2>
+                <div style="display:flex; gap:1.5rem; flex-wrap:wrap; align-items:flex-end;">
+                    <div style="flex:1; min-width:200px;">
+                        <label style="font-family:'IBM Plex Mono',monospace; font-size:0.75rem; color:var(--steel); display:block; margin-bottom:0.3rem;">FULL NAME</label>
+                        <input type="text" id="admin-new-user-name" placeholder="E.g. Jane Doe" style="width:100%; padding:0.8rem; border:1px solid var(--ink); background:var(--paper); font-family:'IBM Plex Sans',sans-serif; border-radius:2px;">
+                    </div>
+                    <div style="width:180px;">
+                        <label style="font-family:'IBM Plex Mono',monospace; font-size:0.75rem; color:var(--steel); display:block; margin-bottom:0.3rem;">ROLE / CLEARANCE</label>
+                        <select id="admin-new-user-role" style="width:100%; padding:0.8rem; border:1px solid var(--ink); background:var(--paper); font-family:'IBM Plex Sans',sans-serif; border-radius:2px;">
+                            <option value="User">Field Technician (User)</option>
+                            <option value="Accounting">Accounting & Finance</option>
+                            <option value="Admin">Administrator</option>
+                        </select>
+                    </div>
+                    <div style="width:180px;">
+                        <label style="font-family:'IBM Plex Mono',monospace; font-size:0.75rem; color:var(--steel); display:block; margin-bottom:0.3rem;">PASSWORD (DEFAULT: 1234)</label>
+                        <input type="text" id="admin-new-user-pass" value="1234" placeholder="1234" style="width:100%; padding:0.8rem; border:1px solid var(--ink); background:var(--paper); font-family:'IBM Plex Mono',monospace; border-radius:2px;">
+                    </div>
+                    <button class="ticket-btn primary" onclick="adminAddUser()" style="padding:0.8rem 1.5rem; font-size:0.9rem; font-weight:600; background:var(--ink); color:var(--paper); border:1px solid var(--ink); box-shadow:2px 2px 0 rgba(29,36,48,0.2); cursor:pointer; border-radius:2px;">Authorize & Add</button>
+                </div>
+            </div>
+          </div>
+          
+          <h2 style="font-size:1.2rem; font-weight:700; color:var(--ink); margin:0 0 1rem;">Active Personnel Directory</h2>
+          <div class="ledger">
+            <div class="ledger-head" style="grid-template-columns:1fr 1fr 150px 100px;">
+                <div>NAME</div><div>ROLE</div><div>STATUS</div><div></div>
+            </div>
+            <div id="admin-users-list"></div>
+          </div>
+      </div>
+
+      <!-- PANE 2: ROLES & ACCESS -->
+      <div id="admin-pane-roles" class="admin-pane" style="display:none;">
+          
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:1rem;">
+            <div>
+              <h2 style="font-size:1.3rem; font-weight:700; color:var(--ink); margin:0 0 0.3rem;">Role-Based Access & Settings</h2>
+              <p style="font-size:0.85rem; color:var(--steel); margin:0;">Manage security clearances, system roles, and assign permissions to personnel.</p>
+            </div>
+            <button onclick="renderAdminRolesList()" class="ticket-btn secondary" style="padding:0.5rem 1rem; font-size:0.8rem; display:flex; align-items:center; gap:6px;">
+              <i data-lucide="refresh-cw" style="width:14px; height:14px;"></i> Refresh Roles
+            </button>
+          </div>
+
+          <!-- ROLE CARDS OVERVIEW -->
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:1.5rem; margin-bottom:2.5rem;">
+              
+              <!-- ADMIN -->
+              <div style="background:var(--card); border:1px solid var(--ink); padding:1.5rem; position:relative; box-shadow:4px 4px 0 rgba(29,36,48,0.12); border-radius:2px;">
+                  <span class="stamp delete" style="position:absolute; top:1.5rem; right:1.5rem; font-family:'IBM Plex Mono',monospace;">ADMIN</span>
+                  <div style="font-weight:700; color:var(--ink); font-size:1.1rem; margin-bottom:0.2rem;">Administrator</div>
+                  <div id="roles-admin-count" style="font-family:'IBM Plex Mono',monospace; font-size:0.75rem; color:var(--steel); margin-bottom:1.2rem;">— USERS IN ROLE</div>
+                  <div style="font-size:0.8rem; color:var(--steel); margin-bottom:1rem;">Full system authorization, pricing controls, user administration, and system audit logs.</div>
+                  
+                  <div style="border-top:1px dashed var(--line); padding-top:0.75rem;">
+                      <div style="display:flex; justify-content:space-between; margin-bottom:0.4rem; font-size:0.85rem; color:var(--ink);">
+                          <span>Appointments & Calendar</span>
+                          <span style="color:var(--green); font-weight:700;">Full</span>
+                      </div>
+                      <div style="display:flex; justify-content:space-between; margin-bottom:0.4rem; font-size:0.85rem; color:var(--ink);">
+                          <span>Customer Directory</span>
+                          <span style="color:var(--green); font-weight:700;">Full</span>
+                      </div>
+                      <div style="display:flex; justify-content:space-between; margin-bottom:0.4rem; font-size:0.85rem; color:var(--ink);">
+                          <span>Invoices & Billing</span>
+                          <span style="color:var(--green); font-weight:700;">Full</span>
+                      </div>
+                      <div style="display:flex; justify-content:space-between; font-size:0.85rem; color:var(--ink);">
+                          <span>Admin & System Settings</span>
+                          <span style="color:var(--green); font-weight:700;">Full</span>
+                      </div>
+                  </div>
+              </div>
+              
+              <!-- USER (FIELD TECHNICIAN) -->
+              <div style="background:var(--card); border:1px solid var(--ink); padding:1.5rem; position:relative; box-shadow:4px 4px 0 rgba(29,36,48,0.12); border-radius:2px;">
+                  <span class="stamp auth" style="position:absolute; top:1.5rem; right:1.5rem; font-family:'IBM Plex Mono',monospace; background:var(--blue); color:var(--card);">USER</span>
+                  <div style="font-weight:700; color:var(--ink); font-size:1.1rem; margin-bottom:0.2rem;">Field Technician</div>
+                  <div id="roles-user-count" style="font-family:'IBM Plex Mono',monospace; font-size:0.75rem; color:var(--steel); margin-bottom:1.2rem;">— USERS IN ROLE</div>
+                  <div style="font-size:0.8rem; color:var(--steel); margin-bottom:1rem;">Access to field service tickets, task execution, appointments, and client contact information.</div>
+                  
+                  <div style="border-top:1px dashed var(--line); padding-top:0.75rem;">
+                      <div style="display:flex; justify-content:space-between; margin-bottom:0.4rem; font-size:0.85rem; color:var(--ink);">
+                          <span>Appointments & Calendar</span>
+                          <span style="color:var(--green); font-weight:700;">Read / Write</span>
+                      </div>
+                      <div style="display:flex; justify-content:space-between; margin-bottom:0.4rem; font-size:0.85rem; color:var(--ink);">
+                          <span>Customer Directory</span>
+                          <span style="color:var(--steel);">View Only</span>
+                      </div>
+                      <div style="display:flex; justify-content:space-between; margin-bottom:0.4rem; font-size:0.85rem; color:var(--ink);">
+                          <span>Invoices & Billing</span>
+                          <span style="color:#b91c1c;">No Access</span>
+                      </div>
+                      <div style="display:flex; justify-content:space-between; font-size:0.85rem; color:var(--ink);">
+                          <span>Admin & System Settings</span>
+                          <span style="color:#b91c1c;">No Access</span>
+                      </div>
+                  </div>
+              </div>
+
+              <!-- ACCOUNTING (FINANCE) -->
+              <div style="background:var(--card); border:1px solid var(--ink); padding:1.5rem; position:relative; box-shadow:4px 4px 0 rgba(29,36,48,0.12); border-radius:2px;">
+                  <span class="stamp create" style="position:absolute; top:1.5rem; right:1.5rem; font-family:'IBM Plex Mono',monospace; background:var(--green); color:var(--card);">FINANCE</span>
+                  <div style="font-weight:700; color:var(--ink); font-size:1.1rem; margin-bottom:0.2rem;">Accounting & Finance</div>
+                  <div id="roles-finance-count" style="font-family:'IBM Plex Mono',monospace; font-size:0.75rem; color:var(--steel); margin-bottom:1.2rem;">— USERS IN ROLE</div>
+                  <div style="font-size:0.8rem; color:var(--steel); margin-bottom:1rem;">Financial ledger oversight, invoicing, payment tracking, and customer balance auditing.</div>
+                  
+                  <div style="border-top:1px dashed var(--line); padding-top:0.75rem;">
+                      <div style="display:flex; justify-content:space-between; margin-bottom:0.4rem; font-size:0.85rem; color:var(--ink);">
+                          <span>Appointments & Calendar</span>
+                          <span style="color:var(--steel);">View Only</span>
+                      </div>
+                      <div style="display:flex; justify-content:space-between; margin-bottom:0.4rem; font-size:0.85rem; color:var(--ink);">
+                          <span>Customer Directory</span>
+                          <span style="color:var(--green); font-weight:700;">Full</span>
+                      </div>
+                      <div style="display:flex; justify-content:space-between; margin-bottom:0.4rem; font-size:0.85rem; color:var(--ink);">
+                          <span>Invoices & Billing</span>
+                          <span style="color:var(--green); font-weight:700;">Full</span>
+                      </div>
+                      <div style="display:flex; justify-content:space-between; font-size:0.85rem; color:var(--ink);">
+                          <span>Admin & System Settings</span>
+                          <span style="color:#b91c1c;">No Access</span>
+                      </div>
+                  </div>
+              </div>
+
+          </div>
+
+          <!-- PERSONNEL ROLE ASSIGNMENT TABLE -->
+          <div style="background:var(--card); border:1px solid var(--ink); border-radius:2px; padding:1.5rem; box-shadow:4px 4px 0 rgba(29,36,48,0.12); margin-bottom:2.5rem;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; border-bottom:1px solid var(--line); padding-bottom:0.75rem;">
+                  <div>
+                      <h3 style="font-size:1.1rem; font-weight:700; color:var(--ink); margin:0 0 0.2rem;">Personnel Role Assignment</h3>
+                      <p style="font-size:0.8rem; color:var(--steel); margin:0;">Select and instantly update clearance level for any personnel in Turso DB.</p>
+                  </div>
+              </div>
+              <div style="overflow-x:auto;">
+                  <table style="width:100%; border-collapse:collapse; text-align:left;">
+                      <thead>
+                          <tr style="border-bottom:2px solid var(--ink); font-family:'IBM Plex Mono',monospace; font-size:0.72rem; color:var(--steel); text-transform:uppercase;">
+                              <th style="padding:0.75rem 1rem;">Personnel / Username</th>
+                              <th style="padding:0.75rem 1rem;">Current Role</th>
+                              <th style="padding:0.75rem 1rem;">Change Clearance</th>
+                              <th style="padding:0.75rem 1rem; text-align:right;">Action</th>
+                          </tr>
+                      </thead>
+                      <tbody id="admin-roles-user-table-body">
+                          <tr><td colspan="4" style="text-align:center; padding:1.5rem; color:var(--steel); font-family:'IBM Plex Mono',monospace;">Loading personnel role records...</td></tr>
+                      </tbody>
+                  </table>
+              </div>
+          </div>
+
+          <!-- ROLE PERMISSION MATRIX & CLEARANCE SETTINGS -->
+          <div style="background:var(--card); border:1px solid var(--ink); border-radius:2px; padding:1.5rem; box-shadow:4px 4px 0 rgba(29,36,48,0.12); margin-bottom:2.5rem;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; border-bottom:1px solid var(--line); padding-bottom:0.75rem; flex-wrap:wrap; gap:0.5rem;">
+                  <div>
+                      <h3 style="font-size:1.1rem; font-weight:700; color:var(--ink); margin:0 0 0.2rem;">Module Permissions & Role Settings</h3>
+                      <p style="font-size:0.8rem; color:var(--steel); margin:0;">Configure access rights across portal modules for each security tier.</p>
+                  </div>
+                  <button id="btn-save-role-settings" onclick="adminSaveRoleSettings()" class="ticket-btn primary" style="padding:6px 14px; font-size:0.8rem; font-weight:600; cursor:pointer;">
+                      <i data-lucide="shield-check" style="width:14px; height:14px; vertical-align:middle; margin-right:4px;"></i> Save Role Settings
+                  </button>
+              </div>
+
+              <div style="overflow-x:auto;">
+                  <table style="width:100%; border-collapse:collapse; text-align:left; font-size:0.85rem;">
+                      <thead>
+                          <tr style="border-bottom:2px solid var(--ink); font-family:'IBM Plex Mono',monospace; font-size:0.72rem; color:var(--steel); text-transform:uppercase;">
+                              <th style="padding:0.75rem 1rem;">Portal Module</th>
+                              <th style="padding:0.75rem 1rem; text-align:center;">Administrator</th>
+                              <th style="padding:0.75rem 1rem; text-align:center;">Accounting & Finance</th>
+                              <th style="padding:0.75rem 1rem; text-align:center;">Field Technician (User)</th>
+                          </tr>
+                      </thead>
+                      <tbody>
+                          <tr style="border-bottom:1px solid var(--paper);">
+                              <td style="padding:0.75rem 1rem; font-weight:600; color:var(--ink);">📅 Appointments & Calendar</td>
+                              <td style="padding:0.75rem 1rem; text-align:center;"><span style="color:var(--green); font-weight:700;">Full Access</span></td>
+                              <td style="padding:0.75rem 1rem; text-align:center;">
+                                  <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
+                                      <input type="checkbox" id="perm-acc-calendar" checked style="accent-color:var(--ink);"> View Only
+                                  </label>
+                              </td>
+                              <td style="padding:0.75rem 1rem; text-align:center;">
+                                  <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
+                                      <input type="checkbox" id="perm-user-calendar" checked style="accent-color:var(--ink);"> Read / Write
+                                  </label>
+                              </td>
+                          </tr>
+                          <tr style="border-bottom:1px solid var(--paper);">
+                              <td style="padding:0.75rem 1rem; font-weight:600; color:var(--ink);">👥 Customer Directory</td>
+                              <td style="padding:0.75rem 1rem; text-align:center;"><span style="color:var(--green); font-weight:700;">Full Access</span></td>
+                              <td style="padding:0.75rem 1rem; text-align:center;">
+                                  <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
+                                      <input type="checkbox" id="perm-acc-customers" checked style="accent-color:var(--ink);"> Full Access
+                                  </label>
+                              </td>
+                              <td style="padding:0.75rem 1rem; text-align:center;">
+                                  <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
+                                      <input type="checkbox" id="perm-user-customers" checked style="accent-color:var(--ink);"> View Only
+                                  </label>
+                              </td>
+                          </tr>
+                          <tr style="border-bottom:1px solid var(--paper);">
+                              <td style="padding:0.75rem 1rem; font-weight:600; color:var(--ink);">💳 Invoices & Billing</td>
+                              <td style="padding:0.75rem 1rem; text-align:center;"><span style="color:var(--green); font-weight:700;">Full Access</span></td>
+                              <td style="padding:0.75rem 1rem; text-align:center;">
+                                  <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
+                                      <input type="checkbox" id="perm-acc-invoices" checked style="accent-color:var(--ink);"> Full Access
+                                  </label>
+                              </td>
+                              <td style="padding:0.75rem 1rem; text-align:center;">
+                                  <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
+                                      <input type="checkbox" id="perm-user-invoices" style="accent-color:var(--ink);"> Allow Invoicing
+                                  </label>
+                              </td>
+                          </tr>
+                          <tr style="border-bottom:1px solid var(--paper);">
+                              <td style="padding:0.75rem 1rem; font-weight:600; color:var(--ink);">⚙️ Admin Panel & Personnel</td>
+                              <td style="padding:0.75rem 1rem; text-align:center;"><span style="color:var(--green); font-weight:700;">Full Access</span></td>
+                              <td style="padding:0.75rem 1rem; text-align:center;"><span style="color:#b91c1c; font-weight:600;">Restricted</span></td>
+                              <td style="padding:0.75rem 1rem; text-align:center;"><span style="color:#b91c1c; font-weight:600;">Restricted</span></td>
+                          </tr>
+                          <tr>
+                              <td style="padding:0.75rem 1rem; font-weight:600; color:var(--ink);">🏷️ Pricing & Service Catalog</td>
+                              <td style="padding:0.75rem 1rem; text-align:center;"><span style="color:var(--green); font-weight:700;">Full Access</span></td>
+                              <td style="padding:0.75rem 1rem; text-align:center;">
+                                  <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
+                                      <input type="checkbox" id="perm-acc-pricing" checked style="accent-color:var(--ink);"> Edit Pricing
+                                  </label>
+                              </td>
+                              <td style="padding:0.75rem 1rem; text-align:center;">
+                                  <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
+                                      <input type="checkbox" id="perm-user-pricing" style="accent-color:var(--ink);"> View Only
+                                  </label>
+                              </td>
+                          </tr>
+                      </tbody>
+                  </table>
+              </div>
+          </div>
+
+          <!-- PERMISSION MATRIX DETAILS -->
+          <div style="background:var(--paper); border:1px dashed var(--line); border-radius:2px; padding:1.25rem;">
+              <h4 style="font-size:0.9rem; font-weight:700; color:var(--ink); margin:0 0 0.5rem; text-transform:uppercase; font-family:'IBM Plex Mono',monospace;">Role Hierarchy Information</h4>
+              <ul style="margin:0; padding-left:1.2rem; font-size:0.82rem; color:var(--steel); line-height:1.6;">
+                  <li><strong>Administrator:</strong> Has unrestricted access to all modules, including database sync, admin ledger, performance metrics, and personnel creation.</li>
+                  <li><strong>Financial (Accounting):</strong> Has full access to the Invoices tab, revenue reporting, and customer billing records.</li>
+                  <li><strong>Field Technician (User):</strong> Default role for new personnel. Default password is <code>1234</code>. Allowed to view services, appointments, and execute scheduled jobs.</li>
+              </ul>
+          </div>
+
+      </div>
+
+      <!-- PANE 3: LOGS -->
+      <div id="admin-pane-logs" class="admin-pane" style="display:none;">
+          <h2 style="font-size:1.2rem; font-weight:700; color:var(--ink); margin:0 0 1rem;">System Activity Ledger</h2>
+          <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px dashed var(--line); padding-bottom:1rem; margin-bottom:1rem;">
+            <div style="display:flex; gap:1rem;">
+                <input type="text" placeholder="Search logs..." style="padding:0.5rem; border:1px solid var(--ink); background:var(--card); font-family:'IBM Plex Sans',sans-serif;">
+                <select style="padding:0.5rem; border:1px solid var(--ink); background:var(--card); font-family:'IBM Plex Sans',sans-serif;">
+                    <option>All Actions</option>
+                    <option>Logins</option>
+                    <option>Updates</option>
+                </select>
+            </div>
+            <button class="ticket-btn ghost" style="padding:0.5rem 1rem; border:1px solid var(--ink); background:transparent; font-weight:600; font-size:0.85rem; border-radius:2px; cursor:pointer;"><i data-lucide="download" style="width:14px;height:14px;vertical-align:middle;"></i> Export Ledger</button>
+          </div>
+          
+          <div class="ledger">
+            <div class="ledger-head" style="grid-template-columns:140px 150px 120px 1fr;">
+                <div>ALLSALL</div><div>USER</div><div>ACTION</div><div>DETAILS</div>
+            </div>
+            <div id="admin-logs-table-body"></div>
+          </div>
+      </div>
+
+      <!-- PANE 4: PERFORMANCE -->
+      <div id="admin-pane-performance" class="admin-pane" style="display:none;">
+          <h2 style="font-size:1.2rem; font-weight:700; color:var(--ink); margin:0 0 1rem;">System Performance Metrics</h2>
+          <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:1.5rem; margin-bottom:2rem;">
+              <div style="background:var(--card); border:1px solid var(--ink); padding:1.5rem; box-shadow:4px 4px 0 rgba(29,36,48,0.12);">
+                  <div style="font-family:'IBM Plex Mono',monospace; font-size:0.75rem; color:var(--steel); margin-bottom:0.5rem;">API RESPONSE ALL</div>
+                  <div id="perf-api-time" style="font-size:2rem; font-weight:700; color:var(--green);">—</div>
+              </div>
+              <div style="background:var(--card); border:1px solid var(--ink); padding:1.5rem; box-shadow:4px 4px 0 rgba(29,36,48,0.12);">
+                  <div style="font-family:'IBM Plex Mono',monospace; font-size:0.75rem; color:var(--steel); margin-bottom:0.5rem;">DATABASE LOAD</div>
+                  <div id="perf-db-load" style="font-size:2rem; font-weight:700; color:var(--blue);">—</div>
+              </div>
+              <div style="background:var(--card); border:1px solid var(--ink); padding:1.5rem; box-shadow:4px 4px 0 rgba(29,36,48,0.12);">
+                  <div style="font-family:'IBM Plex Mono',monospace; font-size:0.75rem; color:var(--steel); margin-bottom:0.5rem;">ACTIVE SESSIONS</div>
+                  <div id="perf-sessions" style="font-size:2rem; font-weight:700; color:var(--ink);">—</div>
+              </div>
+          </div>
+          <div id="perf-chart-area" style="background:var(--card); border:1px solid var(--ink); padding:1.5rem; box-shadow:4px 4px 0 rgba(29,36,48,0.12);">Loading chart...</div>
+      </div>
+      
+    </div>
+  </section>
+
 </main>
 
 <!-- DETAILS MODAL -->
@@ -859,7 +1689,7 @@
   </div>
 </div>
 
-<!-- CUSTOM ALERT MODAL -->
+<!-- CUSALLALERALLDAL -->
 <div id="alert-modal" class="modal-overlay hidden" style="background: rgba(0,0,0,0.3); backdrop-filter: blur(4px);">
   <div class="modal-content" style="max-width: 400px; text-align: center; padding: 2.5rem; border-radius: 24px; box-shadow: 0 20px 50px rgba(0,0,0,0.1);">
     <div id="alert-icon" style="font-size: 3rem; margin-bottom: 1rem;">🔔</div>
@@ -872,63 +1702,134 @@
 
     <div style="display: flex; gap: 10px; justify-content: center;">
       <button id="alert-btn-cancel" class="btn hidden" onclick="closeAlert(false)" style="padding: 10px 25px; border-radius: 50px;">Cancel</button>
-      <button id="alert-btn-ok" class="btn btn-primary" onclick="closeAlert(true)" style="padding: 10px 35px; border-radius: 50px; background: #111827;">OK</button>
+      <button id="alert-btn-ok" class="btn btn-primary" onclick="closeAlert(true)" style="padding: 10px 35px; border-radius: 50px; background: var(--ink);">OK</button>
     </div>
   </div>
 </div>
 
 <!-- QUICK ADD MODAL -->
 <div id="quick-add-modal" class="modal-overlay hidden" style="z-index: 3005;">
-  <div class="modal-content" style="max-width: 450px;">
-    <div class="modal-header">
-      <h2>Quick Add Appointment</h2>
-      <button class="close-btn" onclick="document.getElementById('quick-add-modal').classList.add('hidden')">&times;</button>
+  <div class="modal-content" style="max-width: 600px; width: 90%; border-radius: 20px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);">
+    <div class="modal-header" style="border-bottom: 1px solid var(--paper); padding-bottom: 1rem;">
+      <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--ink);">Book Appointment</h2>
+      <button class="close-btn" style="font-size: 1.5rem; color: var(--steel); background: transparent; border: none; cursor: pointer;" onclick="document.getElementById('quick-add-modal').classList.add('hidden')">&times;</button>
     </div>
-    <div class="modal-body" style="display:flex; flex-direction:column; gap:15px; margin-top:15px;">
-        <div style="display:flex; gap:10px;">
-            <div class="field" style="flex:1;">
-                <label>Date</label>
-                <input type="date" id="qa-date">
-            </div>
-            <div class="field" style="flex:1;">
-                <label>Time</label>
-                <select id="qa-time"></select>
-            </div>
-        </div>
-        <div class="field">
-            <label>Service Category</label>
-            <select id="qa-service-category">
-                <option value="S1">MENU UPDATE</option>
-                <option value="S2">CREDIT CARD</option>
-                <option value="S3">DATA RESET</option>
-                <option value="S4">SERVICE</option>
-                <option value="S5">OTHER</option>
-                <option value="S6">TILL SETUP</option>
-            </select>
-        </div>
-        <div class="field">
-            <label>Staff/Personnel (Assigned To)</label>
-            <select id="qa-staff-select"></select>
-        </div>
+    <div class="modal-body" style="display:flex; flex-direction:column; gap:1.25rem; margin-top:1.25rem; max-height: 80vh; overflow-y: auto; padding-right: 5px;">
         
+        <!-- Search Section -->
+        <div class="field" style="margin-bottom: 0;">
+            <label style="color:var(--steel); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.05em;">Search Customer</label>
+            <input type="text" id="qa-customer-search" class="gc-search-input" placeholder="Search by Company Name, CRM ID or Postcode..." list="vtiger-customer-list" oninput="autoFillQuickAdd()" style="background:var(--card); color:var(--ink); border: 1px solid var(--steel); border-radius: 10px; padding: 10px 14px; outline: none; font-size: 13px; font-weight: 500; width: 100%; box-sizing: border-box;">
+        </div>
+
+        <div style="border-top: 1px dashed var(--paper); margin: 5px 0;"></div>
+
+        <!-- Customer Info Section (Auto-filled, Read-only) -->
+        <div style="background: var(--card); border: 1px solid var(--paper); border-radius: 12px; padding: 1.25rem; display: flex; flex-direction: column; gap: 10px;">
+            <p style="font-size: 11px; font-weight: 800; color: var(--steel); text-transform: uppercase; margin: 0 0 5px 0; letter-spacing: 0.05em;">Customer Information (Auto-filled)</p>
+            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 10px;">
+                <div class="field" style="margin:0;">
+                    <label style="font-size: 10px; color: var(--steel); margin-bottom: 2px;">Customer (Company Name)</label>
+                    <input type="text" id="qa-company-name" readonly placeholder="Auto-filled" style="background:var(--card); color:var(--ink); font-weight: 600; font-size: 13px; padding: 8px 12px; border: 1px solid var(--paper); border-radius: 8px; width: 100%; box-sizing: border-box;">
+                </div>
+                <div class="field" style="margin:0;">
+                    <label style="font-size: 10px; color: var(--steel); margin-bottom: 2px;">Customer Number</label>
+                    <input type="text" id="qa-company-id" readonly placeholder="Auto-filled" style="background:var(--card); color:var(--ink); font-weight: 600; font-size: 13px; padding: 8px 12px; border: 1px solid var(--paper); border-radius: 8px; width: 100%; box-sizing: border-box;">
+                </div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div class="field" style="margin:0;">
+                    <label style="font-size: 10px; color: var(--steel); margin-bottom: 2px;">Postcode</label>
+                    <input type="text" id="qa-postcode" readonly placeholder="Auto-filled" style="background:var(--card); color:var(--ink); font-weight: 600; font-size: 13px; padding: 8px 12px; border: 1px solid var(--paper); border-radius: 8px; width: 100%; box-sizing: border-box;">
+                </div>
+                <div class="field" style="margin:0;">
+                    <label style="font-size: 10px; color: var(--steel); margin-bottom: 2px;">Contract Status</label>
+                    <input type="text" id="qa-status" readonly placeholder="Auto-filled" style="background:var(--card); color:var(--ink); font-weight: 700; font-size: 13px; padding: 8px 12px; border: 1px solid var(--paper); border-radius: 8px; width: 100%; box-sizing: border-box; text-align: center;">
+                </div>
+            </div>
+            <div class="field" style="margin:0;">
+                <label style="font-size: 10px; color: var(--steel); margin-bottom: 2px;">Full Address</label>
+                <input type="text" id="qa-address" readonly placeholder="Auto-filled" style="background:var(--card); color:var(--ink); font-weight: 500; font-size: 13px; padding: 8px 12px; border: 1px solid var(--paper); border-radius: 8px; width: 100%; box-sizing: border-box;">
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div class="field" style="margin:0;">
+                    <label style="font-size: 10px; color: var(--steel); margin-bottom: 2px;">Primary Contact</label>
+                    <input type="text" id="qa-contact" readonly placeholder="Auto-filled" style="background:var(--card); color:var(--ink); font-weight: 500; font-size: 13px; padding: 8px 12px; border: 1px solid var(--paper); border-radius: 8px; width: 100%; box-sizing: border-box;">
+                </div>
+                <div class="field" style="margin:0;">
+                    <label style="font-size: 10px; color: var(--steel); margin-bottom: 2px;">Phone Number</label>
+                    <input type="text" id="qa-phone" readonly placeholder="Auto-filled" style="background:var(--card); color:var(--ink); font-weight: 500; font-size: 13px; padding: 8px 12px; border: 1px solid var(--paper); border-radius: 8px; width: 100%; box-sizing: border-box;">
+                </div>
+            </div>
+        </div>
+
+        <!-- Appointment Scheduling Fields -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="field">
+                <label style="color:var(--steel); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.05em;">Department</label>
+                <select id="qa-service-category" onchange="updateQaSubServices()" style="background:var(--card) url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%2364748b%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e') no-repeat right 12px center; background-size: 14px; color:var(--ink); border: 1px solid var(--steel); border-radius: 10px; padding: 10px 14px; outline: none; font-size: 13px; font-weight: 600; cursor: pointer; width: 100%; box-sizing: border-box; -webkit-appearance: none; -moz-appearance: none; appearance: none; padding-right: 36px !important;">
+                    <option value="S1">MENU UPDATE</option>
+                    <option value="S2">CREDIT CARD</option>
+                    <option value="S3">DATA RESET</option>
+                    <option value="S4">SERVICE</option>
+                    <option value="S5">OTHER</option>
+                    <option value="S6">TILL SETUP</option>
+                </select>
+            </div>
+            <div class="field">
+                <label style="color:var(--steel); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.05em;">Sub Service</label>
+                <select id="qa-sub-service" style="background:var(--card) url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%2364748b%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e') no-repeat right 12px center; background-size: 14px; color:var(--ink); border: 1px solid var(--steel); border-radius: 10px; padding: 10px 14px; outline: none; font-size: 13px; font-weight: 600; cursor: pointer; width: 100%; box-sizing: border-box; -webkit-appearance: none; -moz-appearance: none; appearance: none; padding-right: 36px !important;">
+                </select>
+            </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="field">
+                <label style="color:var(--steel); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.05em;">Appointment Date</label>
+                <input type="date" id="qa-date" style="background:var(--card); color:var(--ink); border: 1px solid var(--steel); border-radius: 10px; padding: 10px 14px; outline: none; font-size: 13px; font-weight: 600; width: 100%; box-sizing: border-box;">
+            </div>
+            <div class="field">
+                <label style="color:var(--steel); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.05em;">Appointment Time</label>
+                <select id="qa-time" style="background:var(--card) url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%2364748b%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e') no-repeat right 12px center; background-size: 14px; color:var(--ink); border: 1px solid var(--steel); border-radius: 10px; padding: 10px 14px; outline: none; font-size: 13px; font-weight: 600; cursor: pointer; width: 100%; box-sizing: border-box; -webkit-appearance: none; -moz-appearance: none; appearance: none; padding-right: 36px !important;">
+                </select>
+            </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="field">
+                <label style="color:var(--steel); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.05em;">Estimated Duration (mins)</label>
+                <input type="number" id="qa-duration" value="30" min="5" step="5" style="background:var(--card); color:var(--ink); border: 1px solid var(--steel); border-radius: 10px; padding: 10px 14px; outline: none; font-size: 13px; font-weight: 600; width: 100%; box-sizing: border-box;">
+            </div>
+            <div class="field">
+                <label style="color:var(--steel); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.05em;">Assigned Engineer</label>
+                <select id="qa-staff-select" style="background:var(--card) url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%2364748b%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e') no-repeat right 12px center; background-size: 14px; color:var(--ink); border: 1px solid var(--steel); border-radius: 10px; padding: 10px 14px; outline: none; font-size: 13px; font-weight: 600; cursor: pointer; width: 100%; box-sizing: border-box; -webkit-appearance: none; -moz-appearance: none; appearance: none; padding-right: 36px !important;">
+                </select>
+            </div>
+        </div>
+
+        <!-- Priority Select Button Group -->
+        <div class="field" style="margin-bottom: 0;">
+            <label style="color:var(--steel); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.05em;">Priority</label>
+            <div style="display: flex; gap: 8px; margin-top: 4px;">
+                <label style="flex: 1; text-align: center; padding: 10px; border: 1px solid var(--steel); border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 13px; background: var(--paper); color: var(--ink); border-color: var(--steel);" class="priority-btn" id="lbl-priority-normal">
+                    <input type="radio" name="qa-priority" value="Normal" checked style="display:none;" onchange="updatePriorityUI('Normal')"> Normal
+                </label>
+                <label style="flex: 1; text-align: center; padding: 10px; border: 1px solid var(--steel); border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 13px; background: var(--card);" class="priority-btn" id="lbl-priority-urgent">
+                    <input type="radio" name="qa-priority" value="Urgent" style="display:none;" onchange="updatePriorityUI('Urgent')"> Urgent
+                </label>
+                <label style="flex: 1; text-align: center; padding: 10px; border: 1px solid var(--steel); border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 13px; background: var(--card);" class="priority-btn" id="lbl-priority-emergency">
+                    <input type="radio" name="qa-priority" value="Emergency" style="display:none;" onchange="updatePriorityUI('Emergency')"> Emergency
+                </label>
+            </div>
+        </div>
+
         <div class="field">
-            <label>Company / Customer</label>
-            <input type="text" id="qa-company-name" placeholder="Search customer..." list="vtiger-customer-list" onchange="autoFillQuickAdd()">
+            <label style="color:var(--steel); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.05em;">Notes</label>
+            <textarea id="qa-notes" rows="3" placeholder="Enter appointment details/notes..." style="background:var(--card); color:var(--ink); border: 1px solid var(--steel); border-radius: 10px; padding: 12px 16px; outline: none; font-size: 13px; font-weight: 500; font-family: inherit; width: 100%; box-sizing: border-box; resize: vertical;"></textarea>
         </div>
 
-        <div style="display:flex; gap:10px;">
-          <div class="field" style="flex:1;">
-              <label>Postcode</label>
-              <input type="text" id="qa-postcode" readonly placeholder="Auto-filled" style="background:#f8fafc;">
-          </div>
-          <div class="field" style="flex:1;">
-              <label>Contract Status</label>
-              <input type="text" id="qa-status" readonly placeholder="Checking..." style="background:#f8fafc; color:#111827; font-weight:700;">
-          </div>
-        </div>
-
-        <!-- Meta Info -->
-        <div style="background:#f1f5f9; padding:12px; border-radius:10px; display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:5px;">
+        <!-- Meta Info (Read-only, hidden/subtle) -->
+        <div style="background:var(--paper); padding:12px; border-radius:10px; display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:5px; display: none;">
           <div class="field" style="margin:0;">
             <label style="font-size:10px; margin-bottom:2px;">Created By</label>
             <input type="text" id="qa-created-by" readonly style="font-size:12px; padding:6px 10px; background:white;">
@@ -939,132 +1840,137 @@
           </div>
         </div>
         
-        <div style="margin-top:20px; text-align:right;">
-            <button class="btn btn-primary" onclick="submitQuickAdd()" style="width: 100%; justify-content: center; padding: 14px; font-weight: 700;">
-              <i data-lucide="check-circle" style="width:18px; height:18px;"></i> Create Appointment
+        <div style="margin-top:10px; text-align:right; border-top: 1px solid var(--paper); padding-top: 1rem;">
+            <button class="btn btn-primary" onclick="submitQuickAdd()" style="width: 100%; justify-content: center; padding: 14px; font-weight: 700; border-radius: 10px;">
+              <i data-lucide="check-circle" style="width:18px; height:18px; margin-right: 6px;"></i> Save Appointment
             </button>
         </div>
     </div>
   </div>
 </div>
 
+
 <!-- GC QUICK ADD MODAL -->
-<div id="gc-quick-add-modal" class="modal-overlay hidden" style="z-index: 3005; align-items:flex-start; padding-top:100px;">
-  <div class="gc-modal-content">
-    <div class="gc-modal-header">
-      <input type="text" id="gc-qa-title" class="gc-title-input" placeholder="Add title">
-      <button class="close-btn" style="background:transparent; color:#64748B; border:none;" onclick="document.getElementById('gc-quick-add-modal').classList.add('hidden')">&times;</button>
+<div id="gc-quick-add-modal" class="modal-overlay hidden" style="z-index: 3005; align-items:center; justify-content:center;">
+  <div class="ticket">
+    <div class="perf"></div>
+    <div class="ticket-head">
+      <div>
+        <div class="job-no">QUICK ADD</div>
+        <h2>Quick Add Appointment</h2>
+      </div>
+      <button class="close-btn" style="background:transparent; color:var(--steel); border:none; font-size:1.5rem; cursor:pointer;" onclick="document.getElementById('gc-quick-add-modal').classList.add('hidden')">&times;</button>
     </div>
-    
-    <div class="gc-modal-tabs">
-        <button class="gc-tab active">Event</button>
-        <button class="gc-tab">Task</button>
-    </div>
-    
-    <div class="gc-modal-body">
-        <div class="gc-field-row">
-            <i data-lucide="clock" class="gc-icon"></i>
-            <div style="display:flex; gap:10px; flex:1;">
-                <input type="date" id="gc-qa-date" class="gc-input">
-                <select id="gc-qa-time" class="gc-input"></select>
-            </div>
-        </div>
-        <div class="gc-field-row">
-            <i data-lucide="tag" class="gc-icon"></i>
-            <select id="gc-qa-category" class="gc-input">
+    <div class="ticket-body">
+      <div class="field-row">
+        <div class="ticket-field"><label>Date</label><input type="date" id="gc-qa-date"></div>
+        <div class="ticket-field"><label>Saat</label><select id="gc-qa-time" class="ticket-input"></select></div>
+        <div class="ticket-field full"><label>Firma / Customer</label><input type="text" id="gc-qa-title" placeholder="Add title"></div>
+        <div class="ticket-field full">
+          <label>Service Category</label>
+          <select id="gc-qa-category">
                 <option value="S1">MENU UPDATE</option>
                 <option value="S2">CREDIT CARD</option>
                 <option value="S3">DATA RESET</option>
                 <option value="S4">SERVICE</option>
                 <option value="S5">OTHER</option>
                 <option value="S6">TILL SETUP</option>
-            </select>
+          </select>
         </div>
-        
-        <div style="margin-top:20px; text-align:right;">
-            <button class="btn btn-primary" onclick="gcSubmitQuickAdd()">Save</button>
-        </div>
+      </div>
+    </div>
+    <div class="ticket-foot">
+      <button class="ticket-btn ghost" onclick="document.getElementById('gc-quick-add-modal').classList.add('hidden')">Cancel</button>
+      <button class="ticket-btn primary" onclick="gcSubmitQuickAdd()">Save</button>
     </div>
   </div>
 </div>
 
-<!-- VIEW APPOINTMENT MODAL -->
-<div id="view-appointment-modal" class="modal-overlay hidden" style="z-index: 3002;">
-  <div class="modal-content" style="max-width: 400px; padding: 25px;">
-    <div class="modal-header">
-      <h2>Appointment Details</h2>
-      <button class="close-btn" onclick="document.getElementById('view-appointment-modal').classList.add('hidden')">&times;</button>
+<!-- VIEW APPOINTMENALLDAL -->
+<div id="view-appointment-modal" class="modal-overlay hidden" style="z-index: 3002; align-items:center; justify-content:center;">
+  <div class="ticket">
+    <div class="perf"></div>
+    <div class="ticket-head">
+      <div>
+        <div class="job-no" id="va-modal-type">APPOINTMENT</div>
+        <h2 id="va-modal-title">Appointment Detail</h2>
+      </div>
+      <button class="close-btn" style="background:transparent; color:var(--steel); border:none; font-size:1.5rem; cursor:pointer;" onclick="document.getElementById('view-appointment-modal').classList.add('hidden')">&times;</button>
     </div>
-    <div class="modal-body" style="display:flex; flex-direction:column; gap:15px; margin-top:20px;">
-      <div class="field">
-        <label>Service Category</label>
-        <div id="va-service-category" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; background:#f8fafc; font-weight:600; color:#111827; font-size:14px; min-height: 38px; display:flex; align-items:center;"></div>
+    <div class="ticket-body" style="max-height: 60vh; overflow-y: auto;">
+      <div class="field-row">
+        <div class="ticket-field full"><label>Firma</label><div class="val" id="va-company"></div></div>
+        <div class="ticket-field"><label>Posta Kodu</label><div class="val" id="va-postcode"></div></div>
+        <div class="ticket-field"><label>Status</label><div class="val" id="va-status"></div></div>
+        <div class="ticket-field full"><label>Service</label><div class="val" id="va-service-category"></div></div>
+        <div class="ticket-field full"><label>Full Address</label><div class="val" id="va-address"></div></div>
+        <div class="ticket-field"><label>Primary Contact</label><div class="val" id="va-contact"></div></div>
+        <div class="ticket-field"><label>Phone Number</label><div class="val" id="va-phone"></div></div>
+        <div class="ticket-field full"><label>Priority</label><div class="val" id="va-priority"></div></div>
+        <div class="ticket-field full"><label>Notes</label><div class="val" id="va-notes"></div></div>
+        <div class="ticket-field"><label>Date</label><input type="date" id="va-date"></div>
+        <div class="ticket-field"><label>Start Saati</label><input type="time" id="va-start-time"></div>
       </div>
-      <div class="field">
-        <label>Company Name</label>
-        <div id="va-company" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; background:#f8fafc; font-weight:600; color:#111827; font-size:14px; min-height: 38px; display:flex; align-items:center;"></div>
+      <div class="meta-line">
+        <span>Createan: <b id="va-created-by"></b></span>
+        <span>Date: <b id="va-created-at"></b></span>
       </div>
-      <div class="field">
-        <label>Postcode</label>
-        <div id="va-postcode" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; background:#f8fafc; font-weight:600; color:#111827; font-size:14px; min-height: 38px; display:flex; align-items:center;"></div>
-      </div>
-      <div class="field">
-        <label>Service Status</label>
-        <div id="va-status" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; background:#f8fafc; font-weight:800; color:#111827; font-size:14px; min-height: 38px; display:flex; align-items:center;"></div>
-      </div>
-      <div style="display: flex; gap: 10px;">
-          <div class="field" style="flex:1;">
-            <label>Date</label>
-            <input type="date" id="va-date" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px;">
-          </div>
-          <div class="field" style="flex:1;">
-            <label>Start Time</label>
-            <input type="time" id="va-start-time" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px;">
-          </div>
-      </div>
-      <div style="background:#f1f5f9; padding:12px; border-radius:6px; margin-top:5px;">
-        <div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size:12px;">
-            <span style="color:#64748b; font-weight:600;">Created Date/Time:</span>
-            <span id="va-created-at" style="color:#111827; font-weight:600;"></span>
-        </div>
-        <div style="display:flex; justify-content:space-between; font-size:12px;">
-            <span style="color:#64748b; font-weight:600;">Created by:</span>
-            <span id="va-created-by" style="color:#111827; font-weight:600;"></span>
-        </div>
-      </div>
-      
-      <div style="display:flex; gap:10px; margin-top:10px;">
-          <button id="va-save-btn" class="btn btn-primary" style="flex:1; justify-content:center; padding:12px;">Change Date Time</button>
-          <button id="va-goticket-btn" class="btn" style="flex:1; justify-content:center; padding:12px; background:#3b82f6; color:white; border:none;">Go To Ticket</button>
-      </div>
-      <div style="display:flex; gap:10px; margin-top:5px;">
-          <button id="va-hold-btn" class="btn" style="flex:1; justify-content:center; padding:12px; background:#f59e0b; color:white; border:none;">On Hold</button>
-          <button id="va-delete-btn" class="btn" style="flex:1; justify-content:center; padding:12px; background:#ef4444; color:white; border:none;">Delete Appt.</button>
-      </div>
+    </div>
+    <div class="ticket-foot">
+      <button id="va-delete-btn" class="ticket-btn danger">Delete</button>
+      <button id="va-hold-btn" class="ticket-btn ghost">Cancel</button>
+      <button id="va-goticket-btn" class="ticket-btn" style="border-color:var(--blue); color:var(--blue);">Panele Upload</button>
+      <button id="va-save-btn" class="ticket-btn primary">Date/Saat Change</button>
     </div>
   </div>
 </div>
 
 <!-- DAY VIEW MODAL -->
-<div id="day-view-modal" class="modal-overlay hidden" style="z-index: 3001;">
-  <div class="modal-content" style="max-width: 600px; padding: 0; display:flex; flex-direction:column; height: 85vh;">
-    <div class="modal-header" style="padding: 20px; border-bottom: 1px solid #e2e8f0; position: sticky; top: 0; background: white; z-index: 10;">
-      <h2 id="day-view-title" style="font-size: 1.4rem; color: #1e293b;"></h2>
-      <button class="close-btn" onclick="document.getElementById('day-view-modal').classList.add('hidden')">&times;</button>
+<div id="day-view-modal" class="modal-overlay hidden" style="z-index: 3001; align-items:center; justify-content:center;">
+  <div class="ticket" style="max-height: 90vh; display: flex; flex-direction: column;">
+    <div class="perf"></div>
+    <div class="ticket-head" style="position: sticky; top: 0; background: var(--card); z-index: 10;">
+      <div>
+        <div class="job-no">DAY VIEW</div>
+        <h2 id="day-view-title">Daily View</h2>
+      </div>
+      <button class="close-btn" style="background:transparent; color:var(--steel); border:none; font-size:1.5rem; cursor:pointer;" onclick="document.getElementById('day-view-modal').classList.add('hidden')">&times;</button>
     </div>
-    <div class="modal-body" style="flex: 1; overflow-y: auto; padding: 0; background: #f8fafc;">
-      <div id="day-view-hourly-list" style="display: flex; flex-direction: column;"></div>
+    <div class="day-list" id="day-view-hourly-list" style="overflow-y: auto; flex: 1;">
+      <!-- JavaScript will populate this -->
     </div>
   </div>
 </div>
 
-<script src="js/config.js"></script>
-<script src="js/api.js"></script>
-<script src="js/auth.js"></script>
-<script src="js/ui.js"></script>
-<script src="app.js"></script>
+
+<script src="js/turso.js?v=6"></script>
+<script src="js/config.js?v=5"></script>
+<!-- Antigravity Core & Orchestration Loop -->
+<script src="antigravity/core/events.js?v=5"></script>
+<script src="antigravity/core/memory.js?v=5"></script>
+<script src="antigravity/core/planner.js?v=5"></script>
+<script src="antigravity/core/executor.js?v=5"></script>
+<script src="antigravity/core/verifier.js?v=5"></script>
+<script src="antigravity/core/loop.js?v=5"></script>
+<!-- Antigravity Specialized Agents -->
+<script src="antigravity/agents/auth.agent.js?v=5"></script>
+<script src="antigravity/agents/customer.agent.js?v=5"></script>
+<script src="antigravity/agents/ticket.agent.js?v=5"></script>
+<script src="antigravity/agents/pricing.agent.js?v=5"></script>
+<script src="antigravity/agents/invoice.agent.js?v=5"></script>
+<script src="antigravity/agents/sync.agent.js?v=5"></script>
+<!-- Antigravity Tools -->
+<script src="antigravity/tools/logger.tool.js?v=5"></script>
+<script src="antigravity/tools/supabase.tool.js?v=5"></script>
+<!-- Entry Point -->
+<script src="antigravity/index.js?v=5"></script>
+
+<script src="js/api.js?v=6"></script>
+<script src="js/auth.js?v=5"></script>
+<script src="js/ui.js?v=5"></script>
+<script src="app.js?v=5"></script>
   <div id="toast-container" style="position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 2000; display: flex; flex-direction: column; gap: 10px;"></div>
-<script src="js/gc_calendar.js"></script>
+<script src="js/gc_calendar.js?v=5"></script>
 <script>
   if(typeof lucide !== 'undefined') lucide.createIcons();
   
@@ -1073,6 +1979,339 @@
       if(window.filterCustomers) window.filterCustomers();
   };
 </script>
+<!-- =============================================
+     CUSALLR DETAIL SLIDE-OVER PANEL
+     ============================================= -->
+<div id="customer-detail-overlay" onclick="closeCustomerDetail()" 
+  style="display:none; position:fixed; inset:0; background:rgba(10,15,25,0.65); z-index:9000;"></div>
+
+<div id="customer-detail-panel"
+  style="display:none; position:fixed; top:0; right:0; width:min(880px, 100vw); height:100vh; 
+         background:#ffffff; border-left:3px solid #1d2430; z-index:9001;
+         overflow-y:auto; box-shadow:-12px 0 40px rgba(0,0,0,0.25);
+         transform:translateX(100%); transition:transform 0.28s cubic-bezier(.4,0,.2,1);">
+  
+  <!-- Panel Header -->
+  <div style="position:sticky; top:0; background:#1d2430; color:#ffffff; padding:1.2rem 1.5rem; display:flex; justify-content:space-between; align-items:center; z-index:2; border-bottom:2px solid #1d2430;">
+    <div>
+      <div style="font-family:'IBM Plex Mono',monospace; font-size:0.65rem; color:rgba(255,255,255,0.55); text-transform:uppercase; margin-bottom:0.2rem;">CUSALLR PROFILE</div>
+      <div id="cd-header-name" style="font-weight:700; font-size:1.15rem; letter-spacing:-0.01em; color:#fff;">—</div>
+      <div id="cd-header-id" style="font-family:'IBM Plex Mono',monospace; font-size:0.72rem; color:rgba(255,255,255,0.55); margin-top:0.15rem;">—</div>
+    </div>
+    <button onclick="closeCustomerDetail()" 
+      style="background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.25); color:#fff; width:36px; height:36px; display:flex; align-items:center; justify-content:center; cursor:pointer; border-radius:2px; font-size:1.1rem; line-height:1;">✕</button>
+  </div>
+
+  <!-- Panel Body -->
+  <div style="padding:1.5rem; background:#ffffff;">
+
+    <!-- Status Badge Row -->
+    <div style="display:flex; gap:0.75rem; align-items:center; margin-bottom:1.5rem; padding-bottom:1.25rem; border-bottom:1px dashed #ccc;">
+      <div id="cd-industry-badge" style="font-family:'IBM Plex Mono',monospace; font-size:0.7rem; font-weight:700; padding:0.25rem 0.75rem; border:1px solid #1d2430; background:#f5f5f5; color:#1d2430;">—</div>
+      <div id="cd-contract-badge" style="font-family:'IBM Plex Mono',monospace; font-size:0.7rem; font-weight:700; padding:0.25rem 0.75rem; border:1px solid #3bb450; color:#3bb450;">—</div>
+    </div>
+
+    <!-- Contact Information -->
+    <div style="margin-bottom:1.5rem;">
+      <div style="font-family:'IBM Plex Mono',monospace; font-size:0.68rem; color:#6b7280; text-transform:uppercase; margin-bottom:0.75rem; padding-bottom:0.35rem; border-bottom:1px solid #e5e7eb;">Contact Information</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+        <div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:0.65rem; color:#6b7280; margin-bottom:0.2rem;">PRIMARY PHONE</div>
+          <div id="cd-phone" style="font-size:0.9rem; color:#1d2430; font-weight:600;">—</div>
+        </div>
+        <div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:0.65rem; color:#6b7280; margin-bottom:0.2rem;">EMAIL</div>
+          <div id="cd-email" style="font-size:0.85rem; color:#1d2430; word-break:break-all;">—</div>
+        </div>
+        <div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:0.65rem; color:#6b7280; margin-bottom:0.2rem;">OWNER / CONTACT</div>
+          <div id="cd-owner" style="font-size:0.9rem; color:#1d2430; font-weight:600;">—</div>
+        </div>
+        <div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:0.65rem; color:#6b7280; margin-bottom:0.2rem;">ASSIGNED TO</div>
+          <div id="cd-assigned" style="font-size:0.85rem; color:#1d2430;">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Billing Address -->
+    <div style="margin-bottom:1.5rem;">
+      <div style="font-family:'IBM Plex Mono',monospace; font-size:0.68rem; color:#6b7280; text-transform:uppercase; margin-bottom:0.75rem; padding-bottom:0.35rem; border-bottom:1px solid #e5e7eb;">Billing Address</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+        <div style="grid-column:1/-1;">
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:0.65rem; color:#6b7280; margin-bottom:0.2rem;">STREET ADDRESS</div>
+          <div id="cd-address" style="font-size:0.88rem; color:#1d2430;">—</div>
+        </div>
+        <div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:0.65rem; color:#6b7280; margin-bottom:0.2rem;">CITY</div>
+          <div id="cd-city" style="font-size:0.9rem; color:#1d2430; font-weight:600;">—</div>
+        </div>
+        <div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:0.65rem; color:#6b7280; margin-bottom:0.2rem;">POSTCODE</div>
+          <div id="cd-postcode" style="font-family:'IBM Plex Mono',monospace; font-size:0.9rem; color:#1d2430; font-weight:700;">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Contract & Service -->
+    <div style="margin-bottom:1.5rem;">
+      <div style="font-family:'IBM Plex Mono',monospace; font-size:0.68rem; color:#6b7280; text-transform:uppercase; margin-bottom:0.75rem; padding-bottom:0.35rem; border-bottom:1px solid #e5e7eb;">Contract &amp; Service</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+        <div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:0.65rem; color:#6b7280; margin-bottom:0.2rem;">CONTRACT STATUS</div>
+          <div id="cd-contract-status" style="font-size:0.88rem; color:#1d2430;">—</div>
+        </div>
+        <div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:0.65rem; color:#6b7280; margin-bottom:0.2rem;">CONTRACT START</div>
+          <div id="cd-contract-start" style="font-family:'IBM Plex Mono',monospace; font-size:0.85rem; color:#1d2430;">—</div>
+        </div>
+        <div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:0.65rem; color:#6b7280; margin-bottom:0.2rem;">CONTRACT DUE</div>
+          <div id="cd-contract-due" style="font-family:'IBM Plex Mono',monospace; font-size:0.85rem; color:#1d2430;">—</div>
+        </div>
+        <div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:0.65rem; color:#6b7280; margin-bottom:0.2rem;">INDUSTRY</div>
+          <div id="cd-industry" style="font-size:0.88rem; color:#1d2430;">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- =============================================
+         CUSALLR TICKETS TABLE SECTION
+         ============================================= -->
+    <div id="cd-tickets-section" style="margin-bottom:1.75rem; padding:1.25rem; background:#fbfcfe; border:1px solid #e2e8f0; border-radius:6px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem; flex-wrap:wrap; gap:0.5rem;">
+        <div style="display:flex; align-items:center; gap:0.6rem;">
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:0.75rem; font-weight:700; color:#1d2430; text-transform:uppercase; letter-spacing:0.04em;">CUSALLR TICKETS (TICKETS)</div>
+          <span id="cd-tickets-count-badge" style="font-family:'IBM Plex Mono',monospace; font-size:0.65rem; font-weight:700; padding:0.15rem 0.5rem; background:#1d2430; color:#ffffff; border-radius:10px;">0</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:0.5rem;">
+          <div id="cd-tickets-filters" style="display:flex; gap:0.3rem;">
+            <button onclick="window.filterCustTickets && filterCustTickets('all')" class="cd-filter-btn" data-filter="all" style="padding:0.25rem 0.55rem; font-size:0.65rem; font-family:'IBM Plex Mono',monospace; font-weight:700; border:1px solid #1d2430; background:#1d2430; color:#ffffff; cursor:pointer; border-radius:3px;">ALL</button>
+            <button onclick="window.filterCustTickets && filterCustTickets('open')" class="cd-filter-btn" data-filter="open" style="padding:0.25rem 0.55rem; font-size:0.65rem; font-family:'IBM Plex Mono',monospace; font-weight:700; border:1px solid #cbd5e1; background:#ffffff; color:#334155; cursor:pointer; border-radius:3px;">OPEN</button>
+            <button onclick="window.filterCustTickets && filterCustTickets('completed')" class="cd-filter-btn" data-filter="completed" style="padding:0.25rem 0.55rem; font-size:0.65rem; font-family:'IBM Plex Mono',monospace; font-weight:700; border:1px solid #cbd5e1; background:#ffffff; color:#334155; cursor:pointer; border-radius:3px;">COMPLETED</button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Table Container -->
+      <div id="cd-tickets-table-container" style="overflow-x:auto; background:#ffffff; border:1px solid #e2e8f0; border-radius:4px; min-height:70px;">
+        <!-- Filled dynamically by customers.js -->
+      </div>
+    </div>
+
+    <!-- =============================================
+         CUSALLR QUOTATIONS (QUOTES) TABLE SECTION
+         ============================================= -->
+    <div id="cd-quotes-section" style="margin-bottom:1.75rem; padding:1.25rem; background:#fbfcfe; border:1px solid #e2e8f0; border-radius:6px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem; flex-wrap:wrap; gap:0.5rem;">
+        <div style="display:flex; align-items:center; gap:0.6rem;">
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:0.75rem; font-weight:700; color:#1d2430; text-transform:uppercase; letter-spacing:0.04em;">CUSALLR QUOTATIONS</div>
+          <span id="cd-quotes-count-badge" style="font-family:'IBM Plex Mono',monospace; font-size:0.65rem; font-weight:700; padding:0.15rem 0.5rem; background:#1d2430; color:#ffffff; border-radius:10px;">0</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:0.5rem;">
+          <div id="cd-quotes-filters" style="display:flex; gap:0.3rem;">
+            <button onclick="window.filterCustQuotes && filterCustQuotes('all')" class="cd-qfilter-btn" data-filter="all" style="padding:0.25rem 0.55rem; font-size:0.65rem; font-family:'IBM Plex Mono',monospace; font-weight:700; border:1px solid #1d2430; background:#1d2430; color:#ffffff; cursor:pointer; border-radius:3px;">ALL</button>
+            <button onclick="window.filterCustQuotes && filterCustQuotes('accepted')" class="cd-qfilter-btn" data-filter="accepted" style="padding:0.25rem 0.55rem; font-size:0.65rem; font-family:'IBM Plex Mono',monospace; font-weight:700; border:1px solid #cbd5e1; background:#ffffff; color:#334155; cursor:pointer; border-radius:3px;">ACCEPTED</button>
+            <button onclick="window.filterCustQuotes && filterCustQuotes('pending')" class="cd-qfilter-btn" data-filter="pending" style="padding:0.25rem 0.55rem; font-size:0.65rem; font-family:'IBM Plex Mono',monospace; font-weight:700; border:1px solid #cbd5e1; background:#ffffff; color:#334155; cursor:pointer; border-radius:3px;">PENDING</button>
+        </div>
+      </div>
+      
+      <!-- Table Container -->
+      <div id="cd-quotes-table-container" style="overflow-x:auto; background:#ffffff; border:1px solid #e2e8f0; border-radius:4px; min-height:70px;">
+        <!-- Filled dynamically by customers.js -->
+      </div>
+    </div>
+
+    <!-- Notes -->
+    <div style="margin-bottom:1.5rem;">
+      <div style="font-family:'IBM Plex Mono',monospace; font-size:0.68rem; color:#6b7280; text-transform:uppercase; margin-bottom:0.75rem; padding-bottom:0.35rem; border-bottom:1px solid #e5e7eb;">Notes &amp; Description</div>
+      <div id="cd-description" style="font-size:0.85rem; color:#1d2430; background:#f9fafb; border:1px dashed #d1d5db; padding:1rem; min-height:60px; white-space:pre-wrap; line-height:1.6;">—</div>
+    </div>
+
+    <!-- Record Info -->
+    <div style="margin-bottom:2rem;">
+      <div style="font-family:'IBM Plex Mono',monospace; font-size:0.68rem; color:#6b7280; text-transform:uppercase; margin-bottom:0.75rem; padding-bottom:0.35rem; border-bottom:1px solid #e5e7eb;">Record Information</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+        <div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:0.65rem; color:#6b7280; margin-bottom:0.2rem;">DATE ADDED</div>
+          <div id="cd-created" style="font-family:'IBM Plex Mono',monospace; font-size:0.85rem; color:#1d2430;">—</div>
+        </div>
+        <div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:0.65rem; color:#6b7280; margin-bottom:0.2rem;">LASALLDIFIED</div>
+          <div id="cd-modified" style="font-family:'IBM Plex Mono',monospace; font-size:0.85rem; color:#1d2430;">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div style="display:flex; gap:0.75rem; border-top:1px dashed #d1d5db; padding-top:1.25rem;">
+      <button onclick="window.addApptFromCustomer && addApptFromCustomer(document.getElementById('cd-header-name').textContent, '')"
+        style="flex:1; padding:0.75rem; background:#1d2430; color:#ffffff; border:1px solid #1d2430; font-family:'IBM Plex Sans',sans-serif; font-weight:600; font-size:0.9rem; cursor:pointer;">
+        + Schedule Appointment
+      </button>
+      <button onclick="closeCustomerDetail()"
+        style="padding:0.75rem 1.25rem; background:transparent; color:#1d2430; border:1px solid #1d2430; font-family:'IBM Plex Sans',sans-serif; font-weight:600; font-size:0.9rem; cursor:pointer;">
+        Close
+      </button>
+    </div>
+
+  </div><!-- /panel body -->
+</div><!-- /customer-detail-panel -->
+
+<!-- =============================================
+     CUSALLR QUICK TICKEALLDAL
+     ============================================= -->
+<div id="cd-ticket-modal" class="modal-overlay hidden" style="z-index:9500; display:none; position:fixed; inset:0; background:rgba(10,15,25,0.7); align-items:center; justify-content:center;">
+  <div style="background:#ffffff; width:min(520px, 95vw); border-radius:6px; border:2px solid #1d2430; box-shadow:0 20px 50px rgba(0,0,0,0.3); overflow:hidden;">
+    <div style="background:#1d2430; color:#fff; padding:1rem 1.25rem; display:flex; justify-content:space-between; align-items:center;">
+      <div>
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:0.65rem; color:rgba(255,255,255,0.6);">SERVICE TICKET</div>
+        <div style="font-weight:700; font-size:1rem;" id="cd-ticket-modal-title">Create New Customer Ticket</div>
+      </div>
+      <button onclick="document.getElementById('cd-ticket-modal').style.display='none'" style="background:transparent; border:none; color:#fff; font-size:1.2rem; cursor:pointer;">✕</button>
+    </div>
+    <div style="padding:1.25rem;">
+      <input type="hidden" id="cd-tm-cust-id">
+      <div style="margin-bottom:0.75rem;">
+        <label style="display:block; font-family:'IBM Plex Mono',monospace; font-size:0.65rem; color:#6b7280; margin-bottom:0.25rem;">COMPANY NAME</label>
+        <input type="text" id="cd-tm-company" readonly style="width:100%; padding:0.5rem; background:#f1f5f9; border:1px solid #cbd5e1; font-weight:600; font-size:0.85rem; border-radius:3px;">
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; margin-bottom:0.75rem;">
+        <div>
+          <label style="display:block; font-family:'IBM Plex Mono',monospace; font-size:0.65rem; color:#6b7280; margin-bottom:0.25rem;">TICKET NO (CRM)</label>
+          <input type="text" id="cd-tm-ticketno" placeholder="TT-..." style="width:100%; padding:0.5rem; border:1px solid #cbd5e1; font-family:'IBM Plex Mono',monospace; font-size:0.85rem; border-radius:3px;">
+        </div>
+        <div>
+          <label style="display:block; font-family:'IBM Plex Mono',monospace; font-size:0.65rem; color:#6b7280; margin-bottom:0.25rem;">SERVICE CATEGORY</label>
+          <select id="cd-tm-service" style="width:100%; padding:0.5rem; border:1px solid #cbd5e1; font-size:0.85rem; border-radius:3px;">
+            <option value="S1 - MENU UPDATE">S1 - MENU UPDATE</option>
+            <option value="S2 - CREDIT CARD">S2 - CREDIT CARD</option>
+            <option value="S3 - DATA RESET">S3 - DATA RESET</option>
+            <option value="S4 - SERVICE">S4 - SERVICE</option>
+            <option value="S5 - OTHER">S5 - OTHER</option>
+            <option value="S6 - TILL SETUP">S6 - TILL SETUP</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; margin-bottom:0.75rem;">
+        <div>
+          <label style="display:block; font-family:'IBM Plex Mono',monospace; font-size:0.65rem; color:#6b7280; margin-bottom:0.25rem;">STATUS</label>
+          <select id="cd-tm-status" style="width:100%; padding:0.5rem; border:1px solid #cbd5e1; font-size:0.85rem; border-radius:3px;">
+            <option value="Pending">Pending (Beklemede)</option>
+            <option value="In Progress">In Progress ()</option>
+            <option value="Completed">Completed (Completed)</option>
+            <option value="Logged">Logged (Kaydedildi)</option>
+          </select>
+        </div>
+        <div>
+          <label style="display:block; font-family:'IBM Plex Mono',monospace; font-size:0.65rem; color:#6b7280; margin-bottom:0.25rem;">PRICE (£)</label>
+          <input type="number" id="cd-tm-price" value="125.00" step="5" style="width:100%; padding:0.5rem; border:1px solid #cbd5e1; font-family:'IBM Plex Mono',monospace; font-size:0.85rem; border-radius:3px;">
+        </div>
+      </div>
+      <div style="margin-bottom:0.75rem;">
+        <label style="display:block; font-family:'IBM Plex Mono',monospace; font-size:0.65rem; color:#6b7280; margin-bottom:0.25rem;">TECHNICIAN / ASSIGNED PERSONNEL</label>
+        <input type="text" id="cd-tm-tech" placeholder="e.g., Ugur, Ali..." style="width:100%; padding:0.5rem; border:1px solid #cbd5e1; font-size:0.85rem; border-radius:3px;">
+      </div>
+      <div style="margin-bottom:1rem;">
+        <label style="display:block; font-family:'IBM Plex Mono',monospace; font-size:0.65rem; color:#6b7280; margin-bottom:0.25rem;">WORK / PROBLEM DESCRIPTION</label>
+        <textarea id="cd-tm-desc" rows="3" placeholder="Ticket details, service description..." style="width:100%; padding:0.5rem; border:1px solid #cbd5e1; font-size:0.85rem; border-radius:3px; resize:vertical;"></textarea>
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:0.5rem;">
+        <button onclick="document.getElementById('cd-ticket-modal').style.display='none'" style="padding:0.5rem 1rem; border:1px solid #cbd5e1; background:#ffffff; font-weight:600; cursor:pointer; border-radius:3px;">Cancel</button>
+        <button onclick="window.saveNewCustomerTicket && saveNewCustomerTicket()" style="padding:0.5rem 1.25rem; background:#2563eb; color:#ffffff; border:none; font-weight:600; cursor:pointer; border-radius:3px;">Save Ticket</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- =============================================
+     CUSALLR QUICK QUOTE MODAL
+     ============================================= -->
+<div id="cd-quote-modal" class="modal-overlay hidden" style="z-index:9500; display:none; position:fixed; inset:0; background:rgba(10,15,25,0.7); align-items:center; justify-content:center;">
+  <div style="background:#ffffff; width:min(520px, 95vw); border-radius:6px; border:2px solid #1d2430; box-shadow:0 20px 50px rgba(0,0,0,0.3); overflow:hidden;">
+    <div style="background:#1d2430; color:#fff; padding:1rem 1.25rem; display:flex; justify-content:space-between; align-items:center;">
+      <div>
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:0.65rem; color:rgba(255,255,255,0.6);">QUOTATION</div>
+        <div style="font-weight:700; font-size:1rem;" id="cd-quote-modal-title">Prepare New Quotation</div>
+      </div>
+      <button onclick="document.getElementById('cd-quote-modal').style.display='none'" style="background:transparent; border:none; color:#fff; font-size:1.2rem; cursor:pointer;">✕</button>
+    </div>
+    <div style="padding:1.25rem;">
+      <input type="hidden" id="cd-qm-cust-id">
+      <div style="margin-bottom:0.75rem;">
+        <label style="display:block; font-family:'IBM Plex Mono',monospace; font-size:0.65rem; color:#6b7280; margin-bottom:0.25rem;">CUSALLR / COMPANY</label>
+        <input type="text" id="cd-qm-company" readonly style="width:100%; padding:0.5rem; background:#f1f5f9; border:1px solid #cbd5e1; font-weight:600; font-size:0.85rem; border-radius:3px;">
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; margin-bottom:0.75rem;">
+        <div>
+          <label style="display:block; font-family:'IBM Plex Mono',monospace; font-size:0.65rem; color:#6b7280; margin-bottom:0.25rem;">QUOTE NO</label>
+          <input type="text" id="cd-qm-quoteno" placeholder="QUO-..." style="width:100%; padding:0.5rem; border:1px solid #cbd5e1; font-family:'IBM Plex Mono',monospace; font-size:0.85rem; border-radius:3px;">
+        </div>
+        <div>
+          <label style="display:block; font-family:'IBM Plex Mono',monospace; font-size:0.65rem; color:#6b7280; margin-bottom:0.25rem;">VALID TILL DATE</label>
+          <input type="date" id="cd-qm-validtill" style="width:100%; padding:0.5rem; border:1px solid #cbd5e1; font-size:0.85rem; border-radius:3px;">
+        </div>
+      </div>
+      <div style="margin-bottom:0.75rem;">
+        <label style="display:block; font-family:'IBM Plex Mono',monospace; font-size:0.65rem; color:#6b7280; margin-bottom:0.25rem;">QUOTE SUBJECT</label>
+        <input type="text" id="cd-qm-subject" placeholder="Örn: 2x Dokunmatik POS + Yazıcı Kurulumu" style="width:100%; padding:0.5rem; border:1px solid #cbd5e1; font-size:0.85rem; border-radius:3px;">
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; margin-bottom:0.75rem;">
+        <div>
+          <label style="display:block; font-family:'IBM Plex Mono',monospace; font-size:0.65rem; color:#6b7280; margin-bottom:0.25rem;">QUOTE STAGE / STATUS</label>
+          <select id="cd-qm-status" style="width:100%; padding:0.5rem; border:1px solid #cbd5e1; font-size:0.85rem; border-radius:3px;">
+            <option value="Created">Created ()</option>
+            <option value="Delivered">Delivered ()</option>
+            <option value="Accepted">Accepted ()</option>
+            <option value="Rejected">Rejected (Reddedildi)</option>
+            <option value="Draft">Draft (Taslak)</option>
+          </select>
+        </div>
+        <div>
+          <label style="display:block; font-family:'IBM Plex Mono',monospace; font-size:0.65rem; color:#6b7280; margin-bottom:0.25rem;">TOTAL AMOUNT (£)</label>
+          <input type="number" id="cd-qm-total" value="0.00" step="10" style="width:100%; padding:0.5rem; border:1px solid #cbd5e1; font-family:'IBM Plex Mono',monospace; font-size:0.85rem; font-weight:700; border-radius:3px;">
+        </div>
+      </div>
+      <div style="margin-bottom:1rem;">
+        <label style="display:block; font-family:'IBM Plex Mono',monospace; font-size:0.65rem; color:#6b7280; margin-bottom:0.25rem;">PRODUCT AND SERVICE DETAILS</label>
+        <textarea id="cd-qm-details" rows="3" placeholder="Items: Hardware, license, setup fee..." style="width:100%; padding:0.5rem; border:1px solid #cbd5e1; font-size:0.85rem; border-radius:3px; resize:vertical;"></textarea>
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:0.5rem;">
+        <button onclick="document.getElementById('cd-quote-modal').style.display='none'" style="padding:0.5rem 1rem; border:1px solid #cbd5e1; background:#ffffff; font-weight:600; cursor:pointer; border-radius:3px;">Cancel</button>
+        <button onclick="window.saveNewCustomerQuote && saveNewCustomerQuote()" style="padding:0.5rem 1.25rem; background:#059669; color:#ffffff; border:none; font-weight:600; cursor:pointer; border-radius:3px;">Save Quote</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- =============================================
+     CUSALLR IALLDETAIL MODAL (Quick View)
+     ============================================= -->
+<div id="cd-detail-view-modal" class="modal-overlay hidden" style="z-index:9600; display:none; position:fixed; inset:0; background:rgba(10,15,25,0.7); align-items:center; justify-content:center;">
+  <div style="background:#ffffff; width:min(550px, 95vw); border-radius:6px; border:2px solid #1d2430; box-shadow:0 20px 50px rgba(0,0,0,0.3); overflow:hidden;">
+    <div style="background:#1d2430; color:#fff; padding:1rem 1.25rem; display:flex; justify-content:space-between; align-items:center;">
+      <div>
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:0.65rem; color:rgba(255,255,255,0.6);" id="cd-dvm-badge">DETAY</div>
+        <div style="font-weight:700; font-size:1.05rem;" id="cd-dvm-title">Detail View</div>
+      </div>
+      <button onclick="document.getElementById('cd-detail-view-modal').style.display='none'" style="background:transparent; border:none; color:#fff; font-size:1.2rem; cursor:pointer;">✕</button>
+    </div>
+    <div id="cd-dvm-content" style="padding:1.5rem; max-height:70vh; overflow-y:auto; line-height:1.6; font-size:0.9rem;">
+      <!-- Content injected dynamically -->
+    </div>
+    <div style="padding:0.75rem 1.25rem; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; justify-content:flex-end;">
+      <button onclick="document.getElementById('cd-detail-view-modal').style.display='none'" style="padding:0.4rem 1.2rem; background:#1d2430; color:#ffffff; border:none; font-weight:600; cursor:pointer; border-radius:3px;">Kapat</button>
+    </div>
+  </div>
+</div>
+
 <datalist id="vtiger-customer-list"></datalist>
+<script src="js/customers.js?v=5"></script>
+<script src="js/main.js?v=5"></script>
+<script src="js/admin.js?v=5"></script>
 </body>
 </html>
+
+
+

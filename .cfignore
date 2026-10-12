@@ -1,0 +1,10 @@
+_ARCHIVE
+node_modules
+tools
+backend
+server.js
+*.bat
+*.py
+*.sql
+.env
+md_backups_*

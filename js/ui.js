@@ -1,3 +1,24 @@
+// --- DESCRIPTION METADATA SERIALIZER ---
+function parseMetadata(desc) {
+    if (!desc) return { metadata: {}, details: '' };
+    const match = desc.match(/^\[METADATA: ({.*?})\]\n([\s\S]*)$/);
+    if (match) {
+        try {
+            return {
+                metadata: JSON.parse(match[1]),
+                details: match[2]
+            };
+        } catch(e) {}
+    }
+    return {
+        metadata: {},
+        details: desc
+    };
+}
+function serializeMetadata(metadata, details) {
+    return `[METADATA: ${JSON.stringify(metadata)}]\n${details}`;
+}
+
 // --- Custom Alert System ---
 function showAlert(title, message, icon = '🔔', showCancel = false, isPrompt = false, callback = null) {
     document.getElementById('alert-title').innerText = title;
@@ -79,9 +100,14 @@ function showTab(tabId) {
     appState.activeTab = tabId;
     document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
     document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-    document.getElementById(`section-${tabId}`).classList.add('active');
-    document.getElementById(`btn-${tabId}`).classList.add('active');
+    const section = document.getElementById(`section-${tabId}`);
+    if (section) section.classList.add('active');
+    const btn = document.getElementById(`btn-${tabId}`);
+    if (btn) btn.classList.add('active');
     
+    if (tabId === 'preferences' || tabId === 'settings') {
+        if (typeof renderPreferencesPage === 'function') renderPreferencesPage();
+    }
     if (tabId === 'settings') {
         updateDataStats(); // Update summary cards when settings is shown
         if (appState.currentUserRole !== 'Admin') showSettingsSubTab('account');
@@ -144,7 +170,10 @@ function showSettingsSubTab(tabId) {
     }
 
     if (tabId === 'stats') updateDataStats(); 
-    if (tabId === 'users') renderPersonnelManagement();
+    if (tabId === 'users') {
+        if (typeof renderPersonnelManagement === 'function') renderPersonnelManagement();
+        if (typeof renderAdminUsersList === 'function') renderAdminUsersList();
+    }
     if (tabId === 'permissions') renderPermissionsManagement();
     if (tabId === 'pricing') renderPricingSettings();
     if (tabId === 'account') renderAccountSettings();
@@ -178,8 +207,8 @@ function renderDataTable() {
     if (thAmount) thAmount.style.display = isUser ? 'none' : 'table-cell';
 
     let filtered = appState.tickets.filter(t => {
-        const stat = t.status || '';
-        return (stat === 'Completed' || stat === 'Tamamlandı' || stat === 'Tamamland' || t.invoiced === true);
+        const isInvoice = t.price > 0 || t.paymentStatus === 'Chargeable' || ['Pending', 'Paid', 'Partially Paid', 'Cancelled', 'Refunded', 'Write Off'].includes(t.status);
+        return !isInvoice;
     });
     
     // --- Data Scoping: Users only see their own tickets ---
@@ -332,7 +361,9 @@ function exportCustomersToCSV() {
 
 function renderCustomersTable() {
     const tbody = document.getElementById('customers-table-body');
-    const search = document.getElementById('customer-search').value.toLowerCase();
+    if(!tbody) return;
+    const searchEl = document.getElementById('customer-search');
+    const search = searchEl ? searchEl.value.toLowerCase() : '';
     let filtered = appState.customers;
     
     // Apply chips filter
@@ -359,15 +390,27 @@ function renderCustomersTable() {
 
     tbody.innerHTML = filtered.map(c => `
         <tr style="border-bottom: 1px solid var(--border-color);">
-            <td style="padding: 16px 20px;"><strong style="color:var(--primary)">${c['CUSTOMER ID'] || 'N/A'}</strong></td>
-            <td style="padding: 16px 20px;"><strong>${c['COMPANY'] || 'N/A'}</strong></td>
+            <td style="padding: 16px 20px;"><strong style="color:var(--primary)">${c['COMPANY'] || 'N/A'}</strong></td>
+            <td style="padding: 16px 20px;">${c['CUSTOMER ID'] || 'N/A'}</td>
             <td style="padding: 16px 20px;">${c['POSTCODE'] || '0'}</td>
             <td style="padding: 16px 20px;"><span class="badge ${c['SERVICE STATUS'] === 'Contract' ? 'badge-success' : 'badge-warning'}" style="${c['SERVICE STATUS'] === 'Contract' ? 'background:#10b981; color:white;' : ''}">${c['SERVICE STATUS'] || 'No Contract'}</span></td>
-
             <td style="padding: 16px 20px; text-align: right;"><button class="btn" style="background:#f1f5f9; color:#1b4376; border:none; font-weight:700; display:inline-flex; align-items:center; gap:6px;" onclick="filterByCustomer('${c['COMPANY']}')"><i data-lucide="history" style="width: 14px; height: 14px;"></i> History</button></td>
         </tr>
     `).join('');
     if (window.lucide) lucide.createIcons();
+}
+
+function getStatusBadge(status) {
+    const colors = {
+        'Pending': {bg: '#fef3c7', text: '#d97706'},
+        'Paid': {bg: '#dcfce7', text: '#15803d'},
+        'Partially Paid': {bg: '#e0f2fe', text: '#0369a1'},
+        'Cancelled': {bg: '#f3f4f6', text: '#4b5563'},
+        'Refunded': {bg: '#f3e8ff', text: '#6b21a8'},
+        'Write Off': {bg: '#fee2e2', text: '#b91c1c'}
+    };
+    const c = colors[status] || {bg: '#fef3c7', text: '#d97706'};
+    return `<span class="badge" style="background:${c.bg}; color:${c.text}; padding:6px 12px; border-radius:50px; font-weight:700; font-size:11px; display:inline-block; border: 1px solid transparent;">${status.toUpperCase()}</span>`;
 }
 
 function renderInvoicesTable() {
@@ -378,17 +421,16 @@ function renderInvoicesTable() {
     const end = document.getElementById('invoice-end-date')?.value;
 
     let filtered = appState.tickets.filter(t => {
-        const stat = t.status || '';
-        return t.paymentStatus === 'Chargeable' && (stat === 'Completed' || stat === 'Tamamlandı' || stat === 'Tamamland' || t.invoiced === true);
+        return t.price > 0 || t.paymentStatus === 'Chargeable' || ['Pending', 'Paid', 'Partially Paid', 'Cancelled', 'Refunded', 'Write Off'].includes(t.status);
     });
     if (appState.currentUserRole === 'User') {
         filtered = filtered.filter(t => t.user === appState.currentUser);
     }
 
     if (appState.currentInvoiceTab === 'pending') {
-        filtered = filtered.filter(t => !t.invoiced);
+        filtered = filtered.filter(t => t.status === 'Pending' || t.status === 'Logged');
     } else if (appState.currentInvoiceTab === 'invoiced') {
-        filtered = filtered.filter(t => t.invoiced);
+        filtered = filtered.filter(t => t.status !== 'Pending' && t.status !== 'Logged');
     }
     
     // Apply filters
@@ -396,14 +438,16 @@ function renderInvoicesTable() {
     if (start) filtered = filtered.filter(t => new Date(t.timestamp) >= new Date(start));
     if (end) { const dEnd = new Date(end); dEnd.setHours(23,59,59); filtered = filtered.filter(t => new Date(t.timestamp) <= dEnd); }
 
-    let baseScoped = appState.tickets.filter(t => t.paymentStatus === 'Chargeable');
+    let baseScoped = appState.tickets.filter(t => {
+        return t.price > 0 || t.paymentStatus === 'Chargeable' || ['Pending', 'Paid', 'Partially Paid', 'Cancelled', 'Refunded', 'Write Off'].includes(t.status);
+    });
     if (appState.currentUserRole === 'User') baseScoped = baseScoped.filter(t => t.user === appState.currentUser);
 
     const elPending = document.getElementById('count-pending');
-    if (elPending) elPending.innerText = baseScoped.filter(t => !t.invoiced).length;
+    if (elPending) elPending.innerText = baseScoped.filter(t => t.status === 'Pending' || t.status === 'Logged').length;
     
     const elInvoiced = document.getElementById('count-invoiced');
-    if (elInvoiced) elInvoiced.innerText = baseScoped.filter(t => t.invoiced).length;
+    if (elInvoiced) elInvoiced.innerText = baseScoped.filter(t => t.status !== 'Pending' && t.status !== 'Logged').length;
     
     const canEdit = appState.currentUserRole === 'Admin' || appState.currentUserRole === 'Accounting';
     
@@ -416,13 +460,9 @@ function renderInvoicesTable() {
             <td style="padding: 20px; text-align: right;"><div style="display: flex; align-items: center; justify-content: flex-end; gap: 12px;">
                 <button onclick="printInvoice('${t.id}')" title="Generate Invoice (Email/PDF)" style="background:none; border:none; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; color:#1e3a8a; width:28px; height:28px; border-radius:50%; transition: background-color 0.2s;"><i data-lucide="mail" style="width: 16px; height: 16px;"></i></button>
                 ${canEdit
-                    ? t.invoiced
-                        ? `<button onclick="showDetails('${t.id}')" title="View Details (Locked – Already Invoiced)" style="background:none; border:none; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; color:#64748b; width:28px; height:28px; border-radius:50%; transition: background-color 0.2s;" title="Record locked – view only"><i data-lucide="eye" style="width: 16px; height: 16px;"></i></button>`
-                        : `<button onclick="editInvoice('${t.id}')" title="Edit Billing" style="background:none; border:none; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; color:#94a3b8; width:28px; height:28px; border-radius:50%; transition: background-color 0.2s;"><i data-lucide="edit-3" style="width: 16px; height: 16px;"></i></button>`
+                    ? `<button onclick="editInvoice('${t.id}')" title="Edit Billing" style="background:none; border:none; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; color:#94a3b8; width:28px; height:28px; border-radius:50%; transition: background-color 0.2s;"><i data-lucide="edit-3" style="width: 16px; height: 16px;"></i></button>`
                     : `<button onclick="showDetails('${t.id}')" title="View Details" style="background:none; border:none; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; color:#64748b; width:28px; height:28px; border-radius:50%; transition: background-color 0.2s;"><i data-lucide="eye" style="width: 16px; height: 16px;"></i></button>`}
-                ${!t.invoiced
-                    ? (canEdit ? `<input type="text" placeholder="Enter Inv No..." onchange="quickInvoice('${t.id}', this.value)" style="padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 12px; font-weight: 700; width: 140px; text-align: center; outline: none; background: #fff; color: #1e293b;" title="Press Enter to Save">` : `<span class="badge badge-warning" style="display:inline-flex; align-items:center; gap:4px;"><div class="status-dot dot-orange dot-blinking" style="margin:0;"></div> PENDING</span>`)
-                    : `<span class="badge badge-success" style="display:inline-flex; align-items:center; gap:4px;"><div class="status-dot dot-green" style="margin:0;"></div> INVOICED</span>`}
+                ${getStatusBadge(t.status || 'Pending')}
             </div></td>
         </tr>
     `).join('');
@@ -436,12 +476,6 @@ function editInvoice(id) {
     const isUser = appState.currentUserRole === 'User';
     const isAccounting = appState.currentUserRole === 'Accounting';
 
-    // --- Lock: Invoiced records are read-only ---
-    if (r.invoiced) {
-        showDetails(id);
-        return;
-    }
-
     appState.editingRecordId = id;
     const content = document.getElementById('modal-details-content');
     document.getElementById('modal-title').innerText = isUser ? "Edit Record – " + r.dbId : "Edit Billing & Record – " + r.dbId;
@@ -449,17 +483,13 @@ function editInvoice(id) {
     const cancelBtn = document.getElementById('btn-modal-cancel');
     if (cancelBtn) cancelBtn.classList.add('hidden');
 
-    const serviceOptions = (appState.settings.services || LOCAL_SERVICES)
-        .map(s => `<option value="${s.name}" ${s.name === r.mainService ? 'selected' : ''}>${s.full_name || s.name} (${s.name})</option>`)
-        .join('');
-
     content.innerHTML = `
         <div style="padding: 0.5rem; color: #111827; font-family: inherit;">
-            <!-- Technician Info Section (Editable) -->
+            <!-- Ticket Info (Read Only) -->
             <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 1.5rem; margin-bottom: 1.5rem;">
                 <div class="grid-4" style="margin-bottom: 15px; gap: 1rem;">
                     <div class="field">
-                        <label style="color:#64748b; font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.05em;">Staff</label>
+                        <label style="color:#64748b; font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.05em;">Staff (Created By)</label>
                         <div style="background: #f8fafc; color: #111827; font-weight: 600; border: 1px solid #e2e8f0; padding: 10px 14px; border-radius: 10px; font-size: 13px; min-height: 38px; display: flex; align-items: center;">${r.user}</div>
                     </div>
                     <div class="field">
@@ -468,7 +498,8 @@ function editInvoice(id) {
                     </div>
                     <div class="field">
                         <label style="color:#64748b; font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.05em;">CRM Ticket</label>
-                        <input type="text" id="e-crm-ticket" value="${r.crmTicket || ''}" ${isAccounting ? 'disabled' : ''} style="background: ${isAccounting ? '#f8fafc' : '#ffffff'}; color: #111827; font-weight: 600; border: 1px solid #cbd5e1; border-radius: 10px; padding: 10px 14px; outline: none; font-size: 13px; width: 100%; box-sizing: border-box;">
+                        <div style="background: #f8fafc; color: #111827; font-weight: 600; border: 1px solid #e2e8f0; padding: 10px 14px; border-radius: 10px; font-size: 13px; min-height: 38px; display: flex; align-items: center;">${r.crmTicket || 'N/A'}</div>
+                        <input type="hidden" id="e-crm-ticket" value="${r.crmTicket || ''}">
                     </div>
                     <div class="field">
                         <label style="color:#64748b; font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.05em;">Timestamp</label>
@@ -489,93 +520,62 @@ function editInvoice(id) {
                         <div style="background: #f8fafc; color: #111827; font-weight: 600; border: 1px solid #e2e8f0; padding: 10px 14px; border-radius: 10px; font-size: 13px; min-height: 38px; display: flex; align-items: center;">${r.postcode || 'N/A'}</div>
                     </div>
                 </div>
-                <div class="grid-2" style="margin-bottom: 15px; gap: 1rem;">
+            </div>
+
+            <!-- Editable Fields -->
+            <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 1.5rem; margin-bottom: 1.5rem;">
+                <p style="font-size: 12px; font-weight: 800; color: var(--primary); margin-bottom: 1.25rem; text-transform: uppercase; letter-spacing: 0.05em;">Invoice Billing Details (Editable)</p>
+                <div class="grid-3" style="gap: 1rem; margin-bottom: 15px;">
                     <div class="field">
-                        <label style="color:#64748b; font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.05em;">Category</label>
-                        <div style="background: #f8fafc; color: #111827; font-weight: 600; border: 1px solid #e2e8f0; padding: 10px 14px; border-radius: 10px; font-size: 13px; min-height: 38px; display: flex; align-items: center;">${(appState.settings.services || LOCAL_SERVICES).find(x => x.name === r.mainService)?.full_name || r.mainService}</div>
+                        <label style="color:#64748b; font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.05em;">Invoice Reference</label>
+                        <input type="text" id="e-inv-no" value="${r.invoiceNo || ''}" placeholder="Enter Inv No..." style="background: #ffffff; color: #111827; border: 1px solid #cbd5e1; border-radius: 10px; padding: 10px 14px; outline: none; font-size: 13px; font-weight: 600;">
                     </div>
                     <div class="field">
-                        <label style="color:#64748b; font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.05em;">Sub Service</label>
-                        <div style="background: #f8fafc; color: #111827; font-weight: 600; border: 1px solid #e2e8f0; padding: 10px 14px; border-radius: 10px; font-size: 13px; min-height: 38px; display: flex; align-items: center;">${r.subService || 'N/A'}</div>
+                        <label style="color:#64748b; font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.05em;">Service Date</label>
+                        <input type="date" id="e-inv-date" value="${r.invoiceDate || new Date().toISOString().split('T')[0]}" style="background: #ffffff; color: #111827; border: 1px solid #cbd5e1; border-radius: 10px; padding: 10px 14px; outline: none; font-size: 13px; font-weight: 600;">
+                    </div>
+                    <div class="field">
+                        <label style="color:#64748b; font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.05em;">Payment Status</label>
+                        <select id="e-invoice-status" style="background: #ffffff url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=\\'http://www.w3.org/2000/svg\\' viewBox=\\'0 0 24 24\\' fill=\\'none\\' stroke=\\'%2364748b\\' stroke-width=\\'2\\' stroke-linecap=\\'round\\' stroke-linejoin=\\'round\\'%3e%3cpolyline points=\\'6 9 12 15 18 9\\'%3e%3c/polyline%3e%3c/svg%3e') no-repeat right 12px center; background-size: 14px; color: #111827; border: 1px solid #cbd5e1; border-radius: 10px; padding: 10px 14px; outline: none; font-size: 13px; font-weight: 600; cursor: pointer; -webkit-appearance: none; -moz-appearance: none; appearance: none; padding-right: 36px !important;">
+                            <option value="Pending" ${r.status === 'Pending' || r.status === 'Logged' ? 'selected' : ''}>Pending</option>
+                            <option value="Paid" ${r.status === 'Paid' ? 'selected' : ''}>Paid</option>
+                            <option value="Partially Paid" ${r.status === 'Partially Paid' ? 'selected' : ''}>Partially Paid</option>
+                            <option value="Cancelled" ${r.status === 'Cancelled' ? 'selected' : ''}>Cancelled</option>
+                            <option value="Refunded" ${r.status === 'Refunded' ? 'selected' : ''}>Refunded</option>
+                            <option value="Write Off" ${r.status === 'Write Off' ? 'selected' : ''}>Write Off</option>
+                        </select>
+                        <input type="hidden" id="e-payment" value="${r.paymentStatus}">
+                        <input type="hidden" id="e-invoiced" value="${r.status !== 'Pending' && r.status !== 'Logged' ? 'true' : 'false'}">
+                    </div>
+                </div>
+                <div class="grid-2" style="gap: 1rem; margin-bottom: 15px;">
+                    <div class="field">
+                        <label style="color:#64748b; font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.05em;">Final Price (£)</label>
+                        <input type="number" id="e-price" value="${r.price}" step="0.01" style="background: #ffffff; color: var(--primary); border: 1px solid #cbd5e1; border-radius: 10px; padding: 10px 14px; outline: none; font-size: 13px; font-weight: 700;">
+                    </div>
+                    <div class="field">
+                        <label style="color:#64748b; font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.05em;">VAT (£)</label>
+                        <input type="number" id="e-vat" value="${parseFloat(r.vat || 0).toFixed(2)}" step="0.01" style="background: #ffffff; color: #111827; border: 1px solid #cbd5e1; border-radius: 10px; padding: 10px 14px; outline: none; font-size: 13px; font-weight: 600;">
                     </div>
                 </div>
                 <div class="field" style="margin-bottom: 15px;">
+                    <label style="color:#64748b; font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.05em;">Invoice Notes</label>
+                    <input type="text" id="e-invoice-notes" value="${r.invoiceNotes || ''}" placeholder="Enter payment/VAT notes here..." style="background: #ffffff; color: #111827; border: 1px solid #cbd5e1; border-radius: 10px; padding: 10px 14px; outline: none; font-size: 13px; font-weight: 600;">
+                </div>
+                <div class="field" style="margin-bottom: 15px;">
                     <label style="color:#64748b; font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.05em;">Work Details</label>
-                    <textarea id="e-description" rows="4" ${isAccounting ? 'disabled' : ''} style="background: ${isAccounting ? '#f8fafc' : '#ffffff'}; color: #334155; border: 1px solid #cbd5e1; border-radius: 10px; padding: 12px 16px; outline: none; font-size: 13px; font-weight: 500;">${r.description || ''}</textarea>
+                    <textarea id="e-description" rows="4" style="background: #ffffff; color: #334155; border: 1px solid #cbd5e1; border-radius: 10px; padding: 12px 16px; outline: none; font-size: 13px; font-weight: 500;">${r.description || ''}</textarea>
                 </div>
-                <div class="grid-3" style="gap: 1rem;">
-                    <div class="field">
-                        <label style="color:#64748b; font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.05em;">Start Time</label>
-                        <input type="time" id="e-start-time" value="${r.startTime || ''}" ${isAccounting ? 'disabled' : ''} style="background: ${isAccounting ? '#f8fafc' : '#ffffff'}; color: #111827; border: 1px solid #cbd5e1; border-radius: 10px; padding: 10px 14px; outline: none; font-size: 13px; font-weight: 600; width: 100%; box-sizing: border-box;"    onclick="try{this.showPicker()}catch(e){}" onfocus="try{this.showPicker()}catch(e){}" style="cursor:pointer;" >
-                    </div>
-                    <div class="field">
-                        <label style="color:#64748b; font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.05em;">End Time</label>
-                        <input type="time" id="e-end-time" value="${r.endTime || ''}" ${isAccounting ? 'disabled' : ''} style="background: ${isAccounting ? '#f8fafc' : '#ffffff'}; color: #111827; border: 1px solid #cbd5e1; border-radius: 10px; padding: 10px 14px; outline: none; font-size: 13px; font-weight: 600; width: 100%; box-sizing: border-box;"    onclick="try{this.showPicker()}catch(e){}" onfocus="try{this.showPicker()}catch(e){}" style="cursor:pointer;" >
-                    </div>
-                    <div class="field">
-                        <label style="color:#64748b; font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.05em;">Duration (min)</label>
-                        <div style="background: #f8fafc; color: #64748b; border: 1px solid #e2e8f0; padding: 10px 14px; border-radius: 10px; font-size: 13px; font-weight: 600; min-height: 38px; display: flex; align-items: center;">${r.duration || 'N/A'}</div>
-                    </div>
-                </div>
+                <input type="hidden" id="e-start-time" value="${r.startTime || ''}">
+                <input type="hidden" id="e-end-time" value="${r.endTime || ''}">
+                <div id="sync-notice" style="margin-top: 1rem; display: none;"></div>
             </div>
-            
-            <!-- Billing Information (Restricted) -->
-            ${isUser ? `
-                <div style="border-top: 1px solid #e2e8f0; padding-top: 1.5rem; opacity: 0.6; pointer-events: none;">
-                    <p style="font-size: 12px; font-weight: 800; color: #94a3b8; margin-bottom: 1.25rem; text-transform: uppercase; letter-spacing: 0.05em;">Billing Information (Admin Only)</p>
-                    <div class="grid-3" style="gap: 1rem; margin-bottom: 1rem; display: none;">
-                        <input type="hidden" id="e-price" value="${r.price}">
-                        <input type="hidden" id="e-payment" value="${r.paymentStatus}">
-                        <input type="hidden" id="e-inv-no" value="${r.invoiceNo || ''}">
-                        <input type="hidden" id="e-inv-date" value="${r.invoiceDate || new Date().toISOString().split('T')[0]}">
-                        <input type="hidden" id="e-invoiced" value="${r.invoiced ? 'true' : 'false'}">
-                    </div>
-                </div>
-            ` : `
-                <div style="border-top: 1px solid #e2e8f0; padding-top: 1.5rem;">
-                    <p style="font-size: 12px; font-weight: 800; color: var(--primary); margin-bottom: 1.25rem; text-transform: uppercase; letter-spacing: 0.05em;">Billing Information (Editable)</p>
-                    <div class="grid-3" style="gap: 1rem; margin-bottom: 1rem;">
-                        <div class="field">
-                            <label style="color:#64748b; font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.05em;">Invoice No</label>
-                            <input type="text" id="e-inv-no" value="${r.invoiceNo || ''}" placeholder="Enter Inv No..." oninput="if(this.value.trim() !== '' && document.getElementById('e-payment').value === 'Chargeable') document.getElementById('e-invoiced').value = 'true';" onchange="if(this.value.trim() !== '') { saveRecordEdits(); }" style="background: #ffffff; color: #111827; border: 1px solid #cbd5e1; border-radius: 10px; padding: 10px 14px; outline: none; font-size: 13px; font-weight: 600;">
-                        </div>
-                        <div class="field">
-                            <label style="color:#64748b; font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.05em;">Invoice Date</label>
-                            <input type="date" id="e-inv-date" value="${r.invoiceDate || new Date().toISOString().split('T')[0]}" style="background: #ffffff; color: #111827; border: 1px solid #cbd5e1; border-radius: 10px; padding: 10px 14px; outline: none; font-size: 13px; font-weight: 600;"    onclick="try{this.showPicker()}catch(e){}" onfocus="try{this.showPicker()}catch(e){}" style="cursor:pointer;" >
-                        </div>
-                        <div class="field">
-                            <label style="color:#64748b; font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.05em;">Final Price (£)</label>
-                            <input type="number" id="e-price" value="${r.price}" step="0.01" style="background: #ffffff; color: var(--primary); border: 1px solid #cbd5e1; border-radius: 10px; padding: 10px 14px; outline: none; font-size: 13px; font-weight: 700;">
-                        </div>
-                    </div>
-                    <div class="grid-2" style="gap: 1rem;">
-                        <div class="field">
-                            <label style="color:#64748b; font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.05em;">Payment Status</label>
-                            <select id="e-payment" onchange="updateInvoiceStatusUI()" style="background: #ffffff url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=\\'http://www.w3.org/2000/svg\\' viewBox=\\'0 0 24 24\\' fill=\\'none\\' stroke=\\'%2364748b\\' stroke-width=\\'2\\' stroke-linecap=\\'round\\' stroke-linejoin=\\'round\\'%3e%3cpolyline points=\\'6 9 12 15 18 9\\'%3e%3c/polyline%3e%3c/svg%3e') no-repeat right 12px center; background-size: 14px; color: #111827; border: 1px solid #cbd5e1; border-radius: 10px; padding: 10px 14px; outline: none; font-size: 13px; font-weight: 600; cursor: pointer; -webkit-appearance: none; -moz-appearance: none; appearance: none; padding-right: 36px !important;">
-                                <option value="Chargeable" ${r.paymentStatus === 'Chargeable' ? 'selected' : ''}>Chargeable</option>
-                                <option value="Contract" ${r.paymentStatus === 'Contract' ? 'selected' : ''}>Contract</option>
-                                <option value="Free" ${r.paymentStatus === 'Free' ? 'selected' : ''}>Free</option>
-                            </select>
-                        </div>
-                        <div class="field">
-                            <label style="color:#64748b; font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.05em;">Process Status</label>
-                            <select id="e-invoiced" ${r.invoiced ? 'disabled style="background: #f8fafc; color: #94a3b8; border: 1px solid #e2e8f0; cursor: not-allowed;"' : 'style="background: #ffffff; color: #111827; border: 1px solid #cbd5e1; cursor: pointer;"'} style="background-image: url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=\\'http://www.w3.org/2000/svg\\' viewBox=\\'0 0 24 24\\' fill=\\'none\\' stroke=\\'%2364748b\\' stroke-width=\\'2\\' stroke-linecap=\\'round\\' stroke-linejoin=\\'round\\'%3e%3cpolyline points=\\'6 9 12 15 18 9\\'%3e%3c/polyline%3e%3c/svg%3e'); background-repeat: no-repeat; background-position: right 12px center; background-size: 14px; border-radius: 10px; padding: 10px 14px; outline: none; font-size: 13px; font-weight: 600; -webkit-appearance: none; -moz-appearance: none; appearance: none; padding-right: 36px !important;">
-                                <option value="false" ${!r.invoiced ? 'selected' : ''}>Pending</option>
-                                <option value="true" ${r.invoiced ? 'selected' : ''}>Invoiced ✅</option>
-                            </select>
-                        </div>
-                    </div>
-                    <!-- Sync Notice Banner: shows real-time invoicing impact -->
-                    <div id="sync-notice" style="margin-top: 1rem; display: none;"></div>
-                </div>
-            `}
         </div>
     `;
     document.getElementById('details-modal').classList.remove('hidden');
     if (window.lucide) lucide.createIcons();
     setTimeout(() => {
-        updateEditSubServices(r.subService);
-        if (!isUser) updateInvoiceStatusUI();
+        if (typeof updateEditSubServices === 'function') updateEditSubServices(r.subService);
     }, 50);
 }
 
@@ -638,11 +638,21 @@ window.updateInvoiceStatusUI = updateInvoiceStatusUI;
 
 function updateEditSubServices(selected) {
     const main = document.getElementById('e-main-service').value;
-    const opts = appState.settings.sub_services[main] || [];
+    const subServices = appState.settings?.sub_services || 
+                        (typeof defaultSeeds !== 'undefined' ? defaultSeeds.sub_services : null) || 
+                        (typeof LOCAL_SUB_SERVICES !== 'undefined' ? LOCAL_SUB_SERVICES : null);
+    let opts = [];
+    if (subServices) {
+        if (Array.isArray(subServices)) {
+            opts = subServices.filter(s => s.service_name === main).map(s => s.name);
+        } else if (typeof subServices === 'object') {
+            opts = subServices[main] || [];
+        }
+    }
     document.getElementById('e-sub-service').innerHTML = opts.map(o => `<option value="${o}" ${selected === o ? 'selected' : ''}>${o}</option>`).join('');
 }
 async function saveRecordEdits() {
-    const newPaymentStatus = document.getElementById('e-payment').value;
+    const newStatus = document.getElementById('e-invoice-status')?.value || 'Pending';
     const newPrice = parseFloat(document.getElementById('e-price').value) || 0;
     const newInvNo = document.getElementById('e-inv-no').value;
     const newInvDate = document.getElementById('e-inv-date').value;
@@ -653,19 +663,19 @@ async function saveRecordEdits() {
     const newSubService = document.getElementById('e-sub-service')?.value || null;
     const newDescription = document.getElementById('e-description')?.value || '';
     const newCrmTicket = document.getElementById('e-crm-ticket')?.value || '';
+    
+    const newVat = parseFloat(document.getElementById('e-vat')?.value || 0) || 0;
+    const newInvoiceNotes = document.getElementById('e-invoice-notes')?.value || '';
+    const newPaymentStatus = document.getElementById('e-payment')?.value || 'Chargeable';
 
-    // --- Synchronization Logic ---
-    let newInvoiced;
-    const invoicedEl = document.getElementById('e-invoiced');
-    if (newPaymentStatus !== 'Chargeable') {
-        newInvoiced = false;
-    } else {
-        if (newInvNo && newInvNo.trim() !== '') {
-            newInvoiced = true;
-        } else {
-            newInvoiced = invoicedEl ? (invoicedEl.value === 'true') : false;
-        }
-    }
+    const r = appState.tickets.find(t => t.id == appState.editingRecordId);
+    const parsed = parseMetadata(r ? (r.rawDescription || r.description) : '');
+    const updatedMetadata = {
+        ...parsed.metadata,
+        vat: newVat,
+        invoiceNotes: newInvoiceNotes
+    };
+    const updatedDescription = serializeMetadata(updatedMetadata, newDescription);
 
     // Recalculate duration from edited times if both are set
     let newDuration = null;
@@ -682,57 +692,93 @@ async function saveRecordEdits() {
         "INV DATE": newInvDate,
         PRICE: newPrice,
         "PAYMENT STATUS": newPaymentStatus,
-        invoiced: newInvoiced,
+        invoiced: newStatus !== 'Pending',
+        STATUS: newStatus,
         "START TIME": newStartTime,
         "END TIME": newEndTime,
-        ...(newMainService ? { "MAIN SERVICE": newMainService } : {}),
-        ...(newSubService ? { "SUB SERVICE": newSubService } : {}),
-        ...(newDescription ? { DESCRIPTION: newDescription } : {}),
+        DESCRIPTION: updatedDescription,
         "CRM TICKET": newCrmTicket,
         ...(newDuration !== null ? { DURATION: newDuration } : {})
     };
 
     try {
-        await sbClient.from('records').update(updates).eq('id', appState.editingRecordId);
+        if (window.globalEventBus) {
+            window.globalEventBus.publish({
+                type: 'ticket_update_requested',
+                payload: {
+                    id: appState.editingRecordId,
+                    updates: updates
+                }
+            });
+            
+            // --- Optimistic Local State Update ---
+            const localTicket = appState.tickets.find(t => t.id == appState.editingRecordId);
+            if (localTicket) {
+                localTicket.invoiceNo = newInvNo;
+                localTicket.invoiceDate = newInvDate;
+                localTicket.price = newPrice;
+                localTicket.paymentStatus = newPaymentStatus;
+                localTicket.invoiced = newStatus !== 'Pending';
+                localTicket.status = newStatus;
+                localTicket.startTime = newStartTime;
+                localTicket.endTime = newEndTime;
+                if (newMainService) localTicket.mainService = newMainService;
+                if (newSubService) localTicket.subService = newSubService;
+                localTicket.description = newDescription;
+                localTicket.rawDescription = updatedDescription;
+                localTicket.crmTicket = newCrmTicket;
+                if (newDuration !== null) localTicket.duration = newDuration;
+                localTicket.vat = newVat;
+                localTicket.invoiceNotes = newInvoiceNotes;
 
-        // Log the edit
-        if (typeof addSystemLog === 'function') {
-            addSystemLog('EDIT RECORD', `Record ID: ${appState.editingRecordId}. New Price: £${newPrice}, Status: ${newPaymentStatus}`);
-        }
+                closeModal();
+                renderDataTable();
+                renderInvoicesTable();
+                updateDataStats();
+                showAlert('Saved', 'Record updated successfully!', '✅');
+            } else {
+                closeModal();
+                initApp();
+                showAlert('Saved', 'Record updated successfully!', '✅');
+            }
+        } else {
+            await sbClient.from('records').update(updates).eq('id', appState.editingRecordId);
 
-        // --- Optimistic Local State Update ---
-        const localTicket = appState.tickets.find(t => t.id == appState.editingRecordId);
-        if (localTicket) {
-            const wasChargeable = localTicket.paymentStatus === 'Chargeable';
-            localTicket.invoiceNo = newInvNo;
-            localTicket.invoiceDate = newInvDate;
-            localTicket.price = newPrice;
-            localTicket.paymentStatus = newPaymentStatus;
-            localTicket.invoiced = newInvoiced;
-            localTicket.startTime = newStartTime;
-            localTicket.endTime = newEndTime;
-            if (newMainService) localTicket.mainService = newMainService;
-            if (newSubService) localTicket.subService = newSubService;
-            if (newDescription !== undefined) localTicket.description = newDescription;
-            localTicket.crmTicket = newCrmTicket;
-            if (newDuration !== null) localTicket.duration = newDuration;
-
-            let msg = 'Record updated successfully!';
-            if (wasChargeable && newPaymentStatus !== 'Chargeable') {
-                msg = `Status changed to "${newPaymentStatus}" — record removed from Invoicing tab automatically.`;
-            } else if (!wasChargeable && newPaymentStatus === 'Chargeable' && newPrice > 0) {
-                msg = `Status changed to "Chargeable" — record is now visible in Invoicing tab.`;
+            // Log the edit
+            if (typeof addSystemLog === 'function') {
+                addSystemLog('EDIT RECORD', `Record ID: ${appState.editingRecordId}. New Price: £${newPrice}, Status: ${newStatus}`);
             }
 
-            closeModal();
-            renderDataTable();
-            renderInvoicesTable();
-            updateDataStats();
-            showAlert('Saved', msg, '✅');
-        } else {
-            closeModal();
-            initApp();
-            showAlert('Saved', 'Record updated successfully!', '✅');
+            // --- Optimistic Local State Update ---
+            const localTicket = appState.tickets.find(t => t.id == appState.editingRecordId);
+            if (localTicket) {
+                localTicket.invoiceNo = newInvNo;
+                localTicket.invoiceDate = newInvDate;
+                localTicket.price = newPrice;
+                localTicket.paymentStatus = newPaymentStatus;
+                localTicket.invoiced = newStatus !== 'Pending';
+                localTicket.status = newStatus;
+                localTicket.startTime = newStartTime;
+                localTicket.endTime = newEndTime;
+                if (newMainService) localTicket.mainService = newMainService;
+                if (newSubService) localTicket.subService = newSubService;
+                localTicket.description = newDescription;
+                localTicket.rawDescription = updatedDescription;
+                localTicket.crmTicket = newCrmTicket;
+                if (newDuration !== null) localTicket.duration = newDuration;
+                localTicket.vat = newVat;
+                localTicket.invoiceNotes = newInvoiceNotes;
+
+                closeModal();
+                renderDataTable();
+                renderInvoicesTable();
+                updateDataStats();
+                showAlert('Saved', 'Record updated successfully!', '✅');
+            } else {
+                closeModal();
+                initApp();
+                showAlert('Saved', 'Record updated successfully!', '✅');
+            }
         }
     } catch (err) {
         showAlert('Error', err.message, '❌');
@@ -751,17 +797,38 @@ async function quickInvoice(id, invNo) {
             "INV DATE": invDate,
             invoiced: true
         };
-        await sbClient.from('records').update(updates).eq('id', id);
         
-        r.invoiceNo = invNo.trim();
-        r.invoiceDate = invDate;
-        r.invoiced = true;
-        
-        renderInvoicesTable();
-        renderDataTable();
-        updateDataStats();
-        
-        showToast('Invoice saved successfully!', 'success');
+        if (window.globalEventBus) {
+            window.globalEventBus.publish({
+                type: 'ticket_update_requested',
+                payload: {
+                    id: id,
+                    updates: updates
+                }
+            });
+            // Update local state optimistically
+            r.invoiceNo = invNo.trim();
+            r.invoiceDate = invDate;
+            r.invoiced = true;
+            
+            renderInvoicesTable();
+            renderDataTable();
+            updateDataStats();
+            
+            showToast('Invoice saved successfully!', 'success');
+        } else {
+            await sbClient.from('records').update(updates).eq('id', id);
+            
+            r.invoiceNo = invNo.trim();
+            r.invoiceDate = invDate;
+            r.invoiced = true;
+            
+            renderInvoicesTable();
+            renderDataTable();
+            updateDataStats();
+            
+            showToast('Invoice saved successfully!', 'success');
+        }
     } catch (e) {
         showAlert('Error', e.message, '❌');
     }
@@ -1079,7 +1146,7 @@ async function addPersonnel() {
         console.error("Personnel Add Error:", e);
         let msg = e.message;
         if (msg.includes('row-level security') || e.code === '42501') {
-            msg = `Security Error (RLS): You don't have permission to add personnel. Please check Supabase policies.`;
+            msg = `Security Error (RLS): You don't have permission to add personnel. Please check Turso DB.`;
         }
         showAlert('Error', msg, '❌'); 
     }
@@ -1141,7 +1208,7 @@ async function resetUserPassword(id, name) {
     if (!newPass) return;
 
     try {
-        // In a real app, you would use Supabase Auth to reset password.
+        // In a real app, you would use Turso Auth to reset password.
         // For now, we store it in a 'password' field if it exists, or just show success.
         // Note: The 'users' table might need a 'password' column if not using Auth.
         const { error } = await sbClient.from('users').update({ password: newPass }).eq('id', id);
@@ -1187,24 +1254,47 @@ function logout() {
     setTimeout(() => window.location.reload(), 1000);
 }
 
-function selectCategory(cat) { 
+function selectCategory(cat, dept) { 
     resetForm(); 
     const el = document.getElementById('f-service-type');
     if (el) {
-        // Ensure the option exists before selecting
         const exists = Array.from(el.options).some(opt => opt.value === cat);
         if (!exists) {
-            const srv = (appState.settings.services || []).find(s => s.name === cat);
-            if (srv) {
-                const opt = document.createElement('option');
-                opt.value = srv.name;
-                opt.text = srv.full_name || srv.name;
-                el.add(opt);
-            }
+            const opt = document.createElement('option');
+            opt.value = cat;
+            const catMap = {
+                'S1': 'MENU UPDATE',
+                'S2': 'CREDIT CARD',
+                'S3': 'DATA RESET',
+                'S4': 'SERVICE',
+                'S5': 'OTHER',
+                'S6': 'TILL SETUP'
+            };
+            opt.text = catMap[cat] || cat;
+            el.add(opt);
         }
         el.value = cat; 
         el.disabled = true; // Lock the category when coming from a tile
     }
+    
+    const deptEl = document.getElementById('f-department');
+    if (deptEl) {
+        deptEl.value = dept || '';
+    }
+    
+    const catDispEl = document.getElementById('f-service-type-display');
+    if (catDispEl) {
+        const catMap = {
+            'S1': 'MENU UPDATE',
+            'S2': 'CREDIT CARD',
+            'S3': 'DATA RESET',
+            'S4': 'SERVICE',
+            'S5': 'OTHER',
+            'S6': 'TILL SETUP'
+        };
+        catDispEl.value = catMap[cat] || cat;
+    }
+    
     updateDynamicFields(); 
     toggleMainForm('form'); 
 }
@@ -1215,7 +1305,17 @@ function updateDynamicFields() {
     if (!mainSelect) return;
     
     const main = mainSelect.value;
-    const opts = (appState.settings.sub_services || {})[main] || [];
+    const subServices = appState.settings?.sub_services || 
+                        (typeof defaultSeeds !== 'undefined' ? defaultSeeds.sub_services : null) || 
+                        (typeof LOCAL_SUB_SERVICES !== 'undefined' ? LOCAL_SUB_SERVICES : null);
+    let opts = [];
+    if (subServices) {
+        if (Array.isArray(subServices)) {
+            opts = subServices.filter(s => s.service_name === main).map(s => s.name);
+        } else if (typeof subServices === 'object') {
+            opts = subServices[main] || [];
+        }
+    }
     
     const subSelect = document.getElementById('f-sub-service');
     if (subSelect) {
@@ -1412,7 +1512,8 @@ function calculateDuration() {
         const defaultMins = (main === 'S1') ? 30 : 15; // Menu Update = 30 min, others = 15 min
         const [eh, em] = e.split(':').map(Number);
         let totalStart = (eh * 60 + em) - defaultMins;
-        if (totalStart < 0) totalStart += 1440;
+        // Clamp to business hours floor (09:00 = 540 min)
+        if (totalStart < 540) totalStart = 540;
         const sh = String(Math.floor(totalStart / 60)).padStart(2, '0');
         const sm = String(totalStart % 60).padStart(2, '0');
         startEl.value = `${sh}:${sm}`;
@@ -1431,42 +1532,100 @@ function calculateDuration() {
     calculatePrice();
 }
 function autoFillCustomerInfo() {
-    const companyInput = document.getElementById('f-company');
-    if (!companyInput) return;
-    const company = companyInput.value;
-    const customer = (appState.customers || []).find(c => (c.COMPANY || '') === company);
+    const searchEl = document.getElementById('f-customer-search');
+    if (!searchEl) return;
+    const searchValue = searchEl.value;
+    
+    // Find customer by name, or CID, or postcode, or full autocomplete label
+    const customer = (appState.customers || []).find(c => {
+        const label = `${c.COMPANY} (${c['CUSTOMER ID'] || c['ORGANIZATION NUMBER'] || ''}, ${c.POSTCODE || ''})`;
+        return label === searchValue || 
+               c.COMPANY === searchValue || 
+               (c['CUSTOMER ID'] || c['ORGANIZATION NUMBER'] || '') === searchValue || 
+               (c.POSTCODE && c.POSTCODE === searchValue);
+    });
+    
+    const companyEl = document.getElementById('f-company');
+    const companyIdEl = document.getElementById('f-company-id');
+    const postcodeEl = document.getElementById('f-postcode');
+    const addressEl = document.getElementById('f-address');
+    const phoneEl = document.getElementById('f-phone');
+    const ownerEl = document.getElementById('f-owner');
+    const statusEl = document.getElementById('f-status');
+    const paymentEl = document.getElementById('f-payment-status');
+    
     if (customer) {
-        const statusEl = document.getElementById('f-status');
-        const paymentEl = document.getElementById('f-payment-status');
+        if (companyEl) companyEl.value = customer.COMPANY || '';
+        if (companyIdEl) companyIdEl.value = customer['CUSTOMER ID'] || customer['ORGANIZATION NUMBER'] || '';
+        if (postcodeEl) postcodeEl.value = customer.POSTCODE || customer['BILLING POSTAL CODE'] || '';
+        
+        const street = customer['ADDRESS'] || '';
+        const city = customer['CITY'] || '';
+        const postcodeVal = customer['POSTCODE'] || customer['BILLING POSTAL CODE'] || '';
+        const addressParts = [street, city, postcodeVal].filter(Boolean);
+        if (addressEl) addressEl.value = addressParts.join(', ');
+        
+        if (phoneEl) phoneEl.value = customer['PHONE'] || customer['PRIMARY PHONE'] || '';
+        if (ownerEl) ownerEl.value = customer['OWNERSHIP'] || '';
+        
         const statusVal = customer['SERVICE STATUS'] || 'No Contract';
+        if (statusEl) statusEl.value = statusVal;
         
-        document.getElementById('f-company-id').value = customer['CUSTOMER ID'] || '';
-        document.getElementById('f-postcode').value = customer['POSTCODE'] || '';
-        statusEl.value = statusVal;
-        
-        // Apply green color if Contract
-        if (statusVal === 'Contract') {
-            statusEl.style.setProperty('background', '#10b981', 'important');
-            statusEl.style.setProperty('color', 'white', 'important');
-            statusEl.style.fontWeight = '800';
-            
-            paymentEl.value = 'Contract';
-            paymentEl.style.setProperty('background', '#10b981', 'important');
-            paymentEl.style.setProperty('color', 'white', 'important');
-            paymentEl.style.fontWeight = '800';
-        } else {
-            statusEl.style.setProperty('background', '#f8fafc', 'important');
-            statusEl.style.setProperty('color', '#111827', 'important');
-            statusEl.style.fontWeight = '500';
-            
-            paymentEl.value = 'Chargeable';
-            paymentEl.style.setProperty('background', '#f8fafc', 'important');
-            paymentEl.style.setProperty('color', '#111827', 'important');
-            paymentEl.style.fontWeight = '500';
+        // Update Status Badge
+        const statusBadge = document.getElementById('f-status-badge');
+        if (statusBadge) {
+            if (statusVal === 'Contract') {
+                statusBadge.textContent = 'ACTIVE CONTRACT';
+                statusBadge.style.cssText = 'background: #10b981; color: white; padding: 6px 12px; border-radius: 50px; font-weight: 700; font-size: 12px; display: inline-block;';
+            } else {
+                statusBadge.textContent = 'CHARGEABLE (NO CONTRACT)';
+                statusBadge.style.cssText = 'background: #f97316; color: white; padding: 6px 12px; border-radius: 50px; font-weight: 700; font-size: 12px; display: inline-block;';
+            }
         }
-
+        
+        // Update Payment Status and Payment Badge
+        const paymentBadge = document.getElementById('f-payment-badge');
+        if (statusVal === 'Contract') {
+            if (paymentEl) paymentEl.value = 'Contract';
+            if (paymentBadge) {
+                paymentBadge.textContent = 'CONTRACT (FREE)';
+                paymentBadge.style.cssText = 'background: #10b981; color: white; padding: 6px 12px; border-radius: 50px; font-weight: 700; font-size: 12px; display: inline-block;';
+            }
+            const priceInput = document.getElementById('f-price');
+            if (priceInput) priceInput.value = '0.00';
+        } else {
+            if (paymentEl) paymentEl.value = 'Chargeable';
+            if (paymentBadge) {
+                paymentBadge.textContent = 'CHARGEABLE';
+                paymentBadge.style.cssText = 'background: #3b82f6; color: white; padding: 6px 12px; border-radius: 50px; font-weight: 700; font-size: 12px; display: inline-block;';
+            }
+            // Recalculate price and update final price
+            calculatePrice();
+        }
+    } else {
+        // Reset customer details to empty
+        if (companyEl) companyEl.value = '';
+        if (companyIdEl) companyIdEl.value = '';
+        if (postcodeEl) postcodeEl.value = '';
+        if (addressEl) addressEl.value = '';
+        if (phoneEl) phoneEl.value = '';
+        if (ownerEl) ownerEl.value = '';
+        if (statusEl) statusEl.value = '';
+        
+        const statusBadge = document.getElementById('f-status-badge');
+        if (statusBadge) {
+            statusBadge.textContent = 'NO CUSTOMER';
+            statusBadge.style.cssText = 'background: #94a3b8; color: white; padding: 6px 12px; border-radius: 50px; font-weight: 700; font-size: 12px; display: inline-block;';
+        }
+        
+        const paymentBadge = document.getElementById('f-payment-badge');
+        if (paymentBadge) {
+            paymentBadge.textContent = 'PENDING';
+            paymentBadge.style.cssText = 'background: #94a3b8; color: white; padding: 6px 12px; border-radius: 50px; font-weight: 700; font-size: 12px; display: inline-block;';
+        }
     }
-}function updatePaymentStyle(el) {
+}
+function updatePaymentStyle(el) {
     if (el.value === 'Contract') {
         el.style.setProperty('background', '#10b981', 'important');
         el.style.setProperty('color', 'white', 'important');
@@ -1502,6 +1661,19 @@ window.handleLocalSettingsChange = handleLocalSettingsChange;
 window.updatePaymentStyle = updatePaymentStyle;
 
 
+function updatePriceFieldAccessibility() {
+    const priceInput = document.getElementById('f-price');
+    if (priceInput) {
+        const canEdit = appState.currentUserRole === 'Admin' || appState.currentUserRole === 'Accounting';
+        priceInput.readOnly = !canEdit;
+        if (!canEdit) {
+            priceInput.style.background = '#f8fafc';
+        } else {
+            priceInput.style.background = '';
+        }
+    }
+}
+
 function resetForm() {
     const form = document.getElementById('master-form'); if (form) form.reset();
     const nextId = appState.tickets.length + 1001; 
@@ -1521,27 +1693,62 @@ function resetForm() {
     }
     
     const statusEl = document.getElementById('f-status');
-    statusEl.value = ''; 
-    statusEl.style.setProperty('background', '#f8fafc', 'important');
-    statusEl.style.setProperty('color', '#111827', 'important');
-    statusEl.style.fontWeight = '500';
+    if (statusEl) {
+        statusEl.value = ''; 
+    }
     
     const paymentEl = document.getElementById('f-payment-status');
-    paymentEl.value = 'Chargeable';
-    paymentEl.style.setProperty('background', '#f8fafc', 'important');
-    paymentEl.style.setProperty('color', '#111827', 'important');
-    paymentEl.style.fontWeight = '500';
+    if (paymentEl) {
+        paymentEl.value = 'Chargeable';
+    }
 
+    // Clear smart search and badges
+    const searchEl = document.getElementById('f-customer-search');
+    if (searchEl) searchEl.value = '';
     
-    // Auto-fill logged in user and disable
+    const statusBadge = document.getElementById('f-status-badge');
+    if (statusBadge) {
+        statusBadge.textContent = 'NO CUSTOMER';
+        statusBadge.style.cssText = 'background: #94a3b8; color: white; padding: 6px 12px; border-radius: 50px; font-weight: 700; font-size: 12px; display: inline-block;';
+    }
+    
+    const paymentBadge = document.getElementById('f-payment-badge');
+    if (paymentBadge) {
+        paymentBadge.textContent = 'PENDING';
+        paymentBadge.style.cssText = 'background: #94a3b8; color: white; padding: 6px 12px; border-radius: 50px; font-weight: 700; font-size: 12px; display: inline-block;';
+    }
 
+    const deptEl = document.getElementById('f-department');
+    if (deptEl) deptEl.value = '';
+    
+    const catDispEl = document.getElementById('f-service-type-display');
+    if (catDispEl) catDispEl.value = '';
 
-    document.getElementById('f-user').innerHTML = `<option value="${appState.currentUser}">${appState.currentUser}</option>`;
-    document.getElementById('f-user').disabled = true;
+    // Clear extended CRM fields
+    const addressEl = document.getElementById('f-address');
+    const phoneEl = document.getElementById('f-phone');
+    const ownerEl = document.getElementById('f-owner');
+    if (addressEl) addressEl.value = '';
+    if (phoneEl) phoneEl.value = '';
+    if (ownerEl) ownerEl.value = '';
+
+    // Auto-fill logged in user and display
+    const userDisplay = document.getElementById('f-user-display');
+    if (userDisplay) {
+        userDisplay.innerText = appState.currentUser || '-';
+    }
+    
+    const userEl = document.getElementById('f-user');
+    if (userEl) {
+        userEl.innerHTML = `<option value="${appState.currentUser}">${appState.currentUser}</option>`;
+        userEl.disabled = true;
+    }
     
     // Enable category field (it might be locked by selectCategory)
-    document.getElementById('f-service-type').disabled = false;
+    const serviceTypeEl = document.getElementById('f-service-type');
+    if (serviceTypeEl) serviceTypeEl.disabled = false;
     
+    updatePriceFieldAccessibility();
     updateDynamicFields();
 }
 
@@ -1617,42 +1824,59 @@ document.getElementById('master-form').addEventListener('submit', async (e) => {
         invoiced: false 
     };
     try { 
-        const { data, error } = await sbClient.from('records').insert([rec]).select();
-        if (error) throw error;
-        if (data && data.length > 0) {
-            const r = data[0];
-            appState.tickets.unshift({
-                id: r.id, 
-                dbId: (r.ID || r.db_id || r.id || 'N/A').toString().split('-')[0].substring(0, 5).toUpperCase(), 
-                crmTicket: r['CRM TICKET'] || r.crm_ticket || 'N/A', 
-                timestamp: r.TIMESTAMP || r.timestamp || r['INV DATE'] || r.created_at || new Date().toISOString(),
-                company: r.COMPANY || r.company_name, 
-                companyId: r.COMPANY_ID || r.company_id, 
-                postcode: r.POSTCODE || r.postcode,
-                user: r.USER || r.staff_user, 
-                mainService: r['MAIN SERVICE'] || r.service_type, 
-                subService: r['SUB SERVICE'] || r.sub_service || '',
-                startTime: r['START TIME'] || r.start_time, 
-                endTime: r['END TIME'] || r.end_time, 
-                duration: r.DURATION || r.duration,
-                price: r.PRICE || r.price, 
-                paymentStatus: r['PAYMENT STATUS'] || r.payment_status, 
-                description: r.DESCRIPTION || r.description,
-                status: r.STATUS || r.status, 
-                invoiced: r.invoiced, 
-                invoiceDate: r['INV DATE'] || r.invoice_date, 
-                invoiceNo: r['INV NO'] || r.invoice_no
+        if (window.globalEventBus) {
+            window.globalEventBus.publish({
+                type: 'ticket_create_requested',
+                payload: {
+                    ...rec,
+                    company: rec.COMPANY,
+                    mainService: rec["MAIN SERVICE"],
+                    subService: rec["SUB SERVICE"],
+                    duration: rec.DURATION,
+                    isUrgent: main === 'S1' && document.getElementById('f-s1-no-appointment')?.checked
+                }
             });
-            updateDataStats();
-            
-            // Log the creation
-            if (typeof addSystemLog === 'function') {
-                addSystemLog('CREATE RECORD', `Added record for company: ${rec.COMPANY}, Service: ${rec['MAIN SERVICE']}`);
+            showAlert('Success', 'Record processed via Antigravity Loop!', '✅');
+            toggleMainForm('home');
+            renderAll();
+        } else {
+            const { data, error } = await sbClient.from('records').insert([rec]).select();
+            if (error) throw error;
+            if (data && data.length > 0) {
+                const r = data[0];
+                appState.tickets.unshift({
+                    id: r.id, 
+                    dbId: (r.ID || r.db_id || r.id || 'N/A').toString().split('-')[0].substring(0, 5).toUpperCase(), 
+                    crmTicket: r['CRM TICKET'] || r.crm_ticket || 'N/A', 
+                    timestamp: r.TIMESTAMP || r.timestamp || r['INV DATE'] || r.created_at || new Date().toISOString(),
+                    company: r.COMPANY || r.company_name, 
+                    companyId: r.COMPANY_ID || r.company_id, 
+                    postcode: r.POSTCODE || r.postcode,
+                    user: r.USER || r.staff_user, 
+                    mainService: r['MAIN SERVICE'] || r.service_type, 
+                    subService: r['SUB SERVICE'] || r.sub_service || '',
+                    startTime: r['START TIME'] || r.start_time, 
+                    endTime: r['END TIME'] || r.end_time, 
+                    duration: r.DURATION || r.duration,
+                    price: r.PRICE || r.price, 
+                    paymentStatus: r['PAYMENT STATUS'] || r.payment_status, 
+                    description: r.DESCRIPTION || r.description,
+                    status: r.STATUS || r.status, 
+                    invoiced: r.invoiced, 
+                    invoiceDate: r['INV DATE'] || r.invoice_date, 
+                    invoiceNo: r['INV NO'] || r.invoice_no
+                });
+                updateDataStats();
+                
+                // Log the creation
+                if (typeof addSystemLog === 'function') {
+                    addSystemLog('CREATE RECORD', `Added record for company: ${rec.COMPANY}, Service: ${rec['MAIN SERVICE']}`);
+                }
             }
+            showAlert('Success', 'Record saved!', '✅');
+            toggleMainForm('home');
+            renderAll();
         }
-        showAlert('Success', 'Record saved!', '✅');
-        toggleMainForm('home');
-        renderAll();
     } catch (err) { 
         showAlert('Error', err.message, '❌'); 
     }
@@ -1664,13 +1888,56 @@ function updateStats() {
 // Placeholder for potential future logic
 async function markAsInvoiced(id) {
     showAlert('Process Invoice', 'Enter Invoice Number:', '🧾', true, true, async (n) => {
-        if (!n) return; try { const { error } = await sbClient.from('records').update({ invoiced: true, "INV NO": n === true ? `INV-${Date.now()}` : n, "INV DATE": new Date().toISOString().split('T')[0] }).eq('id', id); if (error) throw error; initApp(); showAlert('Invoiced', 'Record marked as invoiced with current date.', '✅'); } catch (e) { showAlert('Error', e.message, '❌'); }
+        if (!n) return;
+        try {
+            const invoiceNo = n === true ? `INV-${Date.now()}` : n;
+            const invoiceDate = new Date().toISOString().split('T')[0];
+            const updates = {
+                invoiced: true,
+                "INV NO": invoiceNo,
+                "INV DATE": invoiceDate
+            };
+            if (window.globalEventBus) {
+                window.globalEventBus.publish({
+                    type: 'ticket_update_requested',
+                    payload: {
+                        id: id,
+                        updates: updates
+                    }
+                });
+                
+                // Optimistic UI updates
+                const t = appState.tickets.find(x => x.id === id);
+                if (t) {
+                    t.invoiced = true;
+                    t.invoiceNo = invoiceNo;
+                    t.invoiceDate = invoiceDate;
+                }
+                renderDataTable();
+                renderInvoicesTable();
+                updateDataStats();
+                showAlert('Invoiced', 'Record marked as invoiced with current date.', '✅');
+            } else {
+                const { error } = await sbClient.from('records').update(updates).eq('id', id);
+                if (error) throw error;
+                initApp();
+                showAlert('Invoiced', 'Record marked as invoiced with current date.', '✅');
+            }
+        } catch (e) {
+            showAlert('Error', e.message, '❌');
+        }
     });
 }
 function filterByCustomer(name) { showTab('dataview'); document.getElementById('dataview-search').value = name; renderDataTable(); }
 function renderAll() { 
     renderTabContent(appState.activeTab); 
-    document.getElementById('vtiger-customer-list').innerHTML = appState.customers.map(c => `<option value="${c.COMPANY}">`).join(''); 
+    const dl = document.getElementById('vtiger-customer-list');
+    if (dl && appState.customers) {
+        dl.innerHTML = appState.customers.map(c => {
+            const label = `${c.COMPANY} (${c['CUSTOMER ID'] || c['ORGANIZATION NUMBER'] || ''}, ${c.POSTCODE || ''})`;
+            return `<option value="${label}">`;
+        }).join('');
+    }
     if (window.lucide) lucide.createIcons();
 }
 
@@ -1693,17 +1960,47 @@ window.updateRecordEdits = async function(id, btn) {
             "DESCRIPTION": document.getElementById('edit-desc').value,
             "STATUS": document.getElementById('edit-status') ? document.getElementById('edit-status').value : 'Logged'
         };
-        const { error } = await sbClient.from('records').update(edits).eq('id', id);
-        if (error) throw error;
-        showToast('Record updated successfully', 'success');
-        
-        if (window.addSystemLog) window.addSystemLog(`UPDATE RECORD`, `Updated record ID: ${id}`);
-        
-        closeModal();
-        await fetchRecords();
-        if (typeof renderDataTable === 'function') renderDataTable();
-        if (typeof renderCalendar === 'function') renderCalendar();
-        if (typeof updateDataStats === 'function') updateDataStats();
+        if (window.globalEventBus) {
+            window.globalEventBus.publish({
+                type: 'ticket_update_requested',
+                payload: {
+                    id: id,
+                    updates: edits
+                }
+            });
+            // Update local state optimistically
+            const t = appState.tickets.find(x => x.id === id);
+            if (t) {
+                t.company = edits.COMPANY;
+                t.postcode = edits.POSTCODE;
+                t.mainService = edits["MAIN SERVICE"];
+                t.subService = edits["SUB SERVICE"];
+                t.startTime = edits["START TIME"];
+                t.endTime = edits["END TIME"];
+                t.duration = edits.DURATION;
+                t.price = edits.PRICE;
+                t.paymentStatus = edits["PAYMENT STATUS"];
+                t.description = edits.DESCRIPTION;
+                t.status = edits.STATUS;
+            }
+            closeModal();
+            if (typeof renderDataTable === 'function') renderDataTable();
+            if (typeof renderCalendar === 'function') renderCalendar();
+            if (typeof updateDataStats === 'function') updateDataStats();
+            showToast('Record updated successfully', 'success');
+        } else {
+            const { error } = await sbClient.from('records').update(edits).eq('id', id);
+            if (error) throw error;
+            showToast('Record updated successfully', 'success');
+            
+            if (window.addSystemLog) window.addSystemLog(`UPDATE RECORD`, `Updated record ID: ${id}`);
+            
+            closeModal();
+            await fetchRecords();
+            if (typeof renderDataTable === 'function') renderDataTable();
+            if (typeof renderCalendar === 'function') renderCalendar();
+            if (typeof updateDataStats === 'function') updateDataStats();
+        }
     } catch(e) {
         showToast(e.message, 'error');
         btn.innerHTML = '<i data-lucide="save"></i> Save Changes';
@@ -1733,85 +2030,7 @@ window.nextMonth = function() {
     if (typeof renderCalendar === 'function') renderCalendar();
 }
 
-function renderCalendar() {
-    const grid = document.getElementById('calendar-grid');
-    if(!grid) return;
-    
-    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-    const monthDisplay = document.getElementById('calendar-month-display');
-    if (monthDisplay) monthDisplay.innerText = `${monthNames[currentCalMonth]} ${currentCalYear}`;
-    
-    const firstDay = new Date(currentCalYear, currentCalMonth, 1);
-    const lastDay = new Date(currentCalYear, currentCalMonth + 1, 0);
-    
-    let startingDay = firstDay.getDay(); 
-    if (startingDay === 0) startingDay = 7; 
-    
-    const prevMonthDays = new Date(currentCalYear, currentCalMonth, 0).getDate();
-    
-    let html = '';
-    
-    for (let i = 1; i < startingDay; i++) {
-        const d = prevMonthDays - startingDay + i + 1;
-        html += `<div class="calendar-day other-month"><span class="calendar-date">${d}</span></div>`;
-    }
-    
-    const today = new Date();
-    for (let d = 1; d <= lastDay.getDate(); d++) {
-        const isToday = d === today.getDate() && currentCalMonth === today.getMonth() && currentCalYear === today.getFullYear();
-        html += `<div class="calendar-day ${isToday ? 'today' : ''}" onclick="openDayView(${currentCalYear}, ${currentCalMonth}, ${d})" style="cursor:pointer;">
-                   <span class="calendar-date">${d}</span>
-                   <div id="cal-day-${currentCalYear}-${currentCalMonth}-${d}" style="display:flex; flex-direction:column; gap:2px; margin-top:5px; height: calc(100% - 30px); overflow-y: auto;"></div>
-                 </div>`;
-    }
-    
-    const totalCells = startingDay - 1 + lastDay.getDate();
-    const remaining = totalCells > 35 ? 42 - totalCells : 35 - totalCells;
-    for(let i = 1; i <= remaining; i++) {
-        html += `<div class="calendar-day other-month"><span class="calendar-date">${i}</span></div>`;
-    }
-    
-    grid.innerHTML = html;
-    
-    const tickets = appState.tickets || [];
-    
-    const ticketsByDay = {};
-    tickets.forEach(t => {
-        if (!t.timestamp) return;
-        const dObj = new Date(t.timestamp);
-        if (dObj.getMonth() === currentCalMonth && dObj.getFullYear() === currentCalYear) {
-            const day = dObj.getDate();
-            if (!ticketsByDay[day]) ticketsByDay[day] = [];
-            ticketsByDay[day].push(t);
-        }
-    });
-
-    Object.keys(ticketsByDay).forEach(day => {
-        const dayCell = document.getElementById(`cal-day-${currentCalYear}-${currentCalMonth}-${day}`);
-        if (dayCell) {
-            const list = ticketsByDay[day];
-            const waitingCount = list.filter(t => {
-                const stat = t.status || '';
-                return !(stat === 'Completed' || stat === 'Tamamlandı' || stat === 'Tamamland' || t.invoiced === true);
-            }).length;
-            const completedCount = list.length - waitingCount;
-            
-            let htmlInner = '';
-            if (waitingCount > 0) {
-                htmlInner += `<div style="background-color:#f59e0b; color:white; border-radius:6px; padding:6px 0; text-align:center; font-weight:700; font-size:12px; margin-bottom:5px; box-shadow:0 1px 3px rgba(0,0,0,0.1);">Waiting ${waitingCount} Job${waitingCount > 1 ? 's' : ''}</div>`;
-            }
-            if (completedCount > 0) {
-                htmlInner += `<div style="background-color:#10b981; color:white; border-radius:6px; padding:6px 0; text-align:center; font-weight:700; font-size:12px; margin-bottom:5px; box-shadow:0 1px 3px rgba(0,0,0,0.1);">Completed ${completedCount} Job${completedCount > 1 ? 's' : ''}</div>`;
-            }
-            
-            // Set content
-            dayCell.innerHTML = htmlInner;
-        }
-    });
-
-    if (window.lucide) window.lucide.createIcons();
-}
-window.renderCalendar = renderCalendar;
+// renderCalendar definition removed to use gc_calendar.js global function.
 
 window.openDayView = function(year, month, day) {
     const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -1848,7 +2067,7 @@ window.openDayView = function(year, month, day) {
         if (hourTickets.length > 0) {
             hourTickets.sort((a,b) => (a.startTime || "").localeCompare(b.startTime || ""));
             hourTickets.forEach(t => {
-                const isCompleted = t.status === 'Completed' || t.status === 'Tamamlandı' || t.invoiced === true;
+                const isCompleted = t.status === 'Completed' || t.status === 'Completed' || t.invoiced === true;
                 const statusClass = isCompleted ? 'completed' : 'pending';
                 html += `
                     <div class="calendar-event ${statusClass}" style="margin-bottom:5px; padding:8px 12px; cursor:pointer; ${isCompleted ? 'text-decoration: line-through; opacity: 0.7;' : ''}" onclick="openAppointmentView('${t.id}');" title="${t.company} - ${t.mainService}">
@@ -1878,16 +2097,104 @@ window.createAppointmentForSlot = function(dateStr, timeStr) {
     document.getElementById('quick-add-modal').classList.remove('hidden'); if(window.initPickers) window.initPickers();
     
     // Reset quick add fields
-    document.getElementById('qa-date').value = dateStr;
-    document.getElementById('qa-time').value = timeStr;
-    document.getElementById('qa-company').value = '';
+    document.getElementById('qa-customer-search').value = '';
+    document.getElementById('qa-date').value = dateStr || '';
+    document.getElementById('qa-company-name').value = '';
+    document.getElementById('qa-company-id').value = '';
     document.getElementById('qa-postcode').value = '';
+    document.getElementById('qa-address').value = '';
+    document.getElementById('qa-contact').value = '';
+    document.getElementById('qa-phone').value = '';
+    document.getElementById('qa-notes').value = '';
+    
     const qaStatus = document.getElementById('qa-status');
-    qaStatus.value = 'Checking...';
-    qaStatus.style.setProperty('background', '#f8fafc', 'important');
-    qaStatus.style.setProperty('color', '#111827', 'important');
-    qaStatus.style.fontWeight = '500';
-    document.getElementById('qa-service-category').value = 'S1';
+    if (qaStatus) {
+        qaStatus.value = 'Checking...';
+        qaStatus.style.setProperty('background', '#f8fafc', 'important');
+        qaStatus.style.setProperty('color', '#111827', 'important');
+        qaStatus.style.fontWeight = '500';
+    }
+    
+    const serviceCat = document.getElementById('qa-service-category');
+    if (serviceCat) {
+        serviceCat.value = 'S1';
+    }
+    
+    // Populate times dropdown in qa-time if it's empty
+    const qaTimeSelect = document.getElementById('qa-time');
+    if (qaTimeSelect && qaTimeSelect.options.length === 0) {
+        let timesHtml = '';
+        for (let h = 9; h <= 18; h++) {
+            const tStr = `${String(h).padStart(2,'0')}:00`;
+            timesHtml += `<option value="${tStr}">${tStr}</option>`;
+        }
+        qaTimeSelect.innerHTML = timesHtml;
+    }
+    if (timeStr) qaTimeSelect.value = timeStr;
+    
+    // Populate Assigned Engineer select options
+    const qaStaffSelect = document.getElementById('qa-staff-select');
+    if (qaStaffSelect && qaStaffSelect.options.length === 0) {
+        const personnel = appState.settings.personnel || [];
+        qaStaffSelect.innerHTML = personnel.map(p => `<option value="${p}">${p}</option>`).join('');
+    }
+    if (qaStaffSelect && appState.currentUser) qaStaffSelect.value = appState.currentUser;
+    
+    if (typeof updateQaSubServices === 'function') updateQaSubServices();
+    if (typeof updatePriorityUI === 'function') updatePriorityUI('Normal');
+};
+
+window.updateQaSubServices = function() {
+    const main = document.getElementById('qa-service-category').value;
+    const subSelect = document.getElementById('qa-sub-service');
+    if (!subSelect) return;
+    
+    const subServices = appState.settings?.sub_services || 
+                        (typeof defaultSeeds !== 'undefined' ? defaultSeeds.sub_services : null) || 
+                        (typeof LOCAL_SUB_SERVICES !== 'undefined' ? LOCAL_SUB_SERVICES : null);
+    let opts = [];
+    if (subServices) {
+        if (Array.isArray(subServices)) {
+            opts = subServices.filter(s => s.service_name === main).map(s => s.name);
+        } else if (typeof subServices === 'object') {
+            opts = subServices[main] || [];
+        }
+    }
+    subSelect.innerHTML = opts.map(o => `<option value="${o}">${o}</option>`).join('');
+};
+
+window.updatePriorityUI = function(val) {
+    const normal = document.getElementById('lbl-priority-normal');
+    const urgent = document.getElementById('lbl-priority-urgent');
+    const emergency = document.getElementById('lbl-priority-emergency');
+    
+    [normal, urgent, emergency].forEach(el => {
+        if(el) {
+            el.style.background = '#fff';
+            el.style.color = '#334155';
+            el.style.borderColor = '#cbd5e1';
+        }
+    });
+    
+    if (val === 'Normal') {
+        if (normal) {
+            normal.style.background = '#f1f5f9';
+            normal.style.color = '#334155';
+            normal.style.borderColor = '#94a3b8';
+        }
+    } else if (val === 'Urgent') {
+        if (urgent) {
+            urgent.style.background = '#fef3c7';
+            urgent.style.color = '#d97706';
+            urgent.style.borderColor = '#f59e0b';
+        }
+    } else if (val === 'Emergency') {
+        if (emergency) {
+            emergency.style.background = '#fee2e2';
+            emergency.style.color = '#b91c1c';
+            emergency.style.borderColor = '#ef4444';
+        }
+    }
 };
 
 window.submitQuickAdd = async function() {
@@ -1898,119 +2205,190 @@ window.submitQuickAdd = async function() {
     try {
         const dateStr = document.getElementById('qa-date').value;
         const timeStr = document.getElementById('qa-time').value;
-        const company = document.getElementById('qa-company').value;
+        const company = document.getElementById('qa-company-name').value;
+        const companyId = document.getElementById('qa-company-id').value;
         const postcode = document.getElementById('qa-postcode').value;
-        const status = document.getElementById('qa-status').value || 'Logged';
+        const statusVal = document.getElementById('qa-status').value || 'Logged';
         const service = document.getElementById('qa-service-category').value;
+        const subService = document.getElementById('qa-sub-service')?.value || '';
+        const durationVal = parseInt(document.getElementById('qa-duration').value) || 30;
+        const engineerVal = document.getElementById('qa-staff-select').value;
+        const notesVal = document.getElementById('qa-notes').value || '';
         
-        let combinedDate;
-        try {
-            combinedDate = new Date(`${dateStr}T${timeStr}`).toISOString();
-        } catch(e) {
-            combinedDate = new Date().toISOString();
+        const priorityEl = document.querySelector('input[name="qa-priority"]:checked');
+        const priorityVal = priorityEl ? priorityEl.value : 'Normal';
+        
+        if (!company) {
+            showAlert('Required', 'Please select a valid customer first.', '⚠️');
+            btn.innerText = 'Save Appointment';
+            btn.disabled = false;
+            return;
         }
-        
-        const nextId = appState.tickets.length + 1001; 
-        
-        // Calculate an end time (+30 mins)
-        let tHour = parseInt(timeStr.split(':')[0]) || 0;
-        let tMin = (parseInt(timeStr.split(':')[1]) || 0) + 30;
-        if(tMin >= 60) { tHour++; tMin -= 60; }
+
+        // Calculate end time
+        let [tHour, tMin] = timeStr.split(':').map(Number);
+        tMin = (tMin || 0) + durationVal;
+        while (tMin >= 60) {
+            tHour = (tHour + 1) % 24;
+            tMin -= 60;
+        }
         const endStr = `${String(tHour).padStart(2,'0')}:${String(tMin).padStart(2,'0')}`;
+
+        const metadata = {
+            address: document.getElementById('qa-address').value || '',
+            primaryContact: document.getElementById('qa-contact').value || '',
+            phone: document.getElementById('qa-phone').value || '',
+            contractStatus: statusVal,
+            priority: priorityVal,
+            notes: notesVal
+        };
+        const finalDescription = serializeMetadata(metadata, notesVal);
+        const nextId = appState.tickets.length + 1001; 
         
         const rec = { 
             "CRM TICKET": "", 
             "INV NO": `SRV-${nextId}`, 
             COMPANY: company, 
+            COMPANY_ID: companyId,
             POSTCODE: postcode, 
-            USER: appState.currentUser,
+            USER: engineerVal,
             "MAIN SERVICE": service, 
-            "SUB SERVICE": "", 
+            "SUB SERVICE": subService, 
             "START TIME": timeStr, 
             "END TIME": endStr, 
-            DURATION: 30, 
-            
+            DURATION: durationVal, 
             PRICE: 0, 
-            "PAYMENT STATUS": "Chargeable",
+            "PAYMENT STATUS": (statusVal.toLowerCase().includes('contract') ? "Contract" : "Chargeable"),
             "INV DATE": dateStr, 
-            DESCRIPTION: "Quick Added via Calendar", 
-            STATUS: status, 
+            DESCRIPTION: finalDescription, 
+            STATUS: 'Logged', 
             invoiced: false 
         };
         
-        const { data, error } = await sbClient.from('records').insert([rec]).select();
-        if (error) throw error;
-        
-        if (data && data.length > 0) {
-            const r = data[0];
-            appState.tickets.unshift({
-                id: r.id, 
-                dbId: (r.ID || r.db_id || r.id || 'N/A').toString().split('-')[0].substring(0, 5).toUpperCase(), 
-                crmTicket: r['CRM TICKET'] || r.crm_ticket || 'N/A', 
-                timestamp: r.TIMESTAMP || r.timestamp || r['INV DATE'] || r.created_at || new Date().toISOString(),
-                company: r.COMPANY || r.company_name, 
-                companyId: r.COMPANY_ID || r.company_id, 
-                postcode: r.POSTCODE || r.postcode,
-                user: r.USER || r.staff_user, 
-                mainService: r['MAIN SERVICE'] || r.service_type, 
-                subService: r['SUB SERVICE'] || r.sub_service || '',
-                startTime: r['START TIME'] || r.start_time, 
-                endTime: r['END TIME'] || r.end_time, 
-                duration: r.DURATION || r.duration,
-                price: r.PRICE || r.price, 
-                paymentStatus: r['PAYMENT STATUS'] || r.payment_status, 
-                description: r.DESCRIPTION || r.description,
-                status: r.STATUS || r.status, 
-                invoiced: r.invoiced, 
-                invoiceDate: r['INV DATE'] || r.invoice_date, 
-                invoiceNo: r['INV NO'] || r.invoice_no
+        if (window.globalEventBus) {
+            window.globalEventBus.publish({
+                type: 'appointment_quick_add_requested',
+                payload: {
+                    ...rec,
+                    company: rec.COMPANY,
+                    mainService: rec["MAIN SERVICE"],
+                    subService: rec["SUB SERVICE"],
+                    duration: rec.DURATION
+                }
             });
-            updateDataStats();
-            if (typeof addSystemLog === 'function') {
-                addSystemLog('CREATE RECORD', `Quick added record for company: ${company}`);
+            document.getElementById('quick-add-modal').classList.add('hidden');
+            showAlert('Success', 'Appointment processed via Antigravity Loop!', '✅');
+            renderCalendar(); 
+        } else {
+            const { data, error } = await sbClient.from('records').insert([rec]).select();
+            if (error) throw error;
+            
+            if (data && data.length > 0) {
+                const r = data[0];
+                const parsed = parseMetadata(r.DESCRIPTION || r.description || '');
+                appState.tickets.unshift({
+                    id: r.id, 
+                    dbId: (r.ID || r.db_id || r.id || 'N/A').toString().split('-')[0].substring(0, 5).toUpperCase(), 
+                    crmTicket: r['CRM TICKET'] || r.crm_ticket || 'N/A', 
+                    timestamp: r.TIMESTAMP || r.timestamp || r['INV DATE'] || r.created_at || new Date().toISOString(),
+                    company: r.COMPANY || r.company_name, 
+                    companyId: r.COMPANY_ID || r.company_id, 
+                    postcode: r.POSTCODE || r.postcode,
+                    user: r.USER || r.staff_user, 
+                    mainService: r['MAIN SERVICE'] || r.service_type, 
+                    subService: r['SUB SERVICE'] || r.sub_service || '',
+                    startTime: r['START TIME'] || r.start_time, 
+                    endTime: r['END TIME'] || r.end_time, 
+                    duration: r.DURATION || r.duration,
+                    price: r.PRICE || r.price, 
+                    paymentStatus: r['PAYMENT STATUS'] || r.payment_status, 
+                    description: parsed.details, 
+                    rawDescription: r.DESCRIPTION || r.description || '',
+                    status: r.STATUS || r.status, 
+                    invoiced: r.invoiced, 
+                    invoiceDate: r['INV DATE'] || r.invoice_date, 
+                    invoiceNo: r['INV NO'] || r.invoice_no,
+                    vat: parsed.metadata.vat !== undefined ? parsed.metadata.vat : 0,
+                    invoiceNotes: parsed.metadata.invoiceNotes || '',
+                    address: parsed.metadata.address || '',
+                    phone: parsed.metadata.phone || '',
+                    primaryContact: parsed.metadata.primaryContact || '',
+                    priority: parsed.metadata.priority || 'Normal'
+                });
+                updateDataStats();
+                if (typeof addSystemLog === 'function') {
+                    addSystemLog('CREATE RECORD', `Quick added record for company: ${company}`);
+                }
             }
+            
+            document.getElementById('quick-add-modal').classList.add('hidden');
+            showAlert('Success', 'Appointment created!', '✅');
+            renderCalendar(); 
         }
-        
-        document.getElementById('quick-add-modal').classList.add('hidden');
-        showAlert('Success', 'Appointment created!', '✅');
-        renderCalendar(); // refresh calendar
-        
     } catch(e) {
         showAlert('Error', e.message, '❌');
     } finally {
-        btn.innerText = 'Create Appointment';
+        btn.innerText = 'Save Appointment';
         btn.disabled = false;
     }
 };
 
 window.autoFillQuickAdd = function() {
-    const companyInput = document.getElementById('qa-company');
-    if (!companyInput) return;
-    const company = companyInput.value;
-    const customer = (appState.customers || []).find(c => (c.COMPANY || '') === company);
-    const statusEl = document.getElementById('qa-status');
-    const postcodeEl = document.getElementById('qa-postcode');
+    const searchInput = document.getElementById('qa-customer-search');
+    if (!searchInput) return;
+    const searchVal = searchInput.value;
+    if (!searchVal) return;
     
+    const customer = (appState.customers || []).find(c => {
+        const name = (c.COMPANY || '').toLowerCase();
+        const cid = (c['CUSTOMER ID'] || '').toLowerCase();
+        const pc = (c.POSTCODE || '').toLowerCase();
+        return name === searchVal.toLowerCase() || 
+               cid === searchVal.toLowerCase() || 
+               pc === searchVal.toLowerCase() ||
+               searchVal.toLowerCase().includes(name) ||
+               searchVal.toLowerCase().includes(cid);
+    });
+
+    const companyEl = document.getElementById('qa-company-name');
+    const companyIdEl = document.getElementById('qa-company-id');
+    const postcodeEl = document.getElementById('qa-postcode');
+    const addressEl = document.getElementById('qa-address');
+    const contactEl = document.getElementById('qa-contact');
+    const phoneEl = document.getElementById('qa-phone');
+    const statusEl = document.getElementById('qa-status');
+
     if (customer) {
+        companyEl.value = customer.COMPANY || '';
+        companyIdEl.value = customer['CUSTOMER ID'] || '';
+        postcodeEl.value = customer.POSTCODE || '';
+        addressEl.value = customer.ADDRESS1 || customer.ADDRESS2 || 'N/A';
+        contactEl.value = customer.CONTACT_NAME || 'N/A';
+        phoneEl.value = customer.PHONE || 'N/A';
+        
         const statusVal = customer['SERVICE STATUS'] || 'No Contract';
-        postcodeEl.value = customer['POSTCODE'] || '';
         statusEl.value = statusVal;
         
         const isContract = statusVal.toLowerCase().includes('contract') || statusVal.toLowerCase().includes('var');
         if (isContract) {
-            statusEl.style.setProperty('background', '#10b981', 'important');
-            statusEl.style.setProperty('color', 'white', 'important');
+            statusEl.style.setProperty('background', '#dcfce7', 'important');
+            statusEl.style.setProperty('color', '#15803d', 'important');
             statusEl.style.fontWeight = '800';
         } else {
-            statusEl.style.setProperty('background', '#ef4444', 'important');
-            statusEl.style.setProperty('color', 'white', 'important');
+            statusEl.style.setProperty('background', '#fee2e2', 'important');
+            statusEl.style.setProperty('color', '#b91c1c', 'important');
             statusEl.style.fontWeight = '800';
         }
     } else {
+        companyEl.value = '';
+        companyIdEl.value = '';
         postcodeEl.value = '';
-        statusEl.value = 'Checking...';
-        statusEl.style.setProperty('background', '#f8fafc', 'important');
-        statusEl.style.setProperty('color', '#111827', 'important');
+        addressEl.value = '';
+        contactEl.value = '';
+        phoneEl.value = '';
+        statusEl.value = '';
+        statusEl.style.background = '#f8fafc';
+        statusEl.style.color = '#111827';
         statusEl.style.fontWeight = '500';
     }
 };
@@ -2073,25 +2451,81 @@ window.openAppointmentView = function(id) {
     const r = appState.tickets.find(t => t.id == id || t.dbId == id);
     if (!r) return;
     
+    // Set Modal Title & Fields editability
+    const isTicket = r.isTicket || false;
+    const typeEl = document.getElementById('va-modal-type');
+    const titleEl = document.getElementById('va-modal-title');
+    if (typeEl) {
+        typeEl.style.display = isTicket ? 'none' : 'block';
+        if (!isTicket) typeEl.innerText = 'APPOINTMENT';
+    }
+    if (titleEl) titleEl.innerText = isTicket ? 'Ticket Detail' : 'Appointment Detail';
+    
+    const footEl = document.querySelector('#view-appointment-modal .ticket-foot');
+    if (footEl) {
+        footEl.style.display = isTicket ? 'none' : 'flex';
+    }
+    
+    const dateInput = document.getElementById('va-date');
+    const timeInput = document.getElementById('va-start-time');
+    if (dateInput) {
+        dateInput.disabled = isTicket;
+    }
+    if (timeInput) {
+        timeInput.disabled = isTicket;
+    }
+
     // Fill fields
     const services = appState.settings?.services || window.LOCAL_SERVICES || [];
     const servObj = services.find(x => x.name === r.mainService);
     document.getElementById('va-service-category').innerText = servObj ? (servObj.full_name || servObj.name) : (r.mainService || 'N/A');
-    document.getElementById('va-company').innerText = r.company || 'N/A';
-    document.getElementById('va-postcode').innerText = r.postcode || 'N/A';
     
-    const customer = (appState.customers || []).find(c => (c.COMPANY || '') === r.company);
+    let customer = (appState.customers || []).find(c => 
+        (r.companyId && c['DB_ID'] == r.companyId) || 
+        (r.companyId && c['DB_ID'] == ('11x' + r.companyId)) || 
+        (r.companyId && c['CUSTOMER ID'] == r.companyId) || 
+        (r.company && c.COMPANY === r.company)
+    );
+    
+    const companyName = r.company || (customer ? customer.COMPANY : 'N/A');
+    const postCodeStr = r.postcode || (customer ? customer.POSTCODE : 'N/A');
+    
+    document.getElementById('va-company').innerText = companyName;
+    document.getElementById('va-postcode').innerText = postCodeStr;
+    
     const statusVal = customer ? (customer['SERVICE STATUS'] || 'No Contract') : 'No Contract';
     const statusEl = document.getElementById('va-status');
     statusEl.innerText = statusVal;
     
     if (statusVal.toLowerCase().includes('contract') || statusVal.toLowerCase().includes('var')) {
-        statusEl.style.setProperty('background', '#10b981', 'important');
-        statusEl.style.setProperty('color', 'white', 'important');
+        statusEl.style.setProperty('background', '#dcfce7', 'important');
+        statusEl.style.setProperty('color', '#15803d', 'important');
     } else {
-        statusEl.style.setProperty('background', '#ef4444', 'important');
-        statusEl.style.setProperty('color', 'white', 'important');
+        statusEl.style.setProperty('background', '#fee2e2', 'important');
+        statusEl.style.setProperty('color', '#b91c1c', 'important');
     }
+    
+    // New fields
+    document.getElementById('va-address').innerText = r.address || (customer ? (customer.ADDRESS || 'N/A') : 'N/A');
+    document.getElementById('va-contact').innerText = r.primaryContact || (customer ? (customer.CONTACT || customer['PRIMARY CONTACT'] || 'N/A') : 'N/A');
+    document.getElementById('va-phone').innerText = r.phone || (customer ? (customer.PHONE || customer['PRIMARY PHONE'] || 'N/A') : 'N/A');
+    
+    const priorityEl = document.getElementById('va-priority');
+    if (priorityEl) {
+        const pVal = r.priority || 'Normal';
+        priorityEl.innerText = pVal;
+        if (pVal === 'Normal') {
+            priorityEl.style.setProperty('background', '#f1f5f9', 'important');
+            priorityEl.style.setProperty('color', '#334155', 'important');
+        } else if (pVal === 'Urgent') {
+            priorityEl.style.setProperty('background', '#fef3c7', 'important');
+            priorityEl.style.setProperty('color', '#d97706', 'important');
+        } else if (pVal === 'Emergency') {
+            priorityEl.style.setProperty('background', '#fee2e2', 'important');
+            priorityEl.style.setProperty('color', '#b91c1c', 'important');
+        }
+    }
+    document.getElementById('va-notes').innerText = r.notes || r.description || 'No Notes';
     
     const dObj = new Date(r.timestamp);
     const dateStr = dObj.getFullYear() + '-' + String(dObj.getMonth() + 1).padStart(2, '0') + '-' + String(dObj.getDate()).padStart(2, '0');
@@ -2190,21 +2624,32 @@ window.completeJob = async function(id) {
     // User requested NO prompt for duration here
     try {
         if (typeof showAlert !== 'undefined') showAlert('Info', 'Completing job...', '');
-        const updates = { STATUS: 'Completed' };
         
-        const { error } = await sbClient.from('records').update(updates).eq('id', id);
-        if (error) throw error;
-        
-        // update local state
-        const t = appState.tickets.find(x => x.id === id);
-        if (t) {
-            t.status = 'Completed';
+        if (window.globalEventBus) {
+            window.globalEventBus.publish({
+                type: 'job_completion_requested',
+                payload: { id: id }
+            });
+            showAlert('Success', 'Job completion request processed via Antigravity Loop!', '✅');
+            if (typeof renderWaitingJobs !== 'undefined') renderWaitingJobs();
+            if (typeof renderCalendar !== 'undefined') renderCalendar();
+            if (typeof updateDataStats !== 'undefined') updateDataStats();
+        } else {
+            const updates = { STATUS: 'Completed' };
+            const { error } = await sbClient.from('records').update(updates).eq('id', id);
+            if (error) throw error;
+            
+            // update local state
+            const t = appState.tickets.find(x => x.id === id);
+            if (t) {
+                t.status = 'Completed';
+            }
+            
+            if (typeof showAlert !== 'undefined') showAlert('Success', 'Job completed and moved to Data View!', '');
+            if (typeof renderWaitingJobs !== 'undefined') renderWaitingJobs();
+            if (typeof renderCalendar !== 'undefined') renderCalendar();
+            if (typeof updateDataStats !== 'undefined') updateDataStats();
         }
-        
-        if (typeof showAlert !== 'undefined') showAlert('Success', 'Job completed and moved to Data View!', '');
-        if (typeof renderWaitingJobs !== 'undefined') renderWaitingJobs();
-        if (typeof renderCalendar !== 'undefined') renderCalendar();
-        if (typeof updateDataStats !== 'undefined') updateDataStats();
     } catch(e) {
         console.error(e);
         if (typeof showAlert !== 'undefined') showAlert('Error', e.message, '');
@@ -2220,7 +2665,7 @@ window.renderWaitingJobs = function() {
     // Filter waiting jobs (NOT completed and NOT invoiced)
     const waitingJobs = tickets.filter(t => {
         const stat = (t.status || '').toLowerCase();
-        const isStatusCompleted = (stat === 'completed' || stat === 'tamamlandı' || stat === 'tamamland' || t.invoiced === true);
+        const isStatusCompleted = (stat === 'completed' || stat === 'completed' || stat === 'tamamland' || t.invoiced === true);
         return !isStatusCompleted;
     });
 

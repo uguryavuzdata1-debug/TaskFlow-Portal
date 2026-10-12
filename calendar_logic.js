@@ -1,3 +1,24 @@
+// --- DESCRIPTION METADATA SERIALIZER ---
+function parseMetadata(desc) {
+    if (!desc) return { metadata: {}, details: '' };
+    const match = desc.match(/^\[METADATA: ({.*?})\]\n([\s\S]*)$/);
+    if (match) {
+        try {
+            return {
+                metadata: JSON.parse(match[1]),
+                details: match[2]
+            };
+        } catch(e) {}
+    }
+    return {
+        metadata: {},
+        details: desc
+    };
+}
+function serializeMetadata(metadata, details) {
+    return `[METADATA: ${JSON.stringify(metadata)}]\n${details}`;
+}
+
 // --- CALENDAR LOGIC ---
 let currentCalMonth = new Date().getMonth();
 let currentCalYear = new Date().getFullYear();
@@ -158,23 +179,115 @@ window.openDayView = function(year, month, day) {
     document.getElementById('day-view-modal').classList.remove('hidden');
 };
 
-window.createAppointmentForSlot = function(dateStr, timeStr) {
+window.createAppointmentForSlot = function(dateStr, timeStr, companyName = '') {
     document.getElementById('day-view-modal').classList.add('hidden');
     
     // Show quick add modal
     document.getElementById('quick-add-modal').classList.remove('hidden'); if(window.initPickers) window.initPickers();
     
     // Reset quick add fields
-    document.getElementById('qa-date').value = dateStr;
-    document.getElementById('qa-time').value = timeStr;
-    document.getElementById('qa-company').value = '';
+    document.getElementById('qa-customer-search').value = companyName || '';
+    document.getElementById('qa-date').value = dateStr || '';
+    document.getElementById('qa-company-name').value = '';
+    document.getElementById('qa-company-id').value = '';
     document.getElementById('qa-postcode').value = '';
+    document.getElementById('qa-address').value = '';
+    document.getElementById('qa-contact').value = '';
+    document.getElementById('qa-phone').value = '';
+    document.getElementById('qa-notes').value = '';
+    
     const qaStatus = document.getElementById('qa-status');
-    qaStatus.value = 'Checking...';
-    qaStatus.style.setProperty('background', '#f8fafc', 'important');
-    qaStatus.style.setProperty('color', '#111827', 'important');
-    qaStatus.style.fontWeight = '500';
-    document.getElementById('qa-service-category').value = 'S1';
+    if (qaStatus) {
+        qaStatus.value = 'Checking...';
+        qaStatus.style.setProperty('background', '#f8fafc', 'important');
+        qaStatus.style.setProperty('color', '#111827', 'important');
+        qaStatus.style.fontWeight = '500';
+    }
+    
+    const serviceCat = document.getElementById('qa-service-category');
+    if (serviceCat) {
+        serviceCat.value = 'S1';
+    }
+    
+    // Populate times dropdown in qa-time if it's empty
+    const qaTimeSelect = document.getElementById('qa-time');
+    if (qaTimeSelect && qaTimeSelect.options.length === 0) {
+        let timesHtml = '';
+        for (let h = 9; h <= 18; h++) {
+            const tStr = `${String(h).padStart(2,'0')}:00`;
+            timesHtml += `<option value="${tStr}">${tStr}</option>`;
+        }
+        qaTimeSelect.innerHTML = timesHtml;
+    }
+    if (timeStr) qaTimeSelect.value = timeStr;
+    
+    // Populate Assigned Engineer select options
+    const qaStaffSelect = document.getElementById('qa-staff-select');
+    if (qaStaffSelect && qaStaffSelect.options.length === 0) {
+        const personnel = appState.settings.personnel || [];
+        qaStaffSelect.innerHTML = personnel.map(p => `<option value="${p}">${p}</option>`).join('');
+    }
+    if (qaStaffSelect && appState.currentUser) qaStaffSelect.value = appState.currentUser;
+    
+    if (typeof updateQaSubServices === 'function') updateQaSubServices();
+    if (typeof updatePriorityUI === 'function') updatePriorityUI('Normal');
+    
+    if (companyName) {
+        window.autoFillQuickAdd();
+    }
+};
+
+window.updateQaSubServices = function() {
+    const main = document.getElementById('qa-service-category').value;
+    const subSelect = document.getElementById('qa-sub-service');
+    if (!subSelect) return;
+    
+    const subServices = appState.settings?.sub_services || 
+                        (typeof defaultSeeds !== 'undefined' ? defaultSeeds.sub_services : null) || 
+                        (typeof LOCAL_SUB_SERVICES !== 'undefined' ? LOCAL_SUB_SERVICES : null);
+    let opts = [];
+    if (subServices) {
+        if (Array.isArray(subServices)) {
+            opts = subServices.filter(s => s.service_name === main).map(s => s.name);
+        } else if (typeof subServices === 'object') {
+            opts = subServices[main] || [];
+        }
+    }
+    subSelect.innerHTML = opts.map(o => `<option value="${o}">${o}</option>`).join('');
+};
+
+window.updatePriorityUI = function(val) {
+    const normal = document.getElementById('lbl-priority-normal');
+    const urgent = document.getElementById('lbl-priority-urgent');
+    const emergency = document.getElementById('lbl-priority-emergency');
+    
+    [normal, urgent, emergency].forEach(el => {
+        if(el) {
+            el.style.background = '#fff';
+            el.style.color = '#334155';
+            el.style.borderColor = '#cbd5e1';
+        }
+    });
+    
+    if (val === 'Normal') {
+        if (normal) {
+            normal.style.background = '#f1f5f9';
+            normal.style.color = '#334155';
+            normal.style.borderColor = '#94a3b8';
+        }
+    } else if (val === 'Urgent') {
+        if (urgent) {
+            urgent.style.background = '#fef3c7';
+            urgent.style.color = '#d97706';
+            urgent.style.borderColor = '#f59e0b';
+        }
+    } else if (val === 'Emergency') {
+        if (emergency) {
+            emergency.style.background = '#fee2e2';
+            emergency.style.color = '#b91c1c';
+            emergency.style.borderColor = '#ef4444';
+        }
+    }
 };
 
 window.submitQuickAdd = async function() {
@@ -185,119 +298,190 @@ window.submitQuickAdd = async function() {
     try {
         const dateStr = document.getElementById('qa-date').value;
         const timeStr = document.getElementById('qa-time').value;
-        const company = document.getElementById('qa-company').value;
+        const company = document.getElementById('qa-company-name').value;
+        const companyId = document.getElementById('qa-company-id').value;
         const postcode = document.getElementById('qa-postcode').value;
-        const status = document.getElementById('qa-status').value || 'Logged';
+        const statusVal = document.getElementById('qa-status').value || 'Logged';
         const service = document.getElementById('qa-service-category').value;
+        const subService = document.getElementById('qa-sub-service')?.value || '';
+        const durationVal = parseInt(document.getElementById('qa-duration').value) || 30;
+        const engineerVal = document.getElementById('qa-staff-select').value;
+        const notesVal = document.getElementById('qa-notes').value || '';
         
-        let combinedDate;
-        try {
-            combinedDate = new Date(`${dateStr}T${timeStr}`).toISOString();
-        } catch(e) {
-            combinedDate = new Date().toISOString();
+        const priorityEl = document.querySelector('input[name="qa-priority"]:checked');
+        const priorityVal = priorityEl ? priorityEl.value : 'Normal';
+        
+        if (!company) {
+            showAlert('Required', 'Please select a valid customer first.', '⚠️');
+            btn.innerText = 'Save Appointment';
+            btn.disabled = false;
+            return;
         }
-        
-        const nextId = appState.tickets.length + 1001; 
-        
-        // Calculate an end time (+30 mins)
-        let tHour = parseInt(timeStr.split(':')[0]) || 0;
-        let tMin = (parseInt(timeStr.split(':')[1]) || 0) + 30;
-        if(tMin >= 60) { tHour++; tMin -= 60; }
+
+        // Calculate end time
+        let [tHour, tMin] = timeStr.split(':').map(Number);
+        tMin = (tMin || 0) + durationVal;
+        while (tMin >= 60) {
+            tHour = (tHour + 1) % 24;
+            tMin -= 60;
+        }
         const endStr = `${String(tHour).padStart(2,'0')}:${String(tMin).padStart(2,'0')}`;
+
+        const metadata = {
+            address: document.getElementById('qa-address').value || '',
+            primaryContact: document.getElementById('qa-contact').value || '',
+            phone: document.getElementById('qa-phone').value || '',
+            contractStatus: statusVal,
+            priority: priorityVal,
+            notes: notesVal
+        };
+        const finalDescription = serializeMetadata(metadata, notesVal);
+        const nextId = appState.tickets.length + 1001; 
         
         const rec = { 
             "CRM TICKET": "", 
             "INV NO": `SRV-${nextId}`, 
             COMPANY: company, 
+            COMPANY_ID: companyId,
             POSTCODE: postcode, 
-            USER: appState.currentUser,
+            USER: engineerVal,
             "MAIN SERVICE": service, 
-            "SUB SERVICE": "", 
+            "SUB SERVICE": subService, 
             "START TIME": timeStr, 
             "END TIME": endStr, 
-            DURATION: 30, 
-            
+            DURATION: durationVal, 
             PRICE: 0, 
-            "PAYMENT STATUS": "Chargeable",
+            "PAYMENT STATUS": (statusVal.toLowerCase().includes('contract') ? "Contract" : "Chargeable"),
             "INV DATE": dateStr, 
-            DESCRIPTION: "Quick Added via Calendar", 
-            STATUS: status, 
+            DESCRIPTION: finalDescription, 
+            STATUS: 'Logged', 
             invoiced: false 
         };
         
-        const { data, error } = await sbClient.from('records').insert([rec]).select();
-        if (error) throw error;
-        
-        if (data && data.length > 0) {
-            const r = data[0];
-            appState.tickets.unshift({
-                id: r.id, 
-                dbId: (r.ID || r.db_id || r.id || 'N/A').toString().split('-')[0].substring(0, 5).toUpperCase(), 
-                crmTicket: r['CRM TICKET'] || r.crm_ticket || 'N/A', 
-                timestamp: r.TIMESTAMP || r.timestamp || r['INV DATE'] || r.created_at || new Date().toISOString(),
-                company: r.COMPANY || r.company_name, 
-                companyId: r.COMPANY_ID || r.company_id, 
-                postcode: r.POSTCODE || r.postcode,
-                user: r.USER || r.staff_user, 
-                mainService: r['MAIN SERVICE'] || r.service_type, 
-                subService: r['SUB SERVICE'] || r.sub_service || '',
-                startTime: r['START TIME'] || r.start_time, 
-                endTime: r['END TIME'] || r.end_time, 
-                duration: r.DURATION || r.duration,
-                price: r.PRICE || r.price, 
-                paymentStatus: r['PAYMENT STATUS'] || r.payment_status, 
-                description: r.DESCRIPTION || r.description,
-                status: r.STATUS || r.status, 
-                invoiced: r.invoiced, 
-                invoiceDate: r['INV DATE'] || r.invoice_date, 
-                invoiceNo: r['INV NO'] || r.invoice_no
+        if (window.globalEventBus) {
+            window.globalEventBus.publish({
+                type: 'appointment_quick_add_requested',
+                payload: {
+                    ...rec,
+                    company: rec.COMPANY,
+                    mainService: rec["MAIN SERVICE"],
+                    subService: rec["SUB SERVICE"],
+                    duration: rec.DURATION
+                }
             });
-            updateDataStats();
-            if (typeof addSystemLog === 'function') {
-                addSystemLog('CREATE RECORD', `Quick added record for company: ${company}`);
+            document.getElementById('quick-add-modal').classList.add('hidden');
+            showAlert('Success', 'Appointment processed via Antigravity Loop!', '✅');
+            renderCalendar(); 
+        } else {
+            const { data, error } = await sbClient.from('records').insert([rec]).select();
+            if (error) throw error;
+            
+            if (data && data.length > 0) {
+                const r = data[0];
+                const parsed = parseMetadata(r.DESCRIPTION || r.description || '');
+                appState.tickets.unshift({
+                    id: r.id, 
+                    dbId: (r.ID || r.db_id || r.id || 'N/A').toString().split('-')[0].substring(0, 5).toUpperCase(), 
+                    crmTicket: r['CRM TICKET'] || r.crm_ticket || 'N/A', 
+                    timestamp: r.TIMESTAMP || r.timestamp || r['INV DATE'] || r.created_at || new Date().toISOString(),
+                    company: r.COMPANY || r.company_name, 
+                    companyId: r.COMPANY_ID || r.company_id, 
+                    postcode: r.POSTCODE || r.postcode,
+                    user: r.USER || r.staff_user, 
+                    mainService: r['MAIN SERVICE'] || r.service_type, 
+                    subService: r['SUB SERVICE'] || r.sub_service || '',
+                    startTime: r['START TIME'] || r.start_time, 
+                    endTime: r['END TIME'] || r.end_time, 
+                    duration: r.DURATION || r.duration,
+                    price: r.PRICE || r.price, 
+                    paymentStatus: r['PAYMENT STATUS'] || r.payment_status, 
+                    description: parsed.details, 
+                    rawDescription: r.DESCRIPTION || r.description || '',
+                    status: r.STATUS || r.status, 
+                    invoiced: r.invoiced, 
+                    invoiceDate: r['INV DATE'] || r.invoice_date, 
+                    invoiceNo: r['INV NO'] || r.invoice_no,
+                    vat: parsed.metadata.vat !== undefined ? parsed.metadata.vat : 0,
+                    invoiceNotes: parsed.metadata.invoiceNotes || '',
+                    address: parsed.metadata.address || '',
+                    phone: parsed.metadata.phone || '',
+                    primaryContact: parsed.metadata.primaryContact || '',
+                    priority: parsed.metadata.priority || 'Normal'
+                });
+                updateDataStats();
+                if (typeof addSystemLog === 'function') {
+                    addSystemLog('CREATE RECORD', `Quick added record for company: ${company}`);
+                }
             }
+            
+            document.getElementById('quick-add-modal').classList.add('hidden');
+            showAlert('Success', 'Appointment created!', '✅');
+            renderCalendar(); 
         }
-        
-        document.getElementById('quick-add-modal').classList.add('hidden');
-        showAlert('Success', 'Appointment created!', '✅');
-        renderCalendar(); // refresh calendar
-        
     } catch(e) {
         showAlert('Error', e.message, '❌');
     } finally {
-        btn.innerText = 'Create Appointment';
+        btn.innerText = 'Save Appointment';
         btn.disabled = false;
     }
 };
 
 window.autoFillQuickAdd = function() {
-    const companyInput = document.getElementById('qa-company');
-    if (!companyInput) return;
-    const company = companyInput.value;
-    const customer = (appState.customers || []).find(c => (c.COMPANY || '') === company);
-    const statusEl = document.getElementById('qa-status');
-    const postcodeEl = document.getElementById('qa-postcode');
+    const searchInput = document.getElementById('qa-customer-search');
+    if (!searchInput) return;
+    const searchVal = searchInput.value;
+    if (!searchVal) return;
     
+    const customer = (appState.customers || []).find(c => {
+        const name = (c.COMPANY || '').toLowerCase();
+        const cid = (c['CUSTOMER ID'] || '').toLowerCase();
+        const pc = (c.POSTCODE || '').toLowerCase();
+        return name === searchVal.toLowerCase() || 
+               cid === searchVal.toLowerCase() || 
+               pc === searchVal.toLowerCase() ||
+               searchVal.toLowerCase().includes(name) ||
+               searchVal.toLowerCase().includes(cid);
+    });
+
+    const companyEl = document.getElementById('qa-company-name');
+    const companyIdEl = document.getElementById('qa-company-id');
+    const postcodeEl = document.getElementById('qa-postcode');
+    const addressEl = document.getElementById('qa-address');
+    const contactEl = document.getElementById('qa-contact');
+    const phoneEl = document.getElementById('qa-phone');
+    const statusEl = document.getElementById('qa-status');
+
     if (customer) {
+        companyEl.value = customer.COMPANY || '';
+        companyIdEl.value = customer['CUSTOMER ID'] || '';
+        postcodeEl.value = customer.POSTCODE || '';
+        addressEl.value = customer.ADDRESS1 || customer.ADDRESS2 || 'N/A';
+        contactEl.value = customer.CONTACT_NAME || 'N/A';
+        phoneEl.value = customer.PHONE || 'N/A';
+        
         const statusVal = customer['SERVICE STATUS'] || 'No Contract';
-        postcodeEl.value = customer['POSTCODE'] || '';
         statusEl.value = statusVal;
         
         const isContract = statusVal.toLowerCase().includes('contract') || statusVal.toLowerCase().includes('var');
         if (isContract) {
-            statusEl.style.setProperty('background', '#10b981', 'important');
-            statusEl.style.setProperty('color', 'white', 'important');
+            statusEl.style.setProperty('background', '#dcfce7', 'important');
+            statusEl.style.setProperty('color', '#15803d', 'important');
             statusEl.style.fontWeight = '800';
         } else {
-            statusEl.style.setProperty('background', '#ef4444', 'important');
-            statusEl.style.setProperty('color', 'white', 'important');
+            statusEl.style.setProperty('background', '#fee2e2', 'important');
+            statusEl.style.setProperty('color', '#b91c1c', 'important');
             statusEl.style.fontWeight = '800';
         }
     } else {
+        companyEl.value = '';
+        companyIdEl.value = '';
         postcodeEl.value = '';
-        statusEl.value = 'Checking...';
-        statusEl.style.setProperty('background', '#f8fafc', 'important');
-        statusEl.style.setProperty('color', '#111827', 'important');
+        addressEl.value = '';
+        contactEl.value = '';
+        phoneEl.value = '';
+        statusEl.value = '';
+        statusEl.style.background = '#f8fafc';
+        statusEl.style.color = '#111827';
         statusEl.style.fontWeight = '500';
     }
 };
@@ -373,12 +557,34 @@ window.openAppointmentView = function(id) {
     statusEl.innerText = statusVal;
     
     if (statusVal.toLowerCase().includes('contract') || statusVal.toLowerCase().includes('var')) {
-        statusEl.style.setProperty('background', '#10b981', 'important');
-        statusEl.style.setProperty('color', 'white', 'important');
+        statusEl.style.setProperty('background', '#dcfce7', 'important');
+        statusEl.style.setProperty('color', '#15803d', 'important');
     } else {
-        statusEl.style.setProperty('background', '#ef4444', 'important');
-        statusEl.style.setProperty('color', 'white', 'important');
+        statusEl.style.setProperty('background', '#fee2e2', 'important');
+        statusEl.style.setProperty('color', '#b91c1c', 'important');
     }
+    
+    // New fields
+    document.getElementById('va-address').innerText = r.address || (customer ? (customer.ADDRESS1 || customer.ADDRESS2 || 'N/A') : 'N/A');
+    document.getElementById('va-contact').innerText = r.primaryContact || (customer ? (customer.CONTACT_NAME || 'N/A') : 'N/A');
+    document.getElementById('va-phone').innerText = r.phone || (customer ? (customer.PHONE || 'N/A') : 'N/A');
+    
+    const priorityEl = document.getElementById('va-priority');
+    if (priorityEl) {
+        const pVal = r.priority || 'Normal';
+        priorityEl.innerText = pVal;
+        if (pVal === 'Normal') {
+            priorityEl.style.setProperty('background', '#f1f5f9', 'important');
+            priorityEl.style.setProperty('color', '#334155', 'important');
+        } else if (pVal === 'Urgent') {
+            priorityEl.style.setProperty('background', '#fef3c7', 'important');
+            priorityEl.style.setProperty('color', '#d97706', 'important');
+        } else if (pVal === 'Emergency') {
+            priorityEl.style.setProperty('background', '#fee2e2', 'important');
+            priorityEl.style.setProperty('color', '#b91c1c', 'important');
+        }
+    }
+    document.getElementById('va-notes').innerText = r.notes || r.description || 'No Notes';
     
     const dObj = new Date(r.timestamp);
     const dateStr = dObj.getFullYear() + '-' + String(dObj.getMonth() + 1).padStart(2, '0') + '-' + String(dObj.getDate()).padStart(2, '0');
@@ -474,24 +680,41 @@ window.openAppointmentView = function(id) {
 
 
 window.completeJob = async function(id) {
-    // User requested NO prompt for duration here
     try {
         if (typeof showAlert !== 'undefined') showAlert('Info', 'Completing job...', '');
-        const updates = { STATUS: 'Completed' };
         
-        const { error } = await sbClient.from('records').update(updates).eq('id', id);
-        if (error) throw error;
-        
-        // update local state
-        const t = appState.tickets.find(x => x.id === id);
-        if (t) {
-            t.status = 'Completed';
+        if (window.globalEventBus) {
+            window.globalEventBus.publish({
+                type: 'job_completion_requested',
+                payload: { id }
+            });
+            
+            // update local state optimistically
+            const t = appState.tickets.find(x => x.id === id);
+            if (t) {
+                t.status = 'Completed';
+            }
+            
+            if (typeof showAlert !== 'undefined') showAlert('Success', 'Job completed and moved to Data View!', '');
+            if (typeof renderWaitingJobs !== 'undefined') renderWaitingJobs();
+            if (typeof renderCalendar !== 'undefined') renderCalendar();
+            if (typeof updateDataStats !== 'undefined') updateDataStats();
+        } else {
+            const updates = { STATUS: 'Completed' };
+            const { error } = await sbClient.from('records').update(updates).eq('id', id);
+            if (error) throw error;
+            
+            // update local state
+            const t = appState.tickets.find(x => x.id === id);
+            if (t) {
+                t.status = 'Completed';
+            }
+            
+            if (typeof showAlert !== 'undefined') showAlert('Success', 'Job completed and moved to Data View!', '');
+            if (typeof renderWaitingJobs !== 'undefined') renderWaitingJobs();
+            if (typeof renderCalendar !== 'undefined') renderCalendar();
+            if (typeof updateDataStats !== 'undefined') updateDataStats();
         }
-        
-        if (typeof showAlert !== 'undefined') showAlert('Success', 'Job completed and moved to Data View!', '');
-        if (typeof renderWaitingJobs !== 'undefined') renderWaitingJobs();
-        if (typeof renderCalendar !== 'undefined') renderCalendar();
-        if (typeof updateDataStats !== 'undefined') updateDataStats();
     } catch(e) {
         console.error(e);
         if (typeof showAlert !== 'undefined') showAlert('Error', e.message, '');

@@ -1,0 +1,11 @@
+node_modules/
+.wrangler/
+local.db
+.vscode/
+antigravity/
+dist/
+md_backups_*/
+*.log
+fix_js*.js
+patch_*.js
+delete_demo_data*.js

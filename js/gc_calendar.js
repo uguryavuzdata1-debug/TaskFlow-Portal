@@ -160,9 +160,10 @@ function renderGcWeekView() {
     const d = new Date(sow);
     d.setDate(d.getDate() + i);
     const isToday = sameDay(d, today);
+    const isSunday = d.getDay() === 0;
     const dayName = d.toLocaleString('en-GB', { weekday: 'short' }).toUpperCase();
     const dateNum = d.getDate();
-    daysHtml += `<div class="gc-day-header-cell ${isToday ? 'gc-today-col' : ''}">
+    daysHtml += `<div class="gc-day-header-cell ${isToday ? 'gc-today-col' : ''} ${isSunday ? 'gc-sunday' : ''}">
       <span class="gc-wday">${dayName}</span>
       <span class="gc-wdate ${isToday ? 'gc-today-circle' : ''}">${dateNum}</span>
     </div>`;
@@ -179,7 +180,8 @@ function renderGcWeekView() {
       d.setDate(d.getDate() + i);
       const ds = d.toISOString().split('T')[0];
       const isToday = sameDay(d, today);
-      gridHtml += `<div class="gc-cell ${isToday ? 'gc-today-bg' : ''}"
+      const isSunday = d.getDay() === 0;
+      gridHtml += `<div class="gc-cell ${isToday ? 'gc-today-bg' : ''} ${isSunday ? 'gc-sunday-bg' : ''}"
         onclick="gcOpenQuickAdd('${ds}','${h.toString().padStart(2,'0')}:00')"></div>`;
     }
     gridHtml += `</div>`;
@@ -200,6 +202,11 @@ function renderGcWeekView() {
       return td >= dayStart && td <= dayEnd && isFiltered(t);
     });
 
+    // Sort day events by time to process overlaps
+    dayEvts.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+    // Overlap resolution (Column grouping)
+    const columns = [];
     dayEvts.forEach(evt => {
       const eDate = new Date(evt.timestamp);
       const h = eDate.getHours();
@@ -213,10 +220,44 @@ function renderGcWeekView() {
           dur = parseInt(evt.duration) || 60;
         }
       }
+      evt._startMin = h * 60 + m;
+      evt._endMin = evt._startMin + dur;
+
+      let placed = false;
+      for (let c = 0; c < columns.length; c++) {
+        let lastEvt = columns[c][columns[c].length - 1];
+        if (lastEvt._endMin <= evt._startMin) {
+          columns[c].push(evt);
+          evt._col = c;
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) {
+        evt._col = columns.length;
+        columns.push([evt]);
+      }
+    });
+
+    const numCols = Math.max(1, columns.length);
+
+    dayEvts.forEach(evt => {
+      const eDate = new Date(evt.timestamp);
+      const h = eDate.getHours();
+      const m = eDate.getMinutes();
+      const dur = evt._endMin - evt._startMin;
+
       const top = ((h - 8) * 60 + m) * (48 / 60); // 48px per hour, starting from 08:00
       const height = Math.max(dur * (48 / 60), 20);
-      const left = (i / 7) * 100 + 1;
-      const width = (1 / 7) * 100 - 2;
+      
+      const baseLeft = (i / 7) * 100;
+      const baseWidth = (1 / 7) * 100;
+      
+      // Calculate split widths if there are overlaps
+      const colWidth = baseWidth / numCols;
+      const left = baseLeft + (evt._col * colWidth) + 0.2;
+      const width = colWidth - 0.5;
+
       const color = getEventColor(evt);
       const isCompleted = evt.status === 'Completed' || evt.invoiced === true;
       const timeStr = `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}`;
@@ -284,14 +325,16 @@ function renderGcMonthView() {
   const weekdays = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
   let html = `<div class="gc-month-view">
     <div class="gc-month-header-row">
-      ${weekdays.map(d => `<div class="gc-month-wday">${d}</div>`).join('')}
+      ${weekdays.map((d, index) => `<div class="gc-month-wday ${index === 6 ? 'gc-sunday' : ''}">${d}</div>`).join('')}
     </div>
     <div class="gc-month-grid">`;
 
   // Prev month days
   for (let i = startOffset - 1; i >= 0; i--) {
-    html += `<div class="gc-month-cell gc-other-month">
-      <span class="gc-month-date">${prevDays - i}</span>
+    const d = new Date(year, month - 1, prevDays - i);
+    const isSunday = d.getDay() === 0;
+    html += `<div class="gc-month-cell gc-other-month ${isSunday ? 'gc-sunday-cell' : ''}">
+      <span class="gc-month-day-number">${prevDays - i}</span>
     </div>`;
   }
 
@@ -319,9 +362,11 @@ function renderGcMonthView() {
       evtHtml += `<div class="gc-month-more" onclick="gcDayClick('${dateStr}')">+${evts.length - maxShow} more</div>`;
     }
 
-    html += `<div class="gc-month-cell ${isToday ? 'gc-month-today' : ''}"
+    const cellDate = new Date(year, month, d);
+    const isSunday = cellDate.getDay() === 0;
+    html += `<div class="gc-month-cell ${isToday ? 'today' : ''} ${isSunday ? 'gc-sunday-cell' : ''}"
       onclick="gcDayClick('${dateStr}')">
-      <span class="gc-month-date ${isToday ? 'gc-today-circle' : ''}">${d}</span>
+      <span class="gc-month-day-number ${isToday ? 'gc-today-circle' : ''}">${d}</span>
       <div class="gc-month-events">${evtHtml}</div>
     </div>`;
   }
@@ -330,7 +375,9 @@ function renderGcMonthView() {
   const totalCells = startOffset + daysInMonth;
   const remaining = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
   for (let i = 1; i <= remaining; i++) {
-    html += `<div class="gc-month-cell gc-other-month"><span class="gc-month-date">${i}</span></div>`;
+    const d = new Date(year, month + 1, i);
+    const isSunday = d.getDay() === 0;
+    html += `<div class="gc-month-cell gc-other-month ${isSunday ? 'gc-sunday-cell' : ''}"><span class="gc-month-day-number">${i}</span></div>`;
   }
 
   html += `</div></div>`;
@@ -377,6 +424,10 @@ function renderGcDayView() {
   });
 
   let eventsHtml = '';
+  // Sort day events by time to process overlaps
+  dayEvts.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+  const columns = [];
   dayEvts.forEach(evt => {
     const eDate = new Date(evt.timestamp);
     const h = eDate.getHours();
@@ -388,8 +439,40 @@ function renderGcDayView() {
         dur = parseInt(ph) * 60 + parseInt(pm);
       } else dur = parseInt(evt.duration) || 60;
     }
+    evt._startMin = h * 60 + m;
+    evt._endMin = evt._startMin + dur;
+
+    let placed = false;
+    for (let c = 0; c < columns.length; c++) {
+      let lastEvt = columns[c][columns[c].length - 1];
+      if (lastEvt._endMin <= evt._startMin) {
+        columns[c].push(evt);
+        evt._col = c;
+        placed = true;
+        break;
+      }
+    }
+    if (!placed) {
+      evt._col = columns.length;
+      columns.push([evt]);
+    }
+  });
+
+  const numCols = Math.max(1, columns.length);
+
+  dayEvts.forEach(evt => {
+    const eDate = new Date(evt.timestamp);
+    const h = eDate.getHours();
+    const m = eDate.getMinutes();
+    const dur = evt._endMin - evt._startMin;
+    
     const top = ((h - 8) * 60 + m) * (48 / 60);
     const height = Math.max(dur * (48 / 60), 20);
+    
+    const colWidth = 100 / numCols;
+    const left = evt._col * colWidth;
+    const width = colWidth - 0.5;
+
     const color = getEventColor(evt);
     const isCompleted = evt.status === 'Completed' || evt.invoiced === true;
     const timeStr = `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}`;
@@ -397,10 +480,10 @@ function renderGcDayView() {
     eventsHtml += `
       <div class="gc-event-pill gc-day-event-pill" style="
         top:${top}px; height:${height}px;
-        left:0; width:calc(100% - 4px); right:4px;
+        left:${left}%; width:${width}%;
         background:${color}; opacity:${isCompleted ? 0.6 : 1};"
         onclick="event.stopPropagation(); openAppointmentView('${evt.id}')"
-        title="${evt.company} — ${timeStr}">
+        title="${evt.company || 'No name'} — ${timeStr}">
         <div class="gc-pill-title">${evt.company || 'No name'}</div>
         <div class="gc-pill-time">${timeStr}${evt.mainService ? ' · ' + evt.mainService : ''}</div>
       </div>`;
@@ -410,7 +493,7 @@ function renderGcDayView() {
     <div class="gc-week-view">
       <div class="gc-week-days-header gc-day-header-single">
         <div class="gc-time-gutter"></div>
-        <div class="gc-day-header-cell ${isToday ? 'gc-today-col' : ''}">
+        <div class="gc-day-header-cell ${isToday ? 'gc-today-col' : ''} ${d.getDay() === 0 ? 'gc-sunday' : ''}">
           <span class="gc-wday">${dayName.toUpperCase()}</span>
           <span class="gc-wdate ${isToday ? 'gc-today-circle' : ''}">${dateNum}</span>
         </div>
@@ -456,7 +539,7 @@ function renderGcMiniCalendar() {
     const isTod = sameDay(cellDate, today);
     const inWeek = sow && cellDate >= sow && cellDate <= eow;
     const isSel = sameDay(cellDate, gcCurrentDate) && gcViewMode === 'day';
-    cells += `<div class="gc-mini-day ${isTod ? 'gc-mini-today' : ''} ${inWeek ? 'gc-mini-inweek' : ''} ${isSel ? 'gc-mini-selected' : ''}"
+    cells += `<div class="gc-mini-day ${isTod ? 'today' : ''} ${inWeek ? 'selected-week' : ''} ${isSel ? 'selected-day' : ''}"
       onclick="gcMiniDayClick(${year},${month},${d})">${d}</div>`;
   }
   // Next
@@ -478,7 +561,7 @@ function renderGcMiniCalendar() {
         </button>
       </div>
     </div>
-    <div class="gc-mini-grid">
+    <div class="gc-mini-days">
       <div class="gc-mini-wday">M</div><div class="gc-mini-wday">T</div>
       <div class="gc-mini-wday">W</div><div class="gc-mini-wday">T</div>
       <div class="gc-mini-wday">F</div><div class="gc-mini-wday">S</div>

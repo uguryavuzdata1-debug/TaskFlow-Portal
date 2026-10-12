@@ -18,7 +18,17 @@ window.renderInvoicesTable = renderInvoicesTable;
 window.editInvoice = editInvoice;
 window.saveRecordEdits = saveRecordEdits;
 window.showDetails = showDetails;
-window.printInvoice = printInvoice;
+window.printInvoiceLegacy = printInvoice;
+window.printInvoice = function(id) {
+    if (window.globalEventBus) {
+        window.globalEventBus.publish({
+            type: 'invoice_generation_requested',
+            payload: { id: id }
+        });
+    } else {
+        window.printInvoiceLegacy(id);
+    }
+};
 window.closeModal = closeModal;
 window.markAsInvoiced = markAsInvoiced;
 window.showAlert = showAlert;
@@ -67,6 +77,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const auth = appState.settings.users_auth || {};
         const userData = auth[appState.currentUser] || (appState.currentUser === 'ADMIN' ? { role: 'Admin' } : { role: 'User' });
         appState.currentUserRole = userData.role || (appState.currentUser === 'ADMIN' ? 'Admin' : 'User');
+        appState.currentUserData = userData;
 
         document.body.classList.remove('is-logged-out'); 
         document.getElementById('login-screen').classList.add('hidden');
@@ -79,6 +90,19 @@ document.addEventListener('DOMContentLoaded', async () => {
                 btn.style.display = (appState.currentUserRole === 'Admin') ? 'flex' : 'none';
             }
         });
+    }
+
+    // Temporary probe for Organizations table
+    try {
+        console.log("[INSPECT] Fetching organizations table...");
+        const { data, error } = await sbClient.from('organizations').select('*').limit(3);
+        if (error) {
+            console.error("[INSPECT ERROR] Failed to fetch organizations:", error);
+        } else {
+            console.log("[INSPECT RESULT] Organizations:", JSON.stringify(data));
+        }
+    } catch (e) {
+        console.error("[INSPECT ERROR] Exception:", e);
     }
 });
 

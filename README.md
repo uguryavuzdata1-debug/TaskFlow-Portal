@@ -3,43 +3,48 @@
 Professional management portal for service tracking, CRM integration, and automated invoicing.
 
 ## 🚀 Overview
-TaskFlow is a high-performance, build-free administrative dashboard designed for service-oriented businesses. It integrates directly with **Supabase** for data persistence and provides a seamless workflow from ticket creation to invoicing.
+TaskFlow is a high-performance, build-free administrative dashboard designed for service-oriented businesses. It integrates directly with **Turso Cloud (libSQL)** for cloud data persistence and connects with **Vtiger CRM** for live two-way customer and service synchronization.
 
 ## 🛠 Technology Stack
 - **Frontend**: Vanilla HTML5, CSS3 (Modern UI Tokens), JavaScript (ES6+)
-- **Database**: Supabase (PostgreSQL)
+- **Database**: Turso Cloud (libSQL) – `https://taskflow-uguryavuz.aws-eu-west-1.turso.io`
+- **Backend / Bridge**: Express.js Local API Server (`server.js`, port 3000)
+- **CRM Sync Engine**: Python 3.12 (`Works_CRM/Source` - `sync_all_turso.py`)
 - **Styling**: Custom Design System with Inter Font, CSS Variables, and Glassmorphism effects.
-- **Architecture**: Single Page Application (SPA) logic in `app.js`.
+- **Architecture**: Modular SPA logic with `js/turso.js`, `js/customers.js`, `js/api.js`, `app.js`.
 
-## 📁 Key Files
+## 📁 Key Files & Directories
 - `index.html`: Main application structure and UI components.
-- `app.js`: Core logic, state management, and Supabase integration.
+- `app.js`: Core logic and application state management.
+- `js/turso.js`: Native Turso Cloud libSQL client and API query adapter.
+- `js/customers.js`: Customer management, search, detail panel, tickets, quotes, and appointments.
+- `js/api.js`: Unified data loader connecting to Turso Cloud DB.
+- `server.js`: Express.js API bridge for local and external sync services.
 - `style.css`: Modern UI design system and component styling.
-- `vtiger_bridge.js`: Integration script for local CRM synchronization.
 
 ## 🎨 Branding & Colors
 - **Primary Blue:** `#1b4376` (Used for logins, buttons, and accents)
 - **Secondary Orange:** `#d87617` (Used for main navigation bar)
 - **Logo:** `ika2.PNG`
 
-## Recent Modernization (May 2026)
-- **Compact UI:** Standardized dikey boşluklar ve daraltılmış navigasyon çubuğu.
-- **Brand Cleanup:** Üst menüden metinler kaldırıldı, sadece logo ve ikonlar (Settings hariç metin odaklı) bırakıldı.
-- **Remember Me:** Giriş ekranı oturum hatırlama mantığı ve role-based yetkilendirme akışı düzeltildi.
-- **Admin Tools:** Personnel ve Service Management panelleri genişletildi; şifre sıfırlama ve kategori/alt-hizmet ekleme özellikleri eklendi.
-- **Visual Consistency:** Tüm sayfa başlıkları ve açıklamaları standart font ve boyutlara (`28px` / `15px`) çekildi.
-
 ## 💡 Key Features
 - **Dashboard**: Quick category-based ticket creation.
 - **Invoicing Module**: Dual-tab (Pending/Invoiced) tracking with full record editing.
-- **Data View**: Advanced filtering by category, date, and payment status with live revenue stats.
-- **Customer Directory**: Synchronized client list from Supabase with status tracking.
-- **Custom Alert System**: Premium centered modals replacing browser native dialogs.
+- **Customer Directory**: Synchronized 6.300+ client list from Turso DB with AnyDesk Till details.
+- **Service Tickets (`tickets`)**: Matched with customer names and verified technicians (`Ugur Yavuz`, `ugur isikcevahir`, `Ahmet Baltaci`, `Ibrahim Ahmet`).
+- **Quotations (`quotes`)**: Real-time quote stage, grand total, customer names, and staff assignment.
+- **Calendar & Appointments (`appointments`)**: Planned schedule synchronized with CRM events.
 
-## 🛠 Installation & Usage
-1. No build step required.
-2. Open `index.html` in any modern browser.
-3. Ensure the Supabase credentials in `app.js` are correctly configured.
+## 🛠 Running Locally
+1. Start Node API server:
+   ```cmd
+   node server.js
+   ```
+2. Start HTTP server:
+   ```cmd
+   python -m http.server 8000
+   ```
+3. Open `http://localhost:8000/` in browser.
 
 ---
-*Created by Antigravity for TaskFlow.*
+*Created by Antigravity for TaskFlow Portal.*
