@@ -123,7 +123,10 @@
         // Store filtered so detail panel can look up by index
         window._customerFiltered = filtered;
 
-        container.innerHTML = filtered.map(function(c, idx) {
+        var displayLimit = 60;
+        window._customerDisplayLimit = displayLimit;
+
+        function buildRowHtml(c, idx) {
             var name      = c.organization_name || 'Unknown';
             var number    = c.organization_number || '-';
             var postcode  = c.billing_postal_code || '-';
@@ -184,7 +187,51 @@
 
                 '</div>'
             ].join('');
-        }).join('');
+        }
+
+        var visibleSlice = filtered.slice(0, displayLimit);
+        container.innerHTML = visibleSlice.map(buildRowHtml).join('');
+
+        if (filtered.length > displayLimit) {
+            var loadMoreIndicator = document.createElement('div');
+            loadMoreIndicator.id = 'customer-load-more';
+            loadMoreIndicator.style.cssText = 'padding:1rem;text-align:center;font-family:IBM Plex Mono,monospace;font-size:0.75rem;color:var(--steel);border-top:1px dashed var(--line);cursor:pointer;background:var(--card);';
+            loadMoreIndicator.innerHTML = 'Showing ' + displayLimit + ' of ' + filtered.length + ' customers. Scroll or click to load more...';
+            loadMoreIndicator.onclick = function() { loadNextChunk(); };
+            container.appendChild(loadMoreIndicator);
+        }
+
+        function loadNextChunk() {
+            var curr = window._customerDisplayLimit || 60;
+            if (curr >= filtered.length) return;
+            var nextLimit = curr + 60;
+            window._customerDisplayLimit = nextLimit;
+            var nextSlice = filtered.slice(curr, nextLimit);
+            var lm = document.getElementById('customer-load-more');
+            if (lm) lm.remove();
+
+            var tempDiv = document.createElement('div');
+            tempDiv.innerHTML = nextSlice.map(function(c, i){ return buildRowHtml(c, curr + i); }).join('');
+            while(tempDiv.firstChild) {
+                container.appendChild(tempDiv.firstChild);
+            }
+
+            if (nextLimit < filtered.length) {
+                var newLm = document.createElement('div');
+                newLm.id = 'customer-load-more';
+                newLm.style.cssText = 'padding:1rem;text-align:center;font-family:IBM Plex Mono,monospace;font-size:0.75rem;color:var(--steel);border-top:1px dashed var(--line);cursor:pointer;background:var(--card);';
+                newLm.innerHTML = 'Showing ' + nextLimit + ' of ' + filtered.length + ' customers. Scroll or click to load more...';
+                newLm.onclick = function() { loadNextChunk(); };
+                container.appendChild(newLm);
+            }
+        }
+
+        // On scroll near bottom, auto-load next batch
+        container.onscroll = function() {
+            if (container.scrollTop + container.clientHeight >= container.scrollHeight - 150) {
+                loadNextChunk();
+            }
+        };
     }
 
     var currentCustomer = null;

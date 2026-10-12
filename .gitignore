@@ -9,3 +9,5 @@ md_backups_*/
 fix_js*.js
 patch_*.js
 delete_demo_data*.js
+backups_turso/
+tools/backups_turso/

@@ -1,0 +1,26 @@
+name: Scheduled Live CRM Sync & Turso Backup
+
+on:
+  schedule:
+    # Runs everyday at 02:00 UTC (03:00 London/Europe time)
+    - cron: '0 2 * * *'
+  workflow_dispatch: # Allows manual trigger from GitHub Actions tab
+
+jobs:
+  sync-and-backup:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run vTiger CRM Sync to Live Turso
+        run: node sync-vtiger.js
+
+      - name: Run Live Turso Database Backup
+        run: node tools/backup_turso_live.js
