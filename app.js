@@ -597,6 +597,11 @@ function exportCustomersToCSV() {
 
 function renderCustomersTable() {
     const tbody = document.getElementById('customers-table-body');
+    if (!tbody) {
+        if (typeof renderCustomersList === 'function') renderCustomersList();
+        else if (typeof applyCustomerFilters === 'function') applyCustomerFilters();
+        return;
+    }
     const search = document.getElementById('customer-search').value.toLowerCase();
     let filtered = appState.customers;
     

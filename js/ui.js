@@ -362,6 +362,11 @@ function exportCustomersToCSV() {
 
 function renderCustomersTable() {
     const tbody = document.getElementById('customers-table-body');
+    if (!tbody) {
+        if (typeof renderCustomersList === 'function') renderCustomersList();
+        else if (typeof applyCustomerFilters === 'function') applyCustomerFilters();
+        return;
+    }
     if(!tbody) return;
     const searchEl = document.getElementById('customer-search');
     const search = searchEl ? searchEl.value.toLowerCase() : '';
