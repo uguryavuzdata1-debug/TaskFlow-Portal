@@ -520,19 +520,23 @@
           <div class="dash-kpi-grid">
             <div class="dash-kpi jobs" onclick="showTab('waiting')" style="cursor:pointer;"><div class="stub"></div><div class="lbl">OPEN TICKETS</div><div class="num" id="kpi-tickets">0</div><div class="delta">Appointments</div></div>
             <div class="dash-kpi pending" onclick="showTab('invoices')" style="cursor:pointer;"><div class="stub"></div><div class="lbl">PENDING INVOICES</div><div class="num" id="kpi-invoices">0</div><div class="delta">Open invoice</div></div>
-            <div class="dash-kpi overdue"><div class="stub"></div><div class="lbl">ACTIVE CUSALLR</div><div class="num" id="kpi-customers">0</div><div class="delta down">Registered business</div></div>
+            <div class="dash-kpi overdue"><div class="stub"></div><div class="lbl">ACTIVE CUSTOMERS</div><div class="num" id="kpi-customers">0</div><div class="delta down">Registered business</div></div>
             <div class="dash-kpi revenue" onclick="toggleMainForm('category')" style="cursor:pointer; background:var(--ink);"><div class="stub" style="border-color:var(--steel);"></div><div class="lbl" style="color:var(--steel);">NEW APPOINTMENT</div><div class="num" style="color:var(--paper); font-family:'IBM Plex Sans',sans-serif; font-size:1.4rem; padding-top:0.4rem;">Create +</div><div class="delta" style="color:var(--steel);">Start a new ticket</div></div>
           </div>
 
           <div class="board">
             <div class="dash-panel">
               <div class="dash-panel-head"><h2>Today's Schedule</h2><a onclick="showTab('calendar')">Open Calendar →</a></div>
-              <div style="padding:1rem; text-align:center; color:var(--steel); font-size:0.85rem;">No scheduled appointments for today.</div>
+              <div id="dashboard-schedule-list" style="padding:0.5rem 1rem;">
+                <div style="padding:1rem; text-align:center; color:var(--steel); font-size:0.85rem;">No scheduled appointments for today.</div>
+              </div>
             </div>
 
             <div class="dash-panel">
-              <div class="dash-panel-head"><h2>Recent Activity</h2><a onclick="showTab('settings')">View All →</a></div>
-              <div style="padding:1rem; text-align:center; color:var(--steel); font-size:0.85rem;">No recent activity to display.</div>
+              <div class="dash-panel-head"><h2>Recent Activity</h2><a onclick="showTab('admin'); showAdminPane('logs');">View All →</a></div>
+              <div id="dashboard-activity-list" style="padding:0.5rem 1rem;">
+                <div style="padding:1rem; text-align:center; color:var(--steel); font-size:0.85rem;">No recent activity to display.</div>
+              </div>
             </div>
           </div>
         </div>

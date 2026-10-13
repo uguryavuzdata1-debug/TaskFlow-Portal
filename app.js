@@ -551,7 +551,7 @@ async function refreshCustomersFromDatabase() {
     
     try {
         // --- Fallback chain: try multiple table/view names ---
-        const TABLE_CANDIDATES = ['Organizations', 'VtigerCRM_Organizations', 'customers'];
+        const TABLE_CANDIDATES = ['vt_customers', 'Organizations', 'VtigerCRM_Organizations', 'customers'];
         let usedTable = '';
 
         for (const tableName of TABLE_CANDIDATES) {
@@ -2836,77 +2836,15 @@ function exportData() {
     const a = document.createElement('a');
     a.setAttribute('hidden', '');
     a.setAttribute('href', url);
- // defaultSeeds removed to avoid conflict with api.js
+    a.setAttribute('download', `records_${Date.now()}.csv`);
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+}
 
+// Auto-seeding disabled to ensure strictly real data from database
 async function seedDatabaseIfNeeded() {
-    let seededAny = false;
-    
-    // Services Seeding
-    try {
-        const { data: existingServices, error: fetchErr } = await sbClient.from('services').select('*');
-        if (fetchErr) throw fetchErr;
-
-        if (!existingServices || existingServices.length === 0) {
-            console.log("Seeding services...");
-            const { error: insErr } = await sbClient.from('services').insert(defaultSeeds.services);
-            if (insErr) throw insErr;
-            seededAny = true;
-        }
-    } catch (e) {
-        console.error("Error seeding services:", e);
-        if (e.message && (e.message.includes('row-level security') || e.code === '42501')) {
-            showToast("Hata: 'services' tablosuna access RLS by engellendi.", "error");
-        }
-    }
-    // Standard hardware/dictionary tables
-    const hardwareTables = ['operating_systems', 'till_cpu', 'till_models', 'cc_local_settings', 'card_companies'];
-    for (const table of hardwareTables) {
-        const currentData = appState.settings[table] || [];
-        if (currentData.length === 0) {
-            console.log(`Seeding table ${table}...`);
-            const inserts = defaultSeeds[table].map(v => ({ name: v }));
-            const { error } = await sbClient.from(table).insert(inserts);
-            if (!error) seededAny = true;
-        }
-    }
-
-
-
-    // Users Seeding
-    try {
-        const { data: existingUsers, error: userFetchErr } = await sbClient.from('users').select('*');
-        if (userFetchErr) throw userFetchErr;
-
-        if (!existingUsers || existingUsers.length === 0) {
-            console.log("Seeding users...");
-            // Get or create roles
-            let { data: adminRole } = await sbClient.from('permissions').select('id').eq('role_name', 'Admin').single();
-            if (!adminRole) {
-                const { data: newRole } = await sbClient.from('permissions').insert([{ role_name: 'Admin', access_level: 100 }]).select().single();
-                adminRole = newRole;
-            }
-            let { data: staffRole } = await sbClient.from('permissions').select('id').eq('role_name', 'Staff').single();
-            if (!staffRole) {
-                const { data: newRole } = await sbClient.from('permissions').insert([{ role_name: 'Staff', access_level: 50 }]).select().single();
-                staffRole = newRole;
-            }
-
-            if (adminRole && staffRole) {
-                const defaultUsers = [
-                    { email: 'ugur@taskflow.com', full_name: 'UGUR YAVUZ', role_id: adminRole.id, password: 'admin' },
-                    { email: 'ahmet@taskflow.com', full_name: 'AHMET BALTACI', role_id: staffRole.id, password: '1234' },
-                    { email: 'ugurisik@taskflow.com', full_name: 'UGUR ISIKCEVAHIR', role_id: staffRole.id, password: '1234' }
-                ];
-                const { error: insUserErr } = await sbClient.from('users').insert(defaultUsers);
-                if (insUserErr) throw insUserErr;
-                seededAny = true;
-            }
-        }
-    } catch (e) {
-        console.error("Error seeding users:", e);
-    }
-
-    return seededAny;
+    return false;
 }
 
 function renderAccountSettings() {
@@ -3788,32 +3726,49 @@ if (typeof window.showAdminPane === 'undefined') window.showAdminPane = showAdmi
 
 function updateDashboardKPIs() {
     const appointments = appState.appointments || [];
+    const tickets = appState.tickets || [];
     const invoices = appState.invoices || [];
-    
-    const today = new Date().toISOString().split('T')[0];
-    
-    // KPI 1: Today's Appointments (Pending)
-    const todayPending = appointments.filter(a => a.date === today && a.status === 'PENDING').length;
-    
-    // KPI 2: Completed Today
-    const todayCompleted = appointments.filter(a => a.date === today && a.status === 'CONFIRMED').length;
-    
-    // KPI 3: Overdue Invoices
-    const overdueCount = invoices.filter(i => i.status === 'OVERDUE').length;
-    
-    // KPI 4: Monthly Revenue
-    const monthlyRev = invoices.filter(i => i.status === 'PAID').reduce((sum, i) => sum + (parseFloat(i.total) || 0), 0);
-    
+    const customers = appState.customers || [];
+
+    // KPI 1: Open Tickets & Appointments
+    const openTicketsCount = tickets.filter(t => {
+        const st = (t.status || '').toLowerCase();
+        return st !== 'closed' && st !== 'completed';
+    }).length;
+    const pendingApptsCount = appointments.filter(a => a.status === 'PENDING' || a.status === 'Planned').length;
+    const totalOpenTickets = openTicketsCount + pendingApptsCount;
+
+    // KPI 2: Pending Invoices
+    const pendingInvoicesCount = invoices.filter(i => {
+        const st = (i.status || '').toUpperCase();
+        return st === 'PENDING' || st === 'DRAFT' || st === 'UNPAID';
+    }).length;
+
+    // KPI 3: Registered / Active Customers
+    const totalCustomersCount = customers.length;
+
+    // Update index.html KPI IDs
+    const elTickets = document.getElementById('kpi-tickets');
+    const elInvoices = document.getElementById('kpi-invoices');
+    const elCustomers = document.getElementById('kpi-customers');
+
+    if (elTickets) elTickets.innerText = totalOpenTickets;
+    if (elInvoices) elInvoices.innerText = pendingInvoicesCount;
+    if (elCustomers) elCustomers.innerText = totalCustomersCount.toLocaleString('tr-TR');
+
+    // Also update legacy IDs if present
     const el1 = document.getElementById('dash-kpi-pending');
     const el2 = document.getElementById('dash-kpi-completed');
     const el3 = document.getElementById('dash-kpi-overdue');
     const el4 = document.getElementById('dash-kpi-revenue');
-    
-    if(el1) el1.innerText = todayPending;
-    if(el2) el2.innerText = todayCompleted;
-    if(el3) el3.innerText = overdueCount;
-    if(el4) el4.innerText = '£' + monthlyRev.toFixed(2);
-    
+    if (el1) el1.innerText = pendingApptsCount;
+    if (el2) el2.innerText = tickets.filter(t => (t.status || '').toLowerCase() === 'closed').length;
+    if (el3) el3.innerText = pendingInvoicesCount;
+    if (el4) {
+        const monthlyRev = invoices.filter(i => i.status === 'PAID').reduce((sum, i) => sum + (parseFloat(i.total) || 0), 0);
+        el4.innerText = '£' + monthlyRev.toFixed(2);
+    }
+
     renderDashboardSchedule(appointments);
     renderDashboardActivity();
 }
@@ -3821,21 +3776,33 @@ function updateDashboardKPIs() {
 function renderDashboardSchedule(appointments) {
     const list = document.getElementById('dashboard-schedule-list');
     if (!list) return;
-    
-    const today = new Date().toISOString().split('T')[0];
-    const todayApps = appointments.filter(a => a.date === today).sort((a,b) => a.time.localeCompare(b.time));
-    
+
+    const allApps = (appointments && appointments.length > 0) ? appointments : (appState.appointments || []);
+    if (allApps.length === 0) {
+        list.innerHTML = '<div style="padding:1.5rem; text-align:center; color:var(--steel); font-size:0.85rem;">No scheduled appointments for today.</div>';
+        return;
+    }
+
+    // Sort by date then time
+    const sorted = allApps.slice().sort((a, b) => {
+        const d1 = (a.date || '') + ' ' + (a.time || '');
+        const d2 = (b.date || '') + ' ' + (b.time || '');
+        return d1.localeCompare(d2);
+    }).slice(0, 5);
+
     let html = '';
-    todayApps.forEach(a => {
-        let statusTag = `<span class="ticket-status pending">PENDING</span>`;
-        if(a.status === 'CONFIRMED') statusTag = `<span class="ticket-status confirmed">CONFIRMED</span>`;
-        
+    sorted.forEach(a => {
+        const isConfirmed = a.status === 'CONFIRMED' || a.status === 'HELD';
+        const statusTag = isConfirmed
+            ? '<span class="ticket-status confirmed" style="font-size:0.7rem; font-weight:700; padding:2px 8px; border-radius:12px; background:#dcfce7; color:#15803d;">CONFIRMED</span>'
+            : '<span class="ticket-status pending" style="font-size:0.7rem; font-weight:700; padding:2px 8px; border-radius:12px; background:#fef3c7; color:#b45309;">PLANNED</span>';
+
         html += `
-        <div class="dash-schedule-row" style="display:flex; justify-content:space-between; padding:1rem 0; border-bottom:1px dashed var(--line); align-items:center;">
-            <div style="font-family:'IBM Plex Mono',monospace; color:var(--steel); width:60px;">${a.time}</div>
-            <div style="flex:1;">
-                <div style="font-weight:600; color:var(--ink);">${a.customer_name}</div>
-                <div style="font-size:0.8rem; color:var(--steel);">${a.postcode}</div>
+        <div class="dash-schedule-row" style="display:flex; justify-content:space-between; padding:0.75rem 0; border-bottom:1px dashed var(--line); align-items:center;">
+            <div style="font-family:'IBM Plex Mono',monospace; color:var(--steel); width:75px; font-size:0.8rem;">${a.time || '09:00'}</div>
+            <div style="flex:1; padding:0 0.5rem;">
+                <div style="font-weight:600; color:var(--ink); font-size:0.88rem;">${a.customer_name || a.company || 'Appointment'}</div>
+                <div style="font-size:0.75rem; color:var(--steel);">${a.service_type || 'On-site'} · ${a.technician || 'Technician'}</div>
             </div>
             <div>${statusTag}</div>
         </div>
@@ -3847,14 +3814,34 @@ function renderDashboardSchedule(appointments) {
 function renderDashboardActivity() {
     const list = document.getElementById('dashboard-activity-list');
     if (!list) return;
-    
+
+    let entries = [];
+    if (window.systemLogs && window.systemLogs.length > 0) {
+        entries = window.systemLogs.slice(0, 5);
+    } else if (typeof systemActivityLog !== 'undefined' && systemActivityLog.length > 0) {
+        entries = systemActivityLog.slice(-5).reverse();
+    } else if (appState.tickets && appState.tickets.length > 0) {
+        entries = appState.tickets.slice(0, 5).map(t => ({
+            time: t.timestamp ? t.timestamp.slice(0, 16) : new Date().toLocaleDateString(),
+            user: t.user || 'Technician',
+            details: `${t.crmTicket} - ${t.company} (${t.mainService || 'Service'})`
+        }));
+    }
+
+    if (entries.length === 0) {
+        list.innerHTML = '<div style="padding:1.5rem; text-align:center; color:var(--steel); font-size:0.85rem;">No recent activity to display.</div>';
+        return;
+    }
+
     let html = '';
-    const recent = (systemLogs || []).slice(0, 5);
-    recent.forEach(log => {
+    entries.forEach(log => {
+        const timeStr = log.time || log.timestamp || '';
+        const userStr = (log.user || 'SYSTEM').toUpperCase();
+        const detailStr = log.details || log.description || log.action || '';
         html += `
-        <div class="dash-activity-row" style="padding:1rem 0; border-bottom:1px dashed var(--line);">
-            <div style="font-family:'IBM Plex Mono',monospace; font-size:0.7rem; color:var(--steel); margin-bottom:0.3rem;">${log.time} · ${log.user.toUpperCase()}</div>
-            <div style="font-size:0.9rem; color:var(--ink);">${log.details}</div>
+        <div class="dash-activity-row" style="padding:0.75rem 0; border-bottom:1px dashed var(--line);">
+            <div style="font-family:'IBM Plex Mono',monospace; font-size:0.7rem; color:var(--steel); margin-bottom:0.2rem;">${timeStr} · ${userStr}</div>
+            <div style="font-size:0.85rem; color:var(--ink); font-weight:500;">${detailStr}</div>
         </div>
         `;
     });
@@ -3867,152 +3854,53 @@ showTab = function(tabId) {
     originalShowTab(tabId);
     if(tabId === 'dashboard') {
         updateDashboardKPIs();
+    } else if(tabId === 'waiting') {
+        renderWaitingJobs();
     }
 }
-
 
 // ==========================================
-// END-TO-END FLOW (Tickets -> Invoices)
+// WAITING JOBS & APPOINTMENTS TABLE RENDERER
 // ==========================================
-
-function openQuickAdd() {
-    const modal = document.getElementById('quick-add-modal');
-    if(modal) {
-        modal.classList.add('show');
-    }
-}
-
-function saveQuickAdd() {
-    // 1. Get values from form
-    // Let's assume there are inputs in the modal. We'll use mock data if fields are empty.
-    const companyInput = document.querySelector('#quick-add-modal input[placeholder*="Company"]');
-    const company = companyInput && companyInput.value ? companyInput.value : 'New Walk-in Customer';
-    
-    // 2. Create Ticket
-    const newAppt = {
-        id: 'TKT-' + Date.now().toString().slice(-4),
-        customer_name: company,
-        date: new Date().toISOString().split('T')[0],
-        time: '14:00',
-        status: 'PENDING',
-        postcode: 'SW1A 1AA',
-        service_type: 'On-site Service'
-    };
-    
-    if(!appState.appointments) appState.appointments = [];
-    appState.appointments.push(newAppt);
-    
-    // Log
-    if(typeof systemLogs !== 'undefined') {
-        systemLogs.unshift({
-            time: new Date().toLocaleString(),
-            user: 'Administrator',
-            action: 'CREATE',
-            details: `Appointment created for ${company}`
-        });
-    }
-    
-    showToast('Ticket Created Successfully', 'success');
-    closeModal('quick-add-modal');
-    
-    // Re-render
-    if(typeof updateDashboardKPIs === 'function') updateDashboardKPIs();
-    renderWaitingList();
-}
 
 function completeJob(ticketId) {
-    const tkt = appState.appointments.find(a => a.id === ticketId);
+    const tkt = (appState.appointments || []).find(a => String(a.id) === String(ticketId)) ||
+                (appState.tickets || []).find(t => String(t.id) === String(ticketId));
     if(tkt) {
         tkt.status = 'CONFIRMED';
         showToast('Job marked as completed', 'success');
-        
-        if(typeof systemLogs !== 'undefined') {
-            systemLogs.unshift({
-                time: new Date().toLocaleString(),
-                user: 'Administrator',
-                action: 'UPDATE',
-                details: `Job completed for ${tkt.customer_name}`
-            });
-        }
-        if(typeof updateDashboardKPIs === 'function') updateDashboardKPIs();
-        renderWaitingList();
+        if (typeof updateDashboardKPIs === 'function') updateDashboardKPIs();
+        renderWaitingJobs();
     }
 }
 
 function generateInvoiceFromTicket(ticketId) {
-    const tkt = appState.appointments.find(a => a.id === ticketId);
+    const tkt = (appState.appointments || []).find(a => String(a.id) === String(ticketId)) ||
+                (appState.tickets || []).find(t => String(t.id) === String(ticketId));
     if(tkt) {
-        if(tkt.status !== 'CONFIRMED') {
-            showToast('Job must be completed first!', 'warning');
-            return;
-        }
-        
+        const comp = tkt.customer_name || tkt.company || 'Customer';
         const newInv = {
             id: 'INV-' + Date.now().toString().slice(-4),
-            customer_name: tkt.customer_name,
+            customer_name: comp,
             issue_date: new Date().toISOString().split('T')[0],
             due_date: new Date(Date.now() + 14*24*60*60*1000).toISOString().split('T')[0],
-            total: 150.00,
+            total: 125.00,
             status: 'PENDING'
         };
-        
         if(!appState.invoices) appState.invoices = [];
-        appState.invoices.push(newInv);
-        
+        appState.invoices.unshift(newInv);
         showToast('Invoice Generated!', 'success');
-        
-        if(typeof systemLogs !== 'undefined') {
-            systemLogs.unshift({
-                time: new Date().toLocaleString(),
-                user: 'Administrator',
-                action: 'CREATE',
-                details: `Invoice generated for ${tkt.customer_name}`
-            });
-        }
         showTab('invoices');
     }
 }
 
 function renderWaitingList() {
-    const container = document.getElementById('waiting-list-container');
-    if(!container) return;
-    
-    let html = '';
-    const apps = appState.appointments || [];
-    apps.forEach(a => {
-        let actBtn = '';
-        if(a.status === 'PENDING') {
-            actBtn = `<button class="ticket-btn primary" onclick="completeJob('${a.id}')">Complete Job</button>`;
-        } else {
-            actBtn = `<button class="ticket-btn" onclick="generateInvoiceFromTicket('${a.id}')">Generate Invoice</button>`;
-        }
-        
-        html += `
-        <div class="ledger-row" style="grid-template-columns:100px 100px 1.5fr 150px 1fr; align-items:center;">
-            <div style="font-family:'IBM Plex Mono',monospace; color:var(--steel);">${a.id}</div>
-            <div style="font-family:'IBM Plex Mono',monospace;">${a.time}</div>
-            <div style="font-weight:600; color:var(--ink);">${a.customer_name}</div>
-            <div><span class="ledger-tag ${a.status === 'PENDING' ? 'auth' : 'create'}">${a.status}</span></div>
-            <div style="display:flex; justify-content:flex-end;">${actBtn}</div>
-        </div>
-        `;
-    });
-    container.innerHTML = html;
+    renderWaitingJobs();
 }
 
-window.openQuickAdd = openQuickAdd;
-window.saveQuickAdd = saveQuickAdd;
 window.completeJob = completeJob;
 window.generateInvoiceFromTicket = generateInvoiceFromTicket;
-
-// Re-override showTab to include waiting list
-const prevShowTab2 = showTab;
-showTab = function(tabId) {
-    prevShowTab2(tabId);
-    if(tabId === 'waiting') {
-        renderWaitingList();
-    }
-}
-
-// Customer Directory ? moved to js/customers.js
-}
+window.renderWaitingList = renderWaitingList;
+window.updateDashboardKPIs = updateDashboardKPIs;
+window.renderDashboardSchedule = renderDashboardSchedule;
+window.renderDashboardActivity = renderDashboardActivity;
