@@ -184,6 +184,12 @@ function showSettingsSubTab(tabId) {
     if (tabId === 'till_models') renderTillModelManagement();
 }
 
+function renderCustomersTable() {
+    if (typeof applyCustomerFilters === 'function') applyCustomerFilters();
+    else if (typeof loadCustomers === 'function') loadCustomers();
+}
+window.renderCustomersTable = renderCustomersTable;
+
 function renderTabContent(tabId) {
     if (tabId === 'dataview') renderDataTable();
     if (tabId === 'customers') renderCustomersTable();
