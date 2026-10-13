@@ -19,6 +19,18 @@ function serializeMetadata(metadata, details) {
     return `[METADATA: ${JSON.stringify(metadata)}]\n${details}`;
 }
 
+// --- Epoch Time Helper (Latest Records First) ---
+function toEpoch(ts) {
+    if (!ts) return 0;
+    if (typeof ts === 'number') return ts;
+    const str = String(ts).trim();
+    const normalized = str.includes(' ') && !str.includes('T') ? str.replace(' ', 'T') : str;
+    const d = new Date(normalized);
+    const ms = d.getTime();
+    return isNaN(ms) ? 0 : ms;
+}
+window.toEpoch = toEpoch;
+
 // --- Initialization ---
 async function initApp() {
     try {
@@ -280,9 +292,14 @@ async function initApp() {
                         paymentStatus: isClosed ? 'Completed' : 'Pending'
                     };
                 });
+                mappedTursoTickets.sort((a, b) => {
+                    const diff = toEpoch(b.timestamp) - toEpoch(a.timestamp);
+                    if (diff !== 0) return diff;
+                    return (parseInt(b.id) || 0) - (parseInt(a.id) || 0);
+                });
                 appState.tickets = mappedTursoTickets;
                 appState.tursoTickets = mappedTursoTickets;
-                console.log(`[INIT] ✓ Loaded ${appState.tickets.length} real tickets.`);
+                console.log(`[INIT] ✓ Loaded ${appState.tickets.length} real tickets (sorted latest first).`);
             }
         } catch(e) { console.warn("[INIT] Turso tickets fetch error:", e); }
 
@@ -322,6 +339,11 @@ async function initApp() {
                     };
                 });
                 appState.tickets = appState.tickets.concat(mappedRecords);
+                appState.tickets.sort((a, b) => {
+                    const diff = toEpoch(b.timestamp) - toEpoch(a.timestamp);
+                    if (diff !== 0) return diff;
+                    return (parseInt(b.id) || 0) - (parseInt(a.id) || 0);
+                });
             }
         } catch(e) {}
 
@@ -361,7 +383,12 @@ async function initApp() {
                         assigned_to: q.assigned_user_id || ''
                     };
                 });
-                console.log(`[INIT] ✓ Loaded ${appState.quotes.length} real quotes.`);
+                appState.quotes.sort((a, b) => {
+                    const diff = toEpoch(b.createdtime) - toEpoch(a.createdtime);
+                    if (diff !== 0) return diff;
+                    return (parseInt(b.id) || 0) - (parseInt(a.id) || 0);
+                });
+                console.log(`[INIT] ✓ Loaded ${appState.quotes.length} real quotes (sorted latest first).`);
             }
         } catch(e) { console.warn("[INIT] Turso quotes fetch error:", e); }
 
@@ -388,7 +415,12 @@ async function initApp() {
                         description: a.description || ''
                     };
                 });
-                console.log(`[INIT] ✓ Loaded ${appState.appointments.length} real appointments.`);
+                appState.appointments.sort((a, b) => {
+                    const diff = toEpoch((b.date || '') + ' ' + (b.time || '')) - toEpoch((a.date || '') + ' ' + (a.time || ''));
+                    if (diff !== 0) return diff;
+                    return (parseInt(b.id) || 0) - (parseInt(a.id) || 0);
+                });
+                console.log(`[INIT] ✓ Loaded ${appState.appointments.length} real appointments (sorted latest first).`);
             } else {
                 appState.appointments = [];
             }
@@ -420,7 +452,12 @@ async function initApp() {
                     status: q.quotestage === 'Accepted' ? 'PAID' : (q.quotestage === 'Rejected' ? 'CANCELLED' : 'PENDING')
                 }));
             }
-            console.log(`[INIT] ✓ Loaded ${appState.invoices.length} invoices.`);
+            appState.invoices.sort((a, b) => {
+                const diff = toEpoch(b.issue_date) - toEpoch(a.issue_date);
+                if (diff !== 0) return diff;
+                return (parseInt(b.id) || 0) - (parseInt(a.id) || 0);
+            });
+            console.log(`[INIT] ✓ Loaded ${appState.invoices.length} invoices (sorted latest first).`);
         } catch(e) {
             console.warn("[INIT] Invoices fetch error:", e);
             appState.invoices = [];

@@ -19,6 +19,18 @@ function serializeMetadata(metadata, details) {
     return `[METADATA: ${JSON.stringify(metadata)}]\n${details}`;
 }
 
+// --- Epoch Time Helper (Latest Records First) ---
+function toEpoch(ts) {
+    if (!ts) return 0;
+    if (typeof ts === 'number') return ts;
+    const str = String(ts).trim();
+    const normalized = str.includes(' ') && !str.includes('T') ? str.replace(' ', 'T') : str;
+    const d = new Date(normalized);
+    const ms = d.getTime();
+    return isNaN(ms) ? 0 : ms;
+}
+window.toEpoch = window.toEpoch || toEpoch;
+
 // --- STATIC SECTOR DICTIONARY ---
 // To add new business sectors or modify existing ones, edit this array directly:
 // --- STATIC SYSTEM TYPES DICTIONARY ---
@@ -466,6 +478,15 @@ function renderDataTable() {
     if (start) tickets = tickets.filter(t => (t.timestamp || '').split('T')[0] >= start);
     if (end) tickets = tickets.filter(t => (t.timestamp || '').split('T')[0] <= end);
 
+    // CRITICAL: Sort ALWAYS newest first (son kayıt her zaman en üstte)
+    tickets.sort((a, b) => {
+        const tA = window.toEpoch ? window.toEpoch(a.timestamp) : new Date(String(a.timestamp || '').replace(' ', 'T')).getTime();
+        const tB = window.toEpoch ? window.toEpoch(b.timestamp) : new Date(String(b.timestamp || '').replace(' ', 'T')).getTime();
+        const diff = (tB || 0) - (tA || 0);
+        if (diff !== 0) return diff;
+        return (parseInt(b.id) || 0) - (parseInt(a.id) || 0);
+    });
+
     if (tickets.length === 0) {
         container.innerHTML = '<div style="padding:2.5rem; text-align:center; color:var(--steel); font-size:0.85rem;">No service records match the selected filters.</div>';
         return;
@@ -481,12 +502,18 @@ function renderDataTable() {
             ? '<span class="stamp confirmed" style="font-size:0.65rem; padding:2px 8px; border-radius:20px; background:#dcfce7; color:#15803d; border:1px solid #15803d;">CLOSED</span>'
             : '<span class="stamp pending" style="font-size:0.65rem; padding:2px 8px; border-radius:20px; background:#fef3c7; color:#b45309; border:1px solid #b45309;">OPEN</span>';
 
-        const dateStr = (t.timestamp || '').split('T')[0] || (t.timestamp || '').split(' ')[0] || 'N/A';
+        const ts = t.timestamp || '';
+        const datePart = ts.includes('T') ? ts.split('T')[0] : (ts.includes(' ') ? ts.split(' ')[0] : ts);
+        const rawTime = ts.includes('T') ? ts.split('T')[1] : (ts.includes(' ') ? ts.split(' ')[1] : '');
+        const timePart = rawTime ? rawTime.slice(0, 8) : '';
         const priceStr = parseFloat(t.price || 0) > 0 ? '£' + parseFloat(t.price).toFixed(2) : '£0.00';
 
         html += `
-        <div class="ledger-row" style="display:grid; grid-template-columns:100px 1.5fr 1fr 100px 100px 80px; align-items:center; padding:0.65rem 1rem; border-bottom:1px solid var(--line);">
-            <div class="ledger-ts" style="font-family:'IBM Plex Mono',monospace; font-size:0.75rem; color:var(--steel);">${dateStr}</div>
+        <div class="ledger-row" style="display:grid; grid-template-columns:120px 1.5fr 1fr 100px 100px 80px; align-items:center; padding:0.65rem 1rem; border-bottom:1px solid var(--line);">
+            <div class="ledger-ts" style="font-family:'IBM Plex Mono',monospace; font-size:0.75rem; color:var(--steel); line-height:1.25;">
+                <div style="font-weight:600; color:var(--ink);">${datePart || 'N/A'}</div>
+                ${timePart ? `<div style="font-size:0.68rem; color:#64748b;">${timePart}</div>` : ''}
+            </div>
             <div style="font-weight:700; color:var(--ink); font-size:0.85rem;">${t.company || 'Unknown'}</div>
             <div style="font-size:0.8rem; color:var(--steel); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${t.mainService || ''}">${t.mainService || 'Support'}</div>
             <div>${statusBadge}</div>
@@ -510,7 +537,7 @@ function renderInvoicesTable() {
     const start = document.getElementById('invoice-start-date')?.value;
     const end = document.getElementById('invoice-end-date')?.value;
 
-    let invoices = appState.invoices || [];
+    let invoices = [...(appState.invoices || [])];
 
     if (tabFilter === 'pending') {
         invoices = invoices.filter(i => (i.status || '').toUpperCase() === 'PENDING');
@@ -527,6 +554,15 @@ function renderInvoicesTable() {
 
     if (start) invoices = invoices.filter(i => (i.issue_date || '') >= start);
     if (end) invoices = invoices.filter(i => (i.issue_date || '') <= end);
+
+    // CRITICAL: Sort ALWAYS newest invoice first
+    invoices.sort((a, b) => {
+        const tA = window.toEpoch ? window.toEpoch(a.issue_date) : new Date(String(a.issue_date || '').replace(' ', 'T')).getTime();
+        const tB = window.toEpoch ? window.toEpoch(b.issue_date) : new Date(String(b.issue_date || '').replace(' ', 'T')).getTime();
+        const diff = (tB || 0) - (tA || 0);
+        if (diff !== 0) return diff;
+        return (parseInt(b.id) || 0) - (parseInt(a.id) || 0);
+    });
 
     if (invoices.length === 0) {
         tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:2rem; color:var(--steel);">No invoices match filter.</td></tr>';
@@ -3059,11 +3095,13 @@ window.renderWaitingJobs = function() {
         return;
     }
 
-    // Sort by Date and Time
+    // Sort by Date and Time (Latest First)
     combined.sort((a, b) => {
-        const da = (a.dateStr || '') + ' ' + (a.timeStr || '');
-        const db = (b.dateStr || '') + ' ' + (b.timeStr || '');
-        return da.localeCompare(db);
+        const tA = window.toEpoch ? window.toEpoch((a.dateStr || '') + ' ' + (a.timeStr || '')) : 0;
+        const tB = window.toEpoch ? window.toEpoch((b.dateStr || '') + ' ' + (b.timeStr || '')) : 0;
+        const diff = (tB || 0) - (tA || 0);
+        if (diff !== 0) return diff;
+        return (parseInt(b.id) || 0) - (parseInt(a.id) || 0);
     });
 
     let html = `
@@ -3375,11 +3413,11 @@ function renderDashboardSchedule(appointments) {
         return;
     }
 
-    // Sort by date then time
+    // Sort by date then time (Latest First)
     const sorted = allApps.slice().sort((a, b) => {
         const d1 = (a.date || '') + ' ' + (a.time || '');
         const d2 = (b.date || '') + ' ' + (b.time || '');
-        return d1.localeCompare(d2);
+        return d2.localeCompare(d1);
     }).slice(0, 5);
 
     let html = '';
@@ -3409,11 +3447,23 @@ function renderDashboardActivity() {
 
     let entries = [];
     if (window.systemLogs && window.systemLogs.length > 0) {
-        entries = window.systemLogs.slice(0, 5);
+        entries = [...window.systemLogs].sort((a, b) => {
+            const tA = window.toEpoch ? window.toEpoch(a.timestamp || a.time) : 0;
+            const tB = window.toEpoch ? window.toEpoch(b.timestamp || b.time) : 0;
+            return (tB || 0) - (tA || 0);
+        }).slice(0, 5);
     } else if (window.systemActivityLog && window.systemActivityLog.length > 0) {
-        entries = window.systemActivityLog.slice(-5).reverse();
+        entries = [...window.systemActivityLog].sort((a, b) => {
+            const tA = window.toEpoch ? window.toEpoch(a.timestamp || a.time) : 0;
+            const tB = window.toEpoch ? window.toEpoch(b.timestamp || b.time) : 0;
+            return (tB || 0) - (tA || 0);
+        }).slice(0, 5);
     } else if (appState.tickets && appState.tickets.length > 0) {
-        entries = appState.tickets.slice(0, 5).map(t => ({
+        entries = [...appState.tickets].sort((a, b) => {
+            const tA = window.toEpoch ? window.toEpoch(a.timestamp) : 0;
+            const tB = window.toEpoch ? window.toEpoch(b.timestamp) : 0;
+            return (tB || 0) - (tA || 0);
+        }).slice(0, 5).map(t => ({
             time: t.timestamp ? t.timestamp.slice(0, 16) : new Date().toLocaleDateString(),
             user: t.user || 'Technician',
             details: `${t.crmTicket} - ${t.company} (${t.mainService || 'Service'})`
