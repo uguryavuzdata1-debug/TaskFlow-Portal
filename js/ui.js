@@ -2009,8 +2009,8 @@ window.updateRecordEdits = async function(id, btn) {
 }
 
 // --- CALENDAR LOGIC ---
-let currentCalMonth = new Date().getMonth();
-let currentCalYear = new Date().getFullYear();
+var currentCalMonth = window.currentCalMonth || new Date().getMonth();
+var currentCalYear = window.currentCalYear || new Date().getFullYear();
 
 window.prevMonth = function() {
     currentCalMonth--;
