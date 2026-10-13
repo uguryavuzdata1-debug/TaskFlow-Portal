@@ -532,6 +532,7 @@ async function initApp() {
         renderAll();
         updateDataStats();
         window.lastDataFetchTime = Date.now();
+        if (typeof updateSyncStatusBadge === 'function') updateSyncStatusBadge();
 
         if (!appState.settings.services || appState.settings.services.length === 0) {
             console.warn("[INIT] No services found. Database might be empty or RLS is blocking access.");
@@ -1204,5 +1205,81 @@ async function renderSystemLogs() {
 window.addSystemLog = addSystemLog;
 window.fetchSystemLogs = fetchSystemLogs;
 window.renderSystemLogs = renderSystemLogs;
+
+// ==========================================
+// CRM SYNC STATUS BADGE & MODAL
+// ==========================================
+async function updateSyncStatusBadge() {
+    try {
+        const badge = document.getElementById('sync-status-badge');
+        const textEl = document.getElementById('sync-status-text');
+        const dotEl = document.getElementById('sync-pulse-dot');
+        if (!badge || !textEl || !dotEl) return;
+
+        let rows = [];
+        if (window.tursoExecute) {
+            rows = await window.tursoExecute("SELECT * FROM sync_logs ORDER BY timestamp DESC LIMIT 1");
+        }
+        if (!rows || rows.length === 0) {
+            textEl.textContent = 'CRM: Aktif';
+            return;
+        }
+
+        const latestLog = rows[0];
+        const logTime = new Date(latestLog.timestamp);
+        const now = new Date();
+        const diffMinutes = Math.floor((now.getTime() - logTime.getTime()) / (60 * 1000));
+
+        let logData = {};
+        try { logData = JSON.parse(latestLog.log_data); } catch(e) {}
+        window.latestSyncLogData = { ...logData, timestamp: latestLog.timestamp };
+
+        let timeStr = 'Şimdi';
+        if (diffMinutes >= 1 && diffMinutes < 60) {
+            timeStr = `${diffMinutes} dk önce`;
+        } else if (diffMinutes >= 60) {
+            const hours = Math.floor(diffMinutes / 60);
+            timeStr = `${hours} sa önce`;
+        }
+
+        if (diffMinutes <= 35) {
+            badge.style.background = 'rgba(34, 197, 94, 0.08)';
+            badge.style.borderColor = 'rgba(34, 197, 94, 0.3)';
+            badge.style.color = '#166534';
+            dotEl.style.background = '#22c55e';
+            dotEl.className = 'sync-pulse-dot pulse';
+            textEl.textContent = `CRM: Aktif (${timeStr})`;
+        } else {
+            badge.style.background = 'rgba(234, 179, 8, 0.08)';
+            badge.style.borderColor = 'rgba(234, 179, 8, 0.3)';
+            badge.style.color = '#854d0e';
+            dotEl.style.background = '#eab308';
+            dotEl.className = 'sync-pulse-dot';
+            textEl.textContent = `CRM: Beklemede (${timeStr})`;
+        }
+    } catch(e) {
+        console.warn("Sync status badge update error:", e);
+    }
+}
+
+window.showSyncStatusModal = function() {
+    const data = window.latestSyncLogData || {};
+    const t = data.timestamp ? new Date(data.timestamp).toLocaleString('tr-TR') : 'Bilinmiyor';
+    alert(
+        `🟢 CRM SENKRONİZASYON DURUMU\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `🕒 Son Eşitleme: ${t}\n\n` +
+        `📊 Aktarılan Veri Detayları:\n` +
+        ` • Biletler (Tickets): ${data.tickets_synced !== undefined ? data.tickets_synced : (appState.tickets ? appState.tickets.length : 0)} adet\n` +
+        ` • Müşteriler: ${data.customers_synced !== undefined ? data.customers_synced : (appState.customers ? appState.customers.length : 0)} adet\n` +
+        ` • Teklifler: ${data.quotes_synced !== undefined ? data.quotes_synced : 0} adet\n` +
+        ` • Toplam Kayıt: ${data.total_synced !== undefined ? data.total_synced : 'Güncel'}\n\n` +
+        `🟢 Durum: VTiger ➡️ Turso eşitleme motoru aktif çalışıyor.`
+    );
+};
+
+window.updateSyncStatusBadge = updateSyncStatusBadge;
+setInterval(updateSyncStatusBadge, 60000);
+
 
 

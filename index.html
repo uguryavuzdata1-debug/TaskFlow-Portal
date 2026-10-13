@@ -313,7 +313,12 @@
         <i data-lucide="shield" class="nav-icon"></i> Admin Panel
     </button>
 </div>
-  <div class="user-profile-dropdown-wrapper">
+  <div style="display: flex; align-items: center; margin-left: auto; gap: 10px;">
+    <div class="sync-status-badge" id="sync-status-badge" onclick="showSyncStatusModal()" title="CRM Senkronizasyon Durumu (Detaylar için tıklayın)" style="display: flex; align-items: center; gap: 7px; padding: 6px 14px; background: rgba(34, 197, 94, 0.08); border: 1px solid rgba(34, 197, 94, 0.25); border-radius: 20px; font-size: 0.78rem; font-weight: 600; color: #166534; cursor: pointer; transition: all 0.2s ease; user-select: none;">
+      <span class="sync-pulse-dot pulse" id="sync-pulse-dot" style="width: 8px; height: 8px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.3); display: inline-block;"></span>
+      <span id="sync-status-text">CRM: Aktif</span>
+    </div>
+    <div class="user-profile-dropdown-wrapper">
     <div class="user-profile-trigger" id="user-display-area" onclick="toggleUserProfileDropdown()">
       <span class="user-name-text" id="current-user-name" style="font-size: 15px;">User</span>
       <i data-lucide="chevron-down" style="width: 16px; height: 16px;"></i>
@@ -343,6 +348,7 @@
       </div>
     </div>
   </div>
+</div>
 </nav>
 
 
