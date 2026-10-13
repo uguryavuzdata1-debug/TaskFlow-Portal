@@ -194,288 +194,127 @@ function renderTabContent(tabId) {
 
 // --- Data Table Rendering ---
 function renderDataTable() {
-    const tbody = document.getElementById('data-table-body');
-    if (!tbody) return;
-    const search = document.getElementById('dataview-search')?.value?.toLowerCase() || '';
+    const container = document.getElementById('data-table-body');
+    if (!container) return;
+
+    const search = (document.getElementById('dataview-search')?.value || '').toLowerCase().trim();
+    const category = document.getElementById('dataview-category-filter')?.value || 'all';
+    const payment = document.getElementById('dataview-payment-filter')?.value || 'all';
     const start = document.getElementById('dataview-start-date')?.value || '';
     const end = document.getElementById('dataview-end-date')?.value || '';
-    const payment = document.getElementById('dataview-payment-filter')?.value || 'all';
-    const invStatus = document.getElementById('dataview-invoice-filter')?.value || 'all';
-    const isUser = appState.currentUserRole === 'User';
-    
-    // Toggle header visibility for User role
-    const thAmount = document.getElementById('th-dataview-amount');
-    if (thAmount) thAmount.style.display = isUser ? 'none' : 'table-cell';
 
-    let filtered = appState.tickets.filter(t => {
-        const isInvoice = t.price > 0 || t.paymentStatus === 'Chargeable' || ['Pending', 'Paid', 'Partially Paid', 'Cancelled', 'Refunded', 'Write Off'].includes(t.status);
-        return !isInvoice;
-    });
-    
-    // --- Data Scoping: Users only see their own tickets ---
-    if (isUser) {
-        filtered = filtered.filter(t => t.user === appState.currentUser);
-    }
-
-    if (appState.currentDataTab !== 'all') filtered = filtered.filter(t => t.mainService === appState.currentDataTab);
-    if (payment !== 'all') filtered = filtered.filter(t => t.paymentStatus === payment);
-    if (invStatus === 'pending') filtered = filtered.filter(t => !t.invoiced);
-    if (invStatus === 'invoiced') filtered = filtered.filter(t => t.invoiced);
-    if (search) filtered = filtered.filter(t => (t.company || '').toLowerCase().includes(search) || (t.dbId || '').toLowerCase().includes(search) || (t.description || '').toLowerCase().includes(search));
-    if (start) filtered = filtered.filter(t => new Date(t.timestamp) >= new Date(start));
-    if (end) { const dEnd = new Date(end); dEnd.setHours(23,59,59); filtered = filtered.filter(t => new Date(t.timestamp) <= dEnd); }
-
-    updateDataStats();
-
-    tbody.innerHTML = filtered.map(t => `
-        <tr style="border-bottom: 1px solid var(--border-color);">
-            <td>${new Date(t.timestamp).toLocaleDateString()}</td>
-            <td><strong style="color:var(--primary)">${t.dbId}</strong></td>
-            <td title="${t.postcode}"><strong>${t.company}</strong></td>
-            <td><span class="badge" style="background:#f1f5f9; color:#475569;">${t.mainService}</span></td>
-            <td>
-                <span class="badge ${t.paymentStatus === 'Chargeable' ? 'badge-warning' : 'badge-success'}">${t.paymentStatus}</span>
-                ${!isUser && t.paymentStatus === 'Chargeable' ? (t.invoiced ? '<br><span style="font-size:10px; font-weight:700; color:#10b981; display:inline-flex; align-items:center; gap:4px; margin-top:4px;"><div class="status-dot dot-green" style="margin:0;"></div> INVOICED</span>' : '<br><span style="font-size:10px; font-weight:700; color:#f59e0b; display:inline-flex; align-items:center; gap:4px; margin-top:4px;"><div class="status-dot dot-orange dot-blinking" style="margin:0;"></div> PENDING</span>') : ''}
-            </td>
-            ${isUser ? '' : `<td><strong>£${parseFloat(t.price).toFixed(2)}</strong></td>`}
-            <td style="text-align: right;">
-                <div style="display: flex; gap: 10px; justify-content: flex-end; align-items: center;">
-                    <button class="btn-icon" onclick="showDetails('${t.id}')" title="View Details" style="background:none; border:none; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; color:#1b4376; width:28px; height:28px; border-radius:50%; transition: background-color 0.2s;"><i data-lucide="eye" style="width: 16px; height: 16px;"></i></button>
-                    ${!(isUser && t.invoiced) ? `<button class="btn-icon" onclick="editInvoice('${t.id}')" title="Edit Record" style="background:none; border:none; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; color:#1b4376; width:28px; height:28px; border-radius:50%; transition: background-color 0.2s;"><i data-lucide="edit-3" style="width: 16px; height: 16px;"></i></button>` : ''}
-                </div>
-            </td>
-        </tr>
-    `).join('');
-    if (window.lucide) lucide.createIcons();
-}
-
-function updateDataStats() {
     let tickets = appState.tickets || [];
-    const customers = appState.customers || [];
-    const isUser = appState.currentUserRole === 'User';
-    
-    // --- Data Scoping ---
-    if (isUser) {
-        tickets = tickets.filter(t => t.user === appState.currentUser);
+
+    if (category !== 'all') {
+        tickets = tickets.filter(t => (t.mainService || '').includes(category));
     }
-    
-    const pending = tickets.filter(t => t.status !== 'Completed').length;
-    const completed = tickets.filter(t => t.status === 'Completed').length;
-    const totalRev = tickets.reduce((sum, t) => sum + (parseFloat(t.price) || 0), 0);
-    const chargeable = tickets.filter(t => t.paymentStatus === 'Chargeable').length;
-    const contract = tickets.filter(t => t.paymentStatus === 'Contract').length;
 
-    const elPending = document.getElementById('stat-pending');
-    const elCompleted = document.getElementById('stat-completed');
-    const elCustomers = document.getElementById('stat-customers');
-    const elTotalRecords = document.getElementById('stat-total-records');
-    const elTotalRevenue = document.getElementById('stat-total-revenue');
-    const elSplit = document.getElementById('stat-split');
-
-    if (elPending) elPending.innerText = pending;
-    if (elCompleted) elCompleted.innerText = completed;
-    if (elCustomers) elCustomers.innerText = customers.length;
-    if (elTotalRecords) elTotalRecords.innerText = tickets.length;
-    if (elTotalRevenue) {
-        if (isUser) {
-            // Hide revenue entirely for User role
-            elTotalRevenue.parentElement.parentElement.style.display = 'none';
-        } else {
-            elTotalRevenue.parentElement.parentElement.style.display = 'flex';
-            elTotalRevenue.innerText = '£' + totalRev.toFixed(2);
-        }
+    if (payment !== 'all') {
+        tickets = tickets.filter(t => (t.paymentStatus || '').toLowerCase() === payment.toLowerCase() || (t.status || '').toLowerCase() === payment.toLowerCase());
     }
-    if (elSplit) {
-        if (isUser) {
-            elSplit.style.display = 'none';
-        } else {
-            elSplit.style.display = 'block';
-            elSplit.innerHTML = `Chargeable: <strong>${chargeable}</strong> &nbsp;|&nbsp; Contract: <strong>${contract}</strong>`;
-        }
+
+    if (search) {
+        tickets = tickets.filter(t => 
+            (t.company || '').toLowerCase().includes(search) ||
+            (t.dbId || '').toLowerCase().includes(search) ||
+            (t.crmTicket || '').toLowerCase().includes(search) ||
+            (t.description || '').toLowerCase().includes(search)
+        );
     }
-}
 
-function exportToCSV() {
-    // Collect filtered data from renderDataTable logic
-    const search = document.getElementById('dataview-search').value.toLowerCase();
-    const start = document.getElementById('dataview-start-date').value;
-    const end = document.getElementById('dataview-end-date').value;
-    const payment = document.getElementById('dataview-payment-filter').value;
-    
-    let data = appState.tickets;
-    if (appState.currentDataTab !== 'all') data = data.filter(t => t.mainService === appState.currentDataTab);
-    if (payment !== 'all') data = data.filter(t => t.paymentStatus === payment);
-    if (search) data = data.filter(t => (t.company || '').toLowerCase().includes(search) || (t.dbId || '').toLowerCase().includes(search));
-    if (start) data = data.filter(t => new Date(t.timestamp) >= new Date(start));
-    if (end) { const dEnd = new Date(end); dEnd.setHours(23,59,59); data = data.filter(t => new Date(t.timestamp) <= dEnd); }
+    if (start) tickets = tickets.filter(t => (t.timestamp || '').split('T')[0] >= start);
+    if (end) tickets = tickets.filter(t => (t.timestamp || '').split('T')[0] <= end);
 
-    if (data.length === 0) { showAlert('No Data', 'There are no records to export with current filters.', 'ℹ️'); return; }
-
-    const headers = ["Date", "Record ID", "Company", "Service", "Sub Service", "Price", "Status", "Duration", "Description"];
-    const rows = data.map(t => [
-        new Date(t.timestamp).toLocaleDateString(),
-        t.dbId,
-        `"${t.company}"`,
-        t.mainService,
-        `"${t.subService}"`,
-        t.price,
-        t.paymentStatus,
-        t.duration,
-        `"${(t.description || '').replace(/"/g, '""')}"`
-    ]);
-
-    const csvContent = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute("download", `TaskFlow_Export_${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-}
-
-function exportCustomersToCSV() {
-    const data = appState.customers;
-    if (data.length === 0) { showAlert('No Data', 'Customer database is empty.', 'ℹ️'); return; }
-
-    const headers = ["Customer ID", "Company", "Postcode", "Service Status"];
-    const rows = data.map(c => [
-        c['CUSTOMER ID'],
-        `"${c['COMPANY']}"`,
-        c['POSTCODE'],
-        c['SERVICE STATUS']
-    ]);
-
-    const csvContent = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute("download", `TaskFlow_Customers_${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-}
-
-function renderCustomersTable() {
-    const tbody = document.getElementById('customers-table-body');
-    if (!tbody) {
-        if (typeof renderCustomersList === 'function') renderCustomersList();
-        else if (typeof applyCustomerFilters === 'function') applyCustomerFilters();
+    if (tickets.length === 0) {
+        container.innerHTML = '<div style="padding:2.5rem; text-align:center; color:var(--steel); font-size:0.85rem;">No service records match the selected filters.</div>';
         return;
     }
-    if(!tbody) return;
-    const searchEl = document.getElementById('customer-search');
-    const search = searchEl ? searchEl.value.toLowerCase() : '';
-    let filtered = appState.customers;
-    
-    // Apply chips filter
-    if (appState.currentCustomerFilter === 'contract') {
-        filtered = filtered.filter(c => c['SERVICE STATUS'] === 'Contract');
-    } else if (appState.currentCustomerFilter === 'none') {
-        filtered = filtered.filter(c => c['SERVICE STATUS'] !== 'Contract');
-    }
 
-    if (search) filtered = filtered.filter(c => (c['COMPANY'] || '').toLowerCase().includes(search) || (c['CUSTOMER ID'] || '').toLowerCase().includes(search));
-    
-    // Apply display limit
-    const limitVal = document.getElementById('customer-limit-filter')?.value || '100';
-    const totalFiltered = filtered.length;
-    if (limitVal !== 'all') {
-        const limit = parseInt(limitVal);
-        filtered = filtered.slice(0, limit);
-    }
+    // Display first 100 records for optimal performance
+    const displayList = tickets.slice(0, 100);
 
-    // Update stats
-    const statCount = document.getElementById('stat-customers-count');
-    if (statCount) statCount.innerText = limitVal === 'all' ? totalFiltered : `${filtered.length} / ${totalFiltered}`;
+    let html = '';
+    displayList.forEach(t => {
+        const isClosed = (t.status || '').toLowerCase() === 'closed';
+        const statusBadge = isClosed
+            ? '<span class="stamp confirmed" style="font-size:0.65rem; padding:2px 8px; border-radius:20px; background:#dcfce7; color:#15803d; border:1px solid #15803d;">CLOSED</span>'
+            : '<span class="stamp pending" style="font-size:0.65rem; padding:2px 8px; border-radius:20px; background:#fef3c7; color:#b45309; border:1px solid #b45309;">OPEN</span>';
 
+        const dateStr = (t.timestamp || '').split('T')[0] || (t.timestamp || '').split(' ')[0] || 'N/A';
+        const priceStr = parseFloat(t.price || 0) > 0 ? '£' + parseFloat(t.price).toFixed(2) : '£0.00';
 
-    tbody.innerHTML = filtered.map(c => `
-        <tr style="border-bottom: 1px solid var(--border-color);">
-            <td style="padding: 16px 20px;"><strong style="color:var(--primary)">${c['COMPANY'] || 'N/A'}</strong></td>
-            <td style="padding: 16px 20px;">${c['CUSTOMER ID'] || 'N/A'}</td>
-            <td style="padding: 16px 20px;">${c['POSTCODE'] || '0'}</td>
-            <td style="padding: 16px 20px;"><span class="badge ${c['SERVICE STATUS'] === 'Contract' ? 'badge-success' : 'badge-warning'}" style="${c['SERVICE STATUS'] === 'Contract' ? 'background:#10b981; color:white;' : ''}">${c['SERVICE STATUS'] || 'No Contract'}</span></td>
-            <td style="padding: 16px 20px; text-align: right;"><button class="btn" style="background:#f1f5f9; color:#1b4376; border:none; font-weight:700; display:inline-flex; align-items:center; gap:6px;" onclick="filterByCustomer('${c['COMPANY']}')"><i data-lucide="history" style="width: 14px; height: 14px;"></i> History</button></td>
-        </tr>
-    `).join('');
+        html += `
+        <div class="ledger-row" style="display:grid; grid-template-columns:100px 1.5fr 1fr 100px 100px 80px; align-items:center; padding:0.65rem 1rem; border-bottom:1px solid var(--line);">
+            <div class="ledger-ts" style="font-family:'IBM Plex Mono',monospace; font-size:0.75rem; color:var(--steel);">${dateStr}</div>
+            <div style="font-weight:700; color:var(--ink); font-size:0.85rem;">${t.company || 'Unknown'}</div>
+            <div style="font-size:0.8rem; color:var(--steel); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${t.mainService || ''}">${t.mainService || 'Support'}</div>
+            <div>${statusBadge}</div>
+            <div style="font-weight:700; color:var(--ink); font-size:0.85rem;">${priceStr}</div>
+            <div style="text-align:right;">
+                <button class="ticket-btn" onclick="showDetails('${t.id}')" style="padding:2px 8px; font-size:0.75rem; cursor:pointer;">View</button>
+            </div>
+        </div>
+        `;
+    });
+
+    container.innerHTML = html;
     if (window.lucide) lucide.createIcons();
 }
-
-function getStatusBadge(status) {
-    const colors = {
-        'Pending': {bg: '#fef3c7', text: '#d97706'},
-        'Paid': {bg: '#dcfce7', text: '#15803d'},
-        'Partially Paid': {bg: '#e0f2fe', text: '#0369a1'},
-        'Cancelled': {bg: '#f3f4f6', text: '#4b5563'},
-        'Refunded': {bg: '#f3e8ff', text: '#6b21a8'},
-        'Write Off': {bg: '#fee2e2', text: '#b91c1c'}
-    };
-    const c = colors[status] || {bg: '#fef3c7', text: '#d97706'};
-    return `<span class="badge" style="background:${c.bg}; color:${c.text}; padding:6px 12px; border-radius:50px; font-weight:700; font-size:11px; display:inline-block; border: 1px solid transparent;">${status.toUpperCase()}</span>`;
-}
-
 function renderInvoicesTable() {
     const tbody = document.getElementById('invoice-table-body');
-    const isPending = appState.currentInvoiceTab === 'pending';
-    const search = (document.getElementById('invoice-search')?.value || '').toLowerCase();
+    if (!tbody) return;
+
+    const tabFilter = document.getElementById('invoice-tab-filter')?.value || 'all';
+    const search = (document.getElementById('invoice-search')?.value || '').toLowerCase().trim();
     const start = document.getElementById('invoice-start-date')?.value;
     const end = document.getElementById('invoice-end-date')?.value;
 
-    let filtered = appState.tickets.filter(t => {
-        return t.price > 0 || t.paymentStatus === 'Chargeable' || ['Pending', 'Paid', 'Partially Paid', 'Cancelled', 'Refunded', 'Write Off'].includes(t.status);
-    });
-    if (appState.currentUserRole === 'User') {
-        filtered = filtered.filter(t => t.user === appState.currentUser);
+    let invoices = appState.invoices || [];
+
+    if (tabFilter === 'pending') {
+        invoices = invoices.filter(i => (i.status || '').toUpperCase() === 'PENDING');
+    } else if (tabFilter === 'invoiced' || tabFilter === 'paid') {
+        invoices = invoices.filter(i => (i.status || '').toUpperCase() !== 'PENDING');
     }
 
-    if (appState.currentInvoiceTab === 'pending') {
-        filtered = filtered.filter(t => t.status === 'Pending' || t.status === 'Logged');
-    } else if (appState.currentInvoiceTab === 'invoiced') {
-        filtered = filtered.filter(t => t.status !== 'Pending' && t.status !== 'Logged');
+    if (search) {
+        invoices = invoices.filter(i => 
+            (i.customer_name || '').toLowerCase().includes(search) ||
+            (i.id || '').toLowerCase().includes(search)
+        );
     }
-    
-    // Apply filters
-    if (search) filtered = filtered.filter(t => (t.company || '').toLowerCase().includes(search) || (t.dbId || '').toLowerCase().includes(search) || (t.subService || '').toLowerCase().includes(search));
-    if (start) filtered = filtered.filter(t => new Date(t.timestamp) >= new Date(start));
-    if (end) { const dEnd = new Date(end); dEnd.setHours(23,59,59); filtered = filtered.filter(t => new Date(t.timestamp) <= dEnd); }
 
-    let baseScoped = appState.tickets.filter(t => {
-        return t.price > 0 || t.paymentStatus === 'Chargeable' || ['Pending', 'Paid', 'Partially Paid', 'Cancelled', 'Refunded', 'Write Off'].includes(t.status);
-    });
-    if (appState.currentUserRole === 'User') baseScoped = baseScoped.filter(t => t.user === appState.currentUser);
+    if (start) invoices = invoices.filter(i => (i.issue_date || '') >= start);
+    if (end) invoices = invoices.filter(i => (i.issue_date || '') <= end);
 
-    const elPending = document.getElementById('count-pending');
-    if (elPending) elPending.innerText = baseScoped.filter(t => t.status === 'Pending' || t.status === 'Logged').length;
-    
-    const elInvoiced = document.getElementById('count-invoiced');
-    if (elInvoiced) elInvoiced.innerText = baseScoped.filter(t => t.status !== 'Pending' && t.status !== 'Logged').length;
-    
-    const canEdit = appState.currentUserRole === 'Admin' || appState.currentUserRole === 'Accounting';
-    
-    tbody.innerHTML = filtered.map(t => `
-        <tr style="border-bottom: 1px solid #f1f5f9;">
-            <td style="padding: 20px;"><div style="color:#2563eb; font-weight:700;">${t.dbId}</div><div style="color:#64748b; font-size:11px;">${new Date(t.timestamp).toLocaleDateString()}</div></td>
-            <td style="padding: 20px;"><div style="font-weight:700;">${t.company}</div><div style="color:#64748b; font-size:11px;">${t.postcode}</div></td>
-            <td style="padding: 20px;"><div style="font-weight:700;">${t.subService}</div><div style="color:#64748b; font-size:11px;">${t.mainService}</div></td>
-            <td style="padding: 20px;"><strong>£${parseFloat(t.price).toFixed(2)}</strong></td>
-            <td style="padding: 20px; text-align: right;"><div style="display: flex; align-items: center; justify-content: flex-end; gap: 12px;">
-                <button onclick="printInvoice('${t.id}')" title="Generate Invoice (Email/PDF)" style="background:none; border:none; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; color:#1e3a8a; width:28px; height:28px; border-radius:50%; transition: background-color 0.2s;"><i data-lucide="mail" style="width: 16px; height: 16px;"></i></button>
-                ${canEdit
-                    ? `<button onclick="editInvoice('${t.id}')" title="Edit Billing" style="background:none; border:none; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; color:#94a3b8; width:28px; height:28px; border-radius:50%; transition: background-color 0.2s;"><i data-lucide="edit-3" style="width: 16px; height: 16px;"></i></button>`
-                    : `<button onclick="showDetails('${t.id}')" title="View Details" style="background:none; border:none; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; color:#64748b; width:28px; height:28px; border-radius:50%; transition: background-color 0.2s;"><i data-lucide="eye" style="width: 16px; height: 16px;"></i></button>`}
-                ${getStatusBadge(t.status || 'Pending')}
-            </div></td>
+    if (invoices.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:2rem; color:var(--steel);">No invoices match filter.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = invoices.slice(0, 100).map(inv => {
+        const isPaid = (inv.status || '').toUpperCase() === 'PAID';
+        const statusBadge = isPaid
+            ? '<span class="stamp confirmed" style="font-size:0.7rem; padding:2px 8px; border-radius:20px; background:#dcfce7; color:#15803d; border:1px solid #15803d;">PAID</span>'
+            : '<span class="stamp pending" style="font-size:0.7rem; padding:2px 8px; border-radius:20px; background:#fef3c7; color:#b45309; border:1px solid #b45309;">PENDING</span>';
+
+        return `
+        <tr style="border-bottom: 1px solid var(--border-color, #e2e8f0);">
+            <td style="padding:12px 16px;">
+                <div style="font-weight:600; color:var(--ink);">${inv.issue_date || 'N/A'}</div>
+                <div style="font-family:'IBM Plex Mono',monospace; font-size:0.75rem; color:var(--steel);">${inv.id}</div>
+            </td>
+            <td style="padding:12px 16px; font-weight:700; color:var(--ink);">${inv.customer_name || 'Customer'}</td>
+            <td style="padding:12px 16px; color:var(--steel); font-size:0.85rem;">Quotation / Equipment & Service</td>
+            <td style="padding:12px 16px; font-weight:700; color:var(--ink);">£${parseFloat(inv.total || 0).toFixed(2)}</td>
+            <td style="padding:12px 16px; text-align:right;">
+                ${statusBadge}
+            </td>
         </tr>
-    `).join('');
-
+        `;
+    }).join('');
     if (window.lucide) lucide.createIcons();
 }
-
 // --- Modal Functions ---
 function editInvoice(id) {
     const r = appState.tickets.find(t => t.id == id); if (!r) return;
