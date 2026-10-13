@@ -3127,7 +3127,8 @@ window.renderWaitingJobs = function() {
 };
 
 // --- SYSTEM LOGGING FUNCTIONS ---
-const systemActivityLog = [];
+window.systemActivityLog = window.systemActivityLog || [];
+var systemActivityLog = window.systemActivityLog;
 
 function addSystemLog(action, description) {
     const logEntry = {
@@ -3409,8 +3410,8 @@ function renderDashboardActivity() {
     let entries = [];
     if (window.systemLogs && window.systemLogs.length > 0) {
         entries = window.systemLogs.slice(0, 5);
-    } else if (typeof systemActivityLog !== 'undefined' && systemActivityLog.length > 0) {
-        entries = systemActivityLog.slice(-5).reverse();
+    } else if (window.systemActivityLog && window.systemActivityLog.length > 0) {
+        entries = window.systemActivityLog.slice(-5).reverse();
     } else if (appState.tickets && appState.tickets.length > 0) {
         entries = appState.tickets.slice(0, 5).map(t => ({
             time: t.timestamp ? t.timestamp.slice(0, 16) : new Date().toLocaleDateString(),
