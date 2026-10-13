@@ -430,10 +430,11 @@ function renderTabContent(tabId) {
 // --- Data Table Rendering ---
 function renderDataTable() {
     const tbody = document.getElementById('data-table-body');
-    const search = document.getElementById('dataview-search').value.toLowerCase();
-    const start = document.getElementById('dataview-start-date').value;
-    const end = document.getElementById('dataview-end-date').value;
-    const payment = document.getElementById('dataview-payment-filter').value;
+    if (!tbody) return;
+    const search = document.getElementById('dataview-search')?.value?.toLowerCase() || '';
+    const start = document.getElementById('dataview-start-date')?.value || '';
+    const end = document.getElementById('dataview-end-date')?.value || '';
+    const payment = document.getElementById('dataview-payment-filter')?.value || 'all';
     const invStatus = document.getElementById('dataview-invoice-filter')?.value || 'all';
     const isUser = appState.currentUserRole === 'User';
     
