@@ -90,19 +90,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 btn.style.display = (appState.currentUserRole === 'Admin') ? 'flex' : 'none';
             }
         });
-    }
 
-    // Temporary probe for Organizations table
-    try {
-        console.log("[INSPECT] Fetching organizations table...");
-        const { data, error } = await sbClient.from('organizations').select('*').limit(3);
-        if (error) {
-            console.error("[INSPECT ERROR] Failed to fetch organizations:", error);
-        } else {
-            console.log("[INSPECT RESULT] Organizations:", JSON.stringify(data));
-        }
-    } catch (e) {
-        console.error("[INSPECT ERROR] Exception:", e);
+        if (typeof showTab === 'function') showTab(appState.activeTab || 'dashboard');
+        if (typeof updateDashboardKPIs === 'function') updateDashboardKPIs();
+        if (typeof renderDashboardSchedule === 'function') renderDashboardSchedule();
+        if (typeof renderDashboardActivity === 'function') renderDashboardActivity();
     }
 });
 

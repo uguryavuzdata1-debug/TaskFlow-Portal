@@ -501,6 +501,9 @@ function finishLogin() {
         if (document.getElementById('btn-invoices')) document.getElementById('btn-invoices').style.display = 'none';
     } else {
         if (typeof showTab === 'function') showTab('dashboard');
+        if (typeof updateDashboardKPIs === 'function') updateDashboardKPIs();
+        if (typeof renderDashboardSchedule === 'function') renderDashboardSchedule();
+        if (typeof renderDashboardActivity === 'function') renderDashboardActivity();
         
         if (document.getElementById('btn-dashboard')) document.getElementById('btn-dashboard').style.display = 'flex';
         if (document.getElementById('btn-customers')) document.getElementById('btn-customers').style.display = 'flex';

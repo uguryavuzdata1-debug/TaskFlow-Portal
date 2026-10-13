@@ -492,8 +492,16 @@ function showTab(tabId) {
     const btn = document.getElementById(`btn-${tabId}`);
     if (btn) btn.classList.add('active');
     
+    if (tabId === 'dashboard') {
+        if (typeof updateDashboardKPIs === 'function') updateDashboardKPIs();
+        if (typeof renderDashboardSchedule === 'function') renderDashboardSchedule();
+        if (typeof renderDashboardActivity === 'function') renderDashboardActivity();
+    }
     if (tabId === 'calendar' && typeof renderCalendar !== 'undefined') renderCalendar();
     if (tabId === 'waiting' && typeof renderWaitingJobs !== 'undefined') renderWaitingJobs();
+    if (tabId === 'customers' && typeof renderCustomersTable !== 'undefined') renderCustomersTable();
+    if (tabId === 'invoices' && typeof renderInvoicesTable !== 'undefined') renderInvoicesTable();
+    if (tabId === 'dataview' && typeof renderDataTable !== 'undefined') renderDataTable();
     
     if (tabId === 'settings') {
         updateDataStats(); // Update summary cards when settings is shown
@@ -534,6 +542,7 @@ function showTab(tabId) {
     renderTabContent(tabId);
     if (window.lucide) lucide.createIcons();
 }
+window.showTab = showTab;
 
 function showInvoiceTab(tabId) {
     appState.currentInvoiceTab = tabId;
@@ -1968,12 +1977,30 @@ function renderServiceSelects() {
 }
 
 function renderAll() {
+    if (typeof updateDashboardKPIs === 'function') updateDashboardKPIs();
+    if (typeof renderDashboardSchedule === 'function') renderDashboardSchedule();
+    if (typeof renderDashboardActivity === 'function') renderDashboardActivity();
     renderServiceSelects();
     renderDataTable();
     renderCustomersTable();
     renderInvoicesTable();
+    if (typeof renderWaitingJobs === 'function') renderWaitingJobs();
     updateDataStats();
+
+    const dl = document.getElementById('vtiger-customer-list');
+    const custSource = (typeof allCustomersCache !== 'undefined' && allCustomersCache.length > 0) ? allCustomersCache : (appState.customers || []);
+    if (dl && custSource.length > 0) {
+        dl.innerHTML = custSource.map(c => {
+            const orgName = c.organization_name || c.COMPANY || '';
+            const orgId = c.organization_number || c['CUSTOMER ID'] || '';
+            const postcode = c.billing_postal_code || c.POSTCODE || '';
+            const label = `${orgName} (${orgId}, ${postcode})`;
+            return `<option value="${label}">`;
+        }).join('');
+    }
+    if (window.lucide) lucide.createIcons();
 }
+window.renderAll = renderAll;
 function calculatePrice() {
     const main = document.getElementById('f-service-type').value; 
     const sub = document.getElementById('f-sub-service').value; 
@@ -2420,21 +2447,6 @@ async function markAsInvoiced(id) {
     });
 }
 function filterByCustomer(name) { showTab('dataview'); document.getElementById('dataview-search').value = name; renderDataTable(); }
-function renderAll() { 
-    renderTabContent(appState.activeTab); 
-    const dl = document.getElementById('vtiger-customer-list');
-    const custSource = (typeof allCustomersCache !== 'undefined' && allCustomersCache.length > 0) ? allCustomersCache : (appState.customers || []);
-    if (dl && custSource.length > 0) {
-        dl.innerHTML = custSource.map(c => {
-            const orgName = c.organization_name || c.COMPANY || '';
-            const orgId = c.organization_number || c['CUSTOMER ID'] || '';
-            const postcode = c.billing_postal_code || c.POSTCODE || '';
-            const label = `${orgName} (${orgId}, ${postcode})`;
-            return `<option value="${label}">`;
-        }).join('');
-    }
-    if (window.lucide) lucide.createIcons();
-}
 
 // --- App Initialization & Auth ---
 
@@ -3446,35 +3458,48 @@ window.renderWaitingJobs = function() {
     if (!container) return;
 
     const tickets = appState.tickets || [];
-    
-    // Filter waiting jobs (NOT completed and NOT invoiced)
-    const waitingJobs = tickets.filter(t => {
-        const stat = (t.status || '').toLowerCase();
-        const isStatusCompleted = (stat === 'completed' || stat === 'completed' || stat === 'tamamland' || t.invoiced === true);
-        return !isStatusCompleted;
-    });
+    const appointments = appState.appointments || [];
 
-    if (waitingJobs.length === 0) {
+    // Filter open tickets
+    const openTickets = tickets.filter(t => {
+        const stat = (t.status || '').toLowerCase();
+        return stat !== 'closed' && stat !== 'completed' && stat !== 'tamamlandı' && t.invoiced !== true;
+    }).map(t => ({
+        id: t.id,
+        dateStr: t.invoiceDate || (t.timestamp ? t.timestamp.split('T')[0] : 'N/A'),
+        timeStr: t.startTime || '09:00',
+        company: t.company || 'Unknown',
+        service: t.mainService ? `${t.mainService} - Ticket` : 'Ticket',
+        postcode: t.postcode || 'N/A',
+        status: (t.status || 'OPEN').toUpperCase(),
+        isAppt: false
+    }));
+
+    // Map appointments from Turso
+    const apptItems = appointments.map(a => ({
+        id: String(a.id),
+        dateStr: a.date || 'N/A',
+        timeStr: a.time || '09:00',
+        company: a.customer_name || a.company || 'Customer Appointment',
+        service: a.service_type || 'Appointment',
+        postcode: a.postcode || 'N/A',
+        status: (a.status || 'PENDING').toUpperCase(),
+        isAppt: true
+    }));
+
+    const combined = [...apptItems, ...openTickets];
+
+    if (combined.length === 0) {
         container.innerHTML = '<div style="padding:40px; text-align:center; color:#66707C; background:white; border-radius:12px; border:1px solid #FBF9F3;">No pending appointments found.</div>';
         return;
     }
 
     // Sort by Date and Time
-    const sortedJobs = waitingJobs.sort((a, b) => {
-        const dateA = a.invoiceDate || '';
-        const dateB = b.invoiceDate || '';
-        if (dateA !== dateB) return dateA.localeCompare(dateB);
-        return (a.startTime || '').localeCompare(b.startTime || '');
+    combined.sort((a, b) => {
+        const da = (a.dateStr || '') + ' ' + (a.timeStr || '');
+        const db = (b.dateStr || '') + ' ' + (b.timeStr || '');
+        return da.localeCompare(db);
     });
-
-    const categoryNames = {
-        'S1': 'MENU UPDATE',
-        'S2': 'CREDIT CARD',
-        'S3': 'DATA RESET',
-        'S4': 'SERVICE',
-        'S5': 'OTHER',
-        'S6': 'TILL SETUP'
-    };
 
     let html = `
     <div class="table-wrap" style="background:white; border-radius:12px; border:1px solid #FBF9F3; overflow:hidden;">
@@ -3492,33 +3517,34 @@ window.renderWaitingJobs = function() {
             <tbody>
     `;
 
-    sortedJobs.forEach(t => {
-        const catName = categoryNames[t.mainService] || '';
-        const displayService = t.mainService ? `${t.mainService} - ${catName}` : 'N/A';
-        const dateStr = t.invoiceDate || 'N/A';
-        const timeStr = t.startTime || '00:00';
+    combined.forEach(t => {
+        const isConfirmed = t.status === 'CONFIRMED' || t.status === 'HELD' || t.status === 'COMPLETED';
+        const statusBadge = isConfirmed
+            ? '<span style="font-size:0.75rem; font-weight:800; padding:4px 8px; border-radius:50px; background:#dcfce7; color:#15803d;">CONFIRMED</span>'
+            : '<span style="font-size:0.75rem; font-weight:800; padding:4px 8px; border-radius:50px; background:#fef3c7; color:#b45309;">PLANNED</span>';
 
         html += `
-            <tr style="border-bottom:1px solid #FBF9F3; hover:background:#FBF9F3;">
+            <tr style="border-bottom:1px solid #FBF9F3;">
                 <td style="padding:15px; font-weight:600; color:#1D2430;">
                     <div style="display:flex; flex-direction:column;">
-                        <span>${dateStr}</span>
-                        <span style="font-size:0.75rem; color:#66707C;">${timeStr}</span>
+                        <span>${t.dateStr}</span>
+                        <span style="font-size:0.75rem; color:#66707C;">${t.timeStr}</span>
                     </div>
                 </td>
-                <td style="padding:15px; font-weight:700; color:#1D2430;">${t.company || 'Unknown'}</td>
+                <td style="padding:15px; font-weight:700; color:#1D2430;">${t.company}</td>
                 <td style="padding:15px;">
-                    <span style="font-size:0.85rem; color:#66707C; background:#FBF9F3; padding:4px 10px; border-radius:6px;">${displayService}</span>
+                    <span style="font-size:0.85rem; color:#66707C; background:#FBF9F3; padding:4px 10px; border-radius:6px;">${t.service}</span>
                 </td>
-                <td style="padding:15px; color:#66707C; font-family:monospace;">${t.postcode || 'N/A'}</td>
+                <td style="padding:15px; color:#66707C; font-family:monospace;">${t.postcode}</td>
                 <td style="padding:15px;">
-                    <span style="font-size:0.75rem; font-weight:800; padding:4px 8px; border-radius:50px; background:${t.paymentStatus === 'Chargeable' ? '#fee2e2; color:#B5563A' : '#dcfce7; color:#4F7A5C'}">
-                        ${(t.paymentStatus || 'PENDING').toUpperCase()}
-                    </span>
+                    ${statusBadge}
                 </td>
                 <td style="padding:15px; text-align:right;">
-                    <button onclick="openAppointmentView('${t.id}')" class="btn" style="background:var(--primary); color:white; border:none; padding:6px 12px; border-radius:6px; font-size:12px; cursor:pointer;">
-                        View Details
+                    <button onclick="completeJob('${t.id}')" class="btn" style="background:#15803d; color:white; border:none; padding:6px 12px; border-radius:6px; font-size:12px; cursor:pointer; margin-right:6px;">
+                        Complete
+                    </button>
+                    <button onclick="generateInvoiceFromTicket('${t.id}')" class="btn" style="background:var(--primary); color:white; border:none; padding:6px 12px; border-radius:6px; font-size:12px; cursor:pointer;">
+                        Invoice
                     </button>
                 </td>
             </tr>
@@ -3848,17 +3874,6 @@ function renderDashboardActivity() {
     list.innerHTML = html;
 }
 
-// Call updateDashboardKPIs when tab is switched
-const originalShowTab = showTab;
-showTab = function(tabId) {
-    originalShowTab(tabId);
-    if(tabId === 'dashboard') {
-        updateDashboardKPIs();
-    } else if(tabId === 'waiting') {
-        renderWaitingJobs();
-    }
-}
-
 // ==========================================
 // WAITING JOBS & APPOINTMENTS TABLE RENDERER
 // ==========================================
@@ -3904,3 +3919,11 @@ window.renderWaitingList = renderWaitingList;
 window.updateDashboardKPIs = updateDashboardKPIs;
 window.renderDashboardSchedule = renderDashboardSchedule;
 window.renderDashboardActivity = renderDashboardActivity;
+window.showTab = showTab;
+
+// Auto-run dashboard render if appState is already populated
+if (window.appState && ((appState.tickets && appState.tickets.length > 0) || (appState.customers && appState.customers.length > 0))) {
+    if (typeof updateDashboardKPIs === 'function') updateDashboardKPIs();
+    if (typeof renderDashboardSchedule === 'function') renderDashboardSchedule();
+    if (typeof renderDashboardActivity === 'function') renderDashboardActivity();
+}
