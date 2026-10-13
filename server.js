@@ -87,7 +87,7 @@ app.post('/api/logs', async (req, res) => {
 // CUSTOMERS
 app.get('/api/customers', async (req, res) => {
   try {
-    const result = await db.execute('SELECT * FROM customers');
+    const result = await db.execute('SELECT * FROM vt_customers');
     res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -98,7 +98,7 @@ app.post('/api/customers', async (req, res) => {
   try {
     const customers = Array.isArray(req.body) ? req.body : [req.body];
     const queries = customers.map(c => ({
-      sql: `INSERT INTO customers (
+      sql: `INSERT INTO vt_customers (
         id, organization_name, organization_number, industry, created_time, assigned_to, 
         modified_time, billing_address, billing_city, billing_postal_code, ownership, 
         primary_email, primary_phone, description
@@ -452,9 +452,10 @@ app.post('/api/settings', async (req, res) => {
 // NEW MODULES (Products, Contacts, Contracts, Comments, Documents)
 // ==========================================
 const createGenericEndpoints = (moduleName) => {
+  const tableName = 'vt_' + moduleName;
   app.get(`/api/${moduleName}`, async (req, res) => {
     try {
-      const result = await db.execute(`SELECT * FROM ${moduleName}`);
+      const result = await db.execute(`SELECT * FROM ${tableName}`);
       const data = result.rows.map(r => {
         try { return JSON.parse(r.data); } catch(e) { return {}; }
       });
@@ -468,7 +469,7 @@ const createGenericEndpoints = (moduleName) => {
     try {
       const items = Array.isArray(req.body) ? req.body : [req.body];
       const queries = items.map(item => ({
-        sql: `INSERT INTO ${moduleName} (id, data, modifiedtime) VALUES (?, ?, ?) 
+        sql: `INSERT INTO ${tableName} (id, data, modifiedtime) VALUES (?, ?, ?) 
               ON CONFLICT(id) DO UPDATE SET data=excluded.data, modifiedtime=excluded.modifiedtime`,
         args: [item.id, JSON.stringify(item), item.modifiedtime || '']
       }));
