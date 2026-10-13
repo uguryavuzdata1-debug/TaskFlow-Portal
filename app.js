@@ -505,17 +505,7 @@ function showTab(tabId) {
     if (tabId === 'preferences' || tabId === 'settings') {
         if (typeof renderPreferencesPage === 'function') renderPreferencesPage();
     }
-        // Admin panel: populate Personnel Directory and activate first tab button
-        if (typeof renderAdminUsersList === 'function') {
-            setTimeout(function() { renderAdminUsersList(); }, 100);
-        }
-        // Activate first admin tab button
-        var firstAdminTab = document.querySelector('.admin-tab-btn');
-        if (firstAdminTab && !firstAdminTab.style.borderBottomColor.includes('var(--ink)')) {
-            firstAdminTab.style.borderBottomColor = 'var(--ink)';
-            firstAdminTab.style.color = 'var(--ink)';
-        }
-    }
+
 
     // Admin Panel tab: populate Personnel Directory on load
     if (tabId === 'admin') {

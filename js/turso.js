@@ -413,9 +413,9 @@ function createTursoSbAdapter() {
                         let actualTable = table;
                         if (table === 'organizations' || table === 'vtigercrm_organizations' || table === 'customers') {
                             actualTable = 'vt_customers';
-                        } else if (table === 'vt_tickets') {
+                        } else if (table === 'vt_tickets' || table === 'tickets') {
                             actualTable = 'vt_tickets';
-                        } else if (table === 'vt_quotes') {
+                        } else if (table === 'vt_quotes' || table === 'quotes') {
                             actualTable = 'vt_quotes';
                         } else if (table === 'records') {
                             actualTable = 'records';
@@ -476,12 +476,12 @@ function createTursoSbAdapter() {
                                     await turso.addRecord(r);
                                 }
                                 resultData = insertData;
-                            } else if (actualtable === 'vt_tickets' && insertData) {
+                            } else if ((actualTable === 'vt_tickets' || actualTable === 'tickets') && insertData) {
                                 for (const t of insertData) {
                                     await turso.addTicket(t);
                                 }
                                 resultData = insertData;
-                            } else if (actualtable === 'vt_quotes' && insertData) {
+                            } else if ((actualTable === 'vt_quotes' || actualTable === 'quotes') && insertData) {
                                 for (const q of insertData) {
                                     await turso.addQuote(q);
                                 }

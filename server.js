@@ -281,10 +281,10 @@ app.get('/api/tickets', async (req, res) => {
   try {
     const { parent_id, customer_id } = req.query;
     const cid = parent_id || customer_id;
-    let sql = 'SELECT * FROM tickets ORDER BY createdtime DESC';
+    let sql = 'SELECT * FROM vt_tickets ORDER BY createdtime DESC';
     let args = [];
     if (cid) {
-      sql = 'SELECT * FROM tickets WHERE parent_id = ? ORDER BY createdtime DESC';
+      sql = 'SELECT * FROM vt_tickets WHERE parent_id = ? ORDER BY createdtime DESC';
       args = [cid];
     }
     const result = await db.execute({ sql, args });
@@ -300,7 +300,7 @@ app.post('/api/tickets', async (req, res) => {
     const queries = items.map(t => {
       const id = t.id || ('TCK-' + Date.now() + '-' + Math.floor(Math.random()*1000));
       return {
-        sql: `INSERT INTO tickets (
+        sql: `INSERT INTO vt_tickets (
           id, ticket_no, ticket_title, ticketstatus, ticketpriorities, ticketseverities,
           parent_id, customer_name, assigned_user_id, createdtime, modifiedtime, solution, description
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -337,7 +337,7 @@ app.post('/api/tickets', async (req, res) => {
 
 app.delete('/api/tickets/:id', async (req, res) => {
   try {
-    await db.execute({ sql: 'DELETE FROM tickets WHERE id = ?', args: [req.params.id] });
+    await db.execute({ sql: 'DELETE FROM vt_tickets WHERE id = ?', args: [req.params.id] });
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -349,10 +349,10 @@ app.get('/api/quotes', async (req, res) => {
   try {
     const { account_id, customer_id } = req.query;
     const cid = account_id || customer_id;
-    let sql = 'SELECT * FROM quotes ORDER BY createdtime DESC';
+    let sql = 'SELECT * FROM vt_quotes ORDER BY createdtime DESC';
     let args = [];
     if (cid) {
-      sql = 'SELECT * FROM quotes WHERE account_id = ? ORDER BY createdtime DESC';
+      sql = 'SELECT * FROM vt_quotes WHERE account_id = ? ORDER BY createdtime DESC';
       args = [cid];
     }
     const result = await db.execute({ sql, args });
@@ -368,7 +368,7 @@ app.post('/api/quotes', async (req, res) => {
     const queries = items.map(q => {
       const id = q.id || ('QUO-' + Date.now() + '-' + Math.floor(Math.random()*1000));
       return {
-        sql: `INSERT INTO quotes (
+        sql: `INSERT INTO vt_quotes (
           id, quote_no, subject, quotestage, validtill, hdnGrandTotal,
           account_id, customer_name, assigned_user_id, createdtime, modifiedtime, details
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -403,7 +403,7 @@ app.post('/api/quotes', async (req, res) => {
 
 app.delete('/api/quotes/:id', async (req, res) => {
   try {
-    await db.execute({ sql: 'DELETE FROM quotes WHERE id = ?', args: [req.params.id] });
+    await db.execute({ sql: 'DELETE FROM vt_quotes WHERE id = ?', args: [req.params.id] });
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -516,6 +516,75 @@ app.delete('/api/sync-logs/clear', async (req, res) => {
   }
 });
 
+// ==========================================
+// TELEGRAM DAILY REPORT (17:50 SCHEDULE)
+// ==========================================
+const { runReport, getLocalDateString, buildReportMessage, fetchDailyData } = require('./telegram_reporter');
+
+let lastReportSentDate = null;
+
+// Status & Configuration Check
+app.get('/api/telegram/status', (req, res) => {
+  res.json({
+    configured: !!(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID),
+    hasToken: !!process.env.TELEGRAM_BOT_TOKEN,
+    hasChatId: !!process.env.TELEGRAM_CHAT_ID,
+    scheduledTime: '17:50',
+    lastSentDate: lastReportSentDate
+  });
+});
+
+// Preview Report Text
+app.get('/api/telegram/preview', async (req, res) => {
+  try {
+    const targetDate = req.query.date || getLocalDateString();
+    const data = await fetchDailyData(targetDate);
+    const message = buildReportMessage(data);
+    res.json({ success: true, date: targetDate, message, data });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Manual Trigger / Send Now
+app.post('/api/telegram/send-report', async (req, res) => {
+  try {
+    const targetDate = req.body?.date || req.query?.date || getLocalDateString();
+    const dryRun = req.body?.dryRun === true;
+    const result = await runReport({ date: targetDate, dryRun });
+    if (result.success && !dryRun) {
+      lastReportSentDate = targetDate;
+    }
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 17:50 Internal Background Scheduler
+setInterval(async () => {
+  try {
+    const now = new Date();
+    const hours = now.getHours();
+    const minutes = now.getMinutes();
+    const today = getLocalDateString(now);
+
+    // Trigger at 17:50 (within 17:50 - 17:54 window once per day)
+    if (hours === 17 && minutes >= 50 && minutes < 55) {
+      if (lastReportSentDate !== today) {
+        console.log(`[SCHEDULE] Saat 17:50 - Gün sonu Telegram raporu tetikleniyor (${today})...`);
+        const res = await runReport({ date: today });
+        if (res.success) {
+          lastReportSentDate = today;
+          console.log(`[SCHEDULE] Gün sonu raporu saat 17:50 itibariyle başarıyla gönderildi.`);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[SCHEDULE ERROR] 17:50 rapor gönderim hatası:', err.message);
+  }
+}, 30 * 1000); // Check every 30 seconds
+
 
 // SERVE STATIC FILES
 const path = require('path');
@@ -525,5 +594,7 @@ app.use(express.static(__dirname));
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`TaskFlow Turso API Server running on port ${PORT}`);
+  console.log(`[TELEGRAM] Gün sonu raporlama zamanlayıcısı aktif (Her gün 17:50)`);
 });
+
 
