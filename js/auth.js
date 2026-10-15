@@ -284,42 +284,31 @@ async function savePrefEmail() {
 // Default şifre 1234'tür. Kullanıcı istediği zaman şifresini değiştirebilir.
 // ============================================================
 async function savePrefPassword() {
-    const newPass     = document.getElementById('pref-new-pass')?.value;
+    const newPass = document.getElementById('pref-new-pass')?.value;
     const confirmPass = document.getElementById('pref-confirm-pass')?.value;
 
-    if (!newPass || !confirmPass) { showToast('Lütfen her iki alanı da doldurun.', 'error'); return; }
-    if (newPass !== confirmPass)  { showToast('Şifreler eşleşmiyor!', 'error'); return; }
-    if (newPass.length < 4)       { showToast('Şifre en az 4 karakter olmalı.', 'error'); return; }
-
-    let u = appState?.currentUserData;
-    let userId = u?.id;
-    if (!userId) {
-        const auth = appState?.settings?.users_auth || {};
-        const match = Object.values(auth).find(x => x.username === appState.currentUser || x.full_name === appState.currentUser);
-        if (match && match.id) {
-            userId = match.id;
-            appState.currentUserData = match;
-        }
+    if (!newPass || newPass.length < 3) {
+        showToast('Yeni şifre en az 3 karakter olmalıdır.', 'error');
+        return;
     }
-    if (!userId) userId = 'U-001';
+    if (newPass !== confirmPass) {
+        showToast('Şifreler birbiriyle eşleşmiyor!', 'error');
+        return;
+    }
 
     try {
-        if (window.turso && typeof window.turso.execute === 'function') {
-            await window.turso.execute('UPDATE users SET password = ?, password_hash = ? WHERE id = ?', [newPass, newPass, userId]);
-        } else {
-            await sbClient.from('users')
-                .update({ password: newPass, password_hash: newPass })
-                .eq('id', userId);
-        }
-
-        // Lokal state güncelle
-        if (appState.currentUserData) appState.currentUserData.password = newPass;
-        if (appState.settings && appState.settings.users_auth) {
-            Object.values(appState.settings.users_auth).forEach(function(u) {
-                if (u && (u.id === userId || u.username === appState.currentUser || u.full_name === appState.currentUser)) {
-                    u.password = newPass;
-                }
-            });
+        const token = localStorage.getItem('taskflow_token') || sessionStorage.getItem('taskflow_token');
+        const res = await fetch('/api/auth/change-password', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': token ? ('Bearer ' + token) : ''
+            },
+            body: JSON.stringify({ newPassword: newPass })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+            throw new Error(data.error || 'Şifre güncellenemedi.');
         }
 
         // Form alanlarını temizle
@@ -344,12 +333,10 @@ async function handleLogin() {
     const pass = document.getElementById('login-password').value;
     
     if (!user || !pass) { 
-        if (typeof showToast === 'function') showToast('Please enter username and password.', 'error'); 
-        else alert('Please enter username and password.');
+        if (typeof showToast === 'function') showToast('Lütfen kullanıcı adı ve şifre giriniz.', 'error'); 
+        else alert('Lütfen kullanıcı adı ve şifre giriniz.');
         return; 
     }
-
-    const userUpper = user.toUpperCase();
 
     // Publish login event to the bus
     if (window.globalEventBus) {
@@ -358,79 +345,52 @@ async function handleLogin() {
             payload: { username: user }
         });
     }
-    
-    // Master bypass for ADMIN
-    if (userUpper === 'ADMIN' && (pass === 'admin' || pass === '1234')) {
-        console.log("Master bypass triggered");
-        appState.currentUser = 'ADMIN';
-        appState.currentUserRole = 'Admin';
-        appState.currentUserData = { id: 'U-001', username: 'admin', full_name: 'System Admin', role: 'Admin' };
+
+    try {
+        const response = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: user, password: pass })
+        });
+
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+            if (typeof showToast === 'function') {
+                showToast(data.error || 'Giriş başarısız. Bilgilerinizi kontrol edin.', 'error');
+            } else {
+                alert(data.error || 'Giriş başarısız.');
+            }
+            return;
+        }
+
+        const rememberMe = document.getElementById('login-remember');
+        if (rememberMe && rememberMe.checked) {
+            localStorage.setItem('taskflow_token', data.token);
+            localStorage.setItem('taskflow_user', data.user.full_name || data.user.username);
+        } else {
+            sessionStorage.setItem('taskflow_token', data.token);
+            localStorage.removeItem('taskflow_token');
+            localStorage.removeItem('taskflow_user');
+        }
+
+        appState.currentUser = data.user.full_name || data.user.username;
+        appState.currentUserRole = data.user.role || 'User';
+        appState.currentUserData = data.user;
         
         finishLogin();
-        return;
-    } 
 
-    const auth = appState.settings?.users_auth || {};
-    let userData = auth[user] || auth[user.toLowerCase()] || auth[userUpper] || Object.values(auth).find(u => 
-        (u.username && u.username.toUpperCase() === userUpper) ||
-        (u.full_name && u.full_name.toUpperCase() === userUpper) ||
-        (u.email && u.email.toUpperCase() === userUpper)
-    );
-
-    // If not found in memory, query Turso DB directly
-    if (!userData && window.turso && typeof window.turso.getUsers === 'function') {
-        try {
-            const dbUsers = await window.turso.getUsers();
-            if (dbUsers && dbUsers.length > 0) {
-                const match = dbUsers.find(u => 
-                    (u.username && u.username.toUpperCase() === userUpper) ||
-                    (u.full_name && u.full_name.toUpperCase() === userUpper) ||
-                    (u.email && u.email.toUpperCase() === userUpper)
-                );
-                if (match) {
-                    userData = {
-                        id: match.id,
-                        username: match.username || (match.full_name ? match.full_name.toLowerCase().replace(/\s+/g, '') : match.id),
-                        full_name: match.full_name,
-                        role: match.role || 'User',
-                        password: match.password || '1234',
-                        status: match.status || 'ACTIVE'
-                    };
-                    if (!appState.settings.users_auth) appState.settings.users_auth = {};
-                    appState.settings.users_auth[userData.username] = userData;
-                    appState.settings.users_auth[userData.username.toLowerCase()] = userData;
-                    if (userData.full_name) {
-                        appState.settings.users_auth[userData.full_name] = userData;
-                    }
-                }
-            }
-        } catch (err) {
-            console.warn('[handleLogin] Turso fallback query error:', err);
+        // Oturum açıldıktan sonra canlı verileri yükle
+        if (typeof initApp === 'function') {
+            await initApp();
+        }
+    } catch (err) {
+        console.error('[handleLogin Error]', err);
+        if (typeof showToast === 'function') {
+            showToast('Sunucu bağlantı hatası: ' + err.message, 'error');
+        } else {
+            alert('Sunucu bağlantı hatası: ' + err.message);
         }
     }
-
-    if (!userData) {
-        console.error("User not found in auth list:", user);
-        if (typeof showToast === 'function') showToast('User not found.', 'error');
-        return;
-    }
-
-    const expectedPass = userData.password || '1234';
-    if (expectedPass !== pass) {
-        if (typeof showToast === 'function') showToast('Incorrect password.', 'error');
-        return;
-    }
-
-    if (userData.active === false || userData.status === 'INACTIVE') {
-        if (typeof showToast === 'function') showToast('Account is deactivated.', 'error');
-        return;
-    }
-
-    appState.currentUser = userData.full_name || userData.username || user;
-    appState.currentUserRole = userData.role || 'User';
-    appState.currentUserData = userData;
-    
-    finishLogin();
 }
 
 function finishLogin() {
@@ -534,6 +494,8 @@ function logout() {
     if (main) main.classList.add('hidden');
     
     localStorage.removeItem('taskflow_user');
+    localStorage.removeItem('taskflow_token');
+    sessionStorage.removeItem('taskflow_token');
     
     document.getElementById('login-username').value = '';
     document.getElementById('login-password').value = '';

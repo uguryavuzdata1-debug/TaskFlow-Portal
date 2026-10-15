@@ -314,6 +314,11 @@
     </button>
 </div>
   <div style="display: flex; align-items: center; margin-left: auto; gap: 10px;">
+    <button onclick="openCommandPalette()" title="Hızlı Arama (Ctrl + K)" style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; background: rgba(255, 255, 255, 0.9); border: 1px solid rgba(100, 116, 139, 0.25); border-radius: 20px; font-size: 0.78rem; font-weight: 600; color: #334155; cursor: pointer; transition: all 0.2s ease;">
+      <i data-lucide="search" style="width: 14px; height: 14px; color: #64748b;"></i>
+      <span>Ara</span>
+      <kbd style="font-size: 0.65rem; background: #e2e8f0; padding: 1px 5px; border-radius: 4px; color: #64748b; font-family: monospace;">Ctrl+K</kbd>
+    </button>
     <div class="sync-status-badge" id="sync-status-badge" onclick="showSyncStatusModal()" title="CRM Senkronizasyon Durumu (Detaylar için tıklayın)" style="display: flex; align-items: center; gap: 7px; padding: 6px 14px; background: rgba(34, 197, 94, 0.08); border: 1px solid rgba(34, 197, 94, 0.25); border-radius: 20px; font-size: 0.78rem; font-weight: 600; color: #166534; cursor: pointer; transition: all 0.2s ease; user-select: none;">
       <span class="sync-pulse-dot pulse" id="sync-pulse-dot" style="width: 8px; height: 8px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.3); display: inline-block;"></span>
       <span id="sync-status-text">CRM: Aktif</span>
@@ -527,7 +532,7 @@
             <div class="dash-kpi jobs" onclick="showTab('waiting')" style="cursor:pointer;"><div class="stub"></div><div class="lbl">OPEN TICKETS</div><div class="num" id="kpi-tickets">0</div><div class="delta">Appointments</div></div>
             <div class="dash-kpi pending" onclick="showTab('invoices')" style="cursor:pointer;"><div class="stub"></div><div class="lbl">PENDING INVOICES</div><div class="num" id="kpi-invoices">0</div><div class="delta">Open invoice</div></div>
             <div class="dash-kpi overdue"><div class="stub"></div><div class="lbl">ACTIVE CUSTOMERS</div><div class="num" id="kpi-customers">0</div><div class="delta down">Registered business</div></div>
-            <div class="dash-kpi revenue" onclick="toggleMainForm('category')" style="cursor:pointer; background:var(--ink);"><div class="stub" style="border-color:var(--steel);"></div><div class="lbl" style="color:var(--steel);">NEW APPOINTMENT</div><div class="num" style="color:var(--paper); font-family:'IBM Plex Sans',sans-serif; font-size:1.4rem; padding-top:0.4rem;">Create +</div><div class="delta" style="color:var(--steel);">Start a new ticket</div></div>
+            <div class="dash-kpi revenue" onclick="toggleMainForm('category')" style="cursor:pointer; background:var(--ink);"><div class="stub" style="border-color:var(--steel);"></div><div class="lbl" style="color:var(--steel);">CREATE TICKET</div><div class="num" style="color:var(--paper); font-family:'IBM Plex Sans',sans-serif; font-size:1.4rem; padding-top:0.4rem;">Create +</div><div class="delta" style="color:var(--steel);">Start a new ticket</div></div>
           </div>
 
           <div class="board">
@@ -563,15 +568,20 @@
           <div class="tile-title">MENU UPDATE</div>
           <div class="tile-desc">Update menu items, prices, or layouts.</div>
         </div>
-        <div class="tile" onclick="selectCategory('S6', 'PROGRAMMING')">
-          <div class="tile-icon" style="background: var(--paper);"><i data-lucide="code-2" style="color: var(--blue); width: 24px; height: 24px;"></i></div>
-          <div class="tile-title">PROGRAMMING</div>
-          <div class="tile-desc">Configure or update till databases.</div>
+        <div class="tile" onclick="selectCategory('S6', 'TILL SETUP')">
+          <div class="tile-icon" style="background: #eff6ff;"><i data-lucide="monitor" style="color: #2563eb; width: 24px; height: 24px;"></i></div>
+          <div class="tile-title">TILL SETUP</div>
+          <div class="tile-desc">Till system setup, OS images, databases & scales.</div>
         </div>
-        <div class="tile" onclick="selectCategory('S6', 'IMAGING')">
-          <div class="tile-icon" style="background: var(--paper);"><i data-lucide="monitor" style="color: var(--green); width: 24px; height: 24px;"></i></div>
-          <div class="tile-title">IMAGING</div>
-          <div class="tile-desc">Operating system installations and system images.</div>
+        <div class="tile" onclick="selectCategory('S8', 'SOFTWARING')">
+          <div class="tile-icon" style="background: #fdf4ff;"><i data-lucide="layers" style="color: #c026d3; width: 24px; height: 24px;"></i></div>
+          <div class="tile-title">SOFTWARING</div>
+          <div class="tile-desc">HandHeld, Kiosk, Online, and Tablet apps.</div>
+        </div>
+        <div class="tile" onclick="selectCategory('S9', 'HARDWARE')">
+          <div class="tile-icon" style="background: #fffbeb;"><i data-lucide="scale" style="color: #d97706; width: 24px; height: 24px;"></i></div>
+          <div class="tile-title">HARDWARE</div>
+          <div class="tile-desc">Cas CN1, Barcode Label Scale, and hardware programming.</div>
         </div>
         <div class="tile" onclick="selectCategory('S2', 'CREDIT CARD')">
           <div class="tile-icon" style="background: var(--teal-soft);"><i data-lucide="credit-card" style="color: var(--teal-text); width: 24px; height: 24px;"></i></div>
@@ -615,7 +625,7 @@
         <!-- SECTION 1: Ticket Information -->
         <div class="form-section-card">
           <h3 class="form-section-title">Ticket Information</h3>
-          <div class="grid-3">
+          <div class="grid-4">
             <div class="field">
               <label>CRM Ticket Number <span style="color:red">*</span></label>
               <input type="text" id="f-crm-ticket" placeholder="Enter CRM Ticket No..." required>
@@ -624,6 +634,10 @@
               <label>Created By</label>
               <div id="f-user-display" style="padding: 10px 14px; background: var(--card); border: 1px solid var(--steel); border-radius: 8px; font-weight: 600; color: var(--ink);">-</div>
               <select id="f-user" style="display: none;"></select>
+            </div>
+            <div class="field">
+              <label>Ticket Date <span style="color:red">*</span></label>
+              <input type="date" id="f-date" required style="background: var(--card); font-weight: 600;">
             </div>
             <div class="field">
               <label>Timestamp</label>
@@ -726,14 +740,16 @@
         <div class="form-section-card mt-2">
           <h3 class="form-section-title">Work Details</h3>
           <div id="desc-field-container">
-            <!-- Textarea will be appended here by dynamic fields renderer, or kept directly -->
+            <div class="field">
+              <textarea id="f-desc" style="width: 100%; min-height: 100px; padding: 12px; border: 1px solid var(--border-color); border-radius: 8px;" placeholder="Describe the specific work performed, technical root-causes, or client requests..."></textarea>
+            </div>
           </div>
         </div>
 
         <!-- SECTION 5: Billing & Pricing -->
         <div class="form-section-card mt-2">
           <h3 class="form-section-title">Billing</h3>
-          <div class="grid-3">
+          <div class="grid-4">
             <div class="field">
               <label>Service Mode</label>
               <div style="display: flex; align-items: center; min-height: 40px;">
@@ -744,6 +760,12 @@
                 <option value="Contract">Contract</option>
                 <option value="Free">Free</option>
               </select>
+            </div>
+            <div class="field">
+              <label>Fast-Track Fee</label>
+              <div style="display: flex; align-items: center; min-height: 40px;">
+                <span id="f-fast-track-badge" class="badge" style="background: var(--card); color: var(--steel); border: 1px solid var(--border-color); padding: 6px 12px; border-radius: 50px; font-weight: 700; font-size: 12px;">£0.00</span>
+              </div>
             </div>
             <div class="field">
               <label>Estimated Price</label>
@@ -1140,8 +1162,12 @@
           <option value="all">ALL DEPARTMENTS</option>
           <option value="S1">MENU UPDATE</option>
           <option value="S2">CREDIT CARD</option>
+          <option value="S3">DATA RESET</option>
           <option value="S4">SERVICE</option>
-          <option value="S6">PROGRAMMING / TILL</option>
+          <option value="S5">OTHER</option>
+          <option value="S6">TILL SETUP</option>
+          <option value="S8">SOFTWARING</option>
+          <option value="S9">HARDWARE</option>
         </select>
         <select id="dataview-payment-filter" onchange="renderDataTable()" style="padding:0.6rem 1rem; border:1px solid var(--ink); background:var(--card); font-family:'IBM Plex Sans',sans-serif; border-radius:2px;">
           <option value="all">ALL STATUSES</option>
@@ -1300,10 +1326,6 @@
   <section id="section-waiting" class="section">
     <div class="wrap invoice-wrap">
       <h1 style="font-size:clamp(1.5rem,3vw,2rem); margin:0 0 1.5rem; font-weight:700; color:var(--ink); letter-spacing:-0.01em;">Appointments List</h1>
-      
-      <div class="toolbar" style="display:flex; justify-content:flex-end; margin-bottom:1.5rem; border-bottom:1px dashed var(--line); padding-bottom:1rem;">
-        <button class="ticket-btn primary" onclick="showTab('dashboard'); toggleMainForm('category');" style="background:var(--ink); color:var(--paper); border:1px solid var(--ink); box-shadow:2px 2px 0 rgba(29,36,48,0.2);">+ Schedule New</button>
-      </div>
 
       <div class="ledger" style="margin-bottom:2rem;">
         <div class="ledger-head" style="grid-template-columns:120px 1.5fr 1fr 120px 80px;">
@@ -1413,225 +1435,248 @@
       <!-- PANE 2: ROLES & ACCESS -->
       <div id="admin-pane-roles" class="admin-pane" style="display:none;">
           
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:1rem;">
-            <div>
-              <h2 style="font-size:1.3rem; font-weight:700; color:var(--ink); margin:0 0 0.3rem;">Role-Based Access & Settings</h2>
-              <p style="font-size:0.85rem; color:var(--steel); margin:0;">Manage security clearances, system roles, and assign permissions to personnel.</p>
+          <!-- SUB-NAVIGATION BAR FOR ROLES -->
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:1rem; border-bottom:1px solid var(--line); padding-bottom:1rem;">
+            <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+              <button type="button" class="role-sub-btn active" onclick="showRoleSubSection('overview', this)" style="padding:0.6rem 1.1rem; font-size:0.85rem; font-weight:600; cursor:pointer; border:1px solid var(--ink); background:var(--ink); color:var(--card); font-family:'IBM Plex Sans',sans-serif; display:flex; align-items:center; gap:6px; transition:all 0.15s ease;">
+                <i data-lucide="shield" style="width:15px; height:15px;"></i> Role-Based Access & Settings
+              </button>
+              <button type="button" class="role-sub-btn" onclick="showRoleSubSection('permissions', this)" style="padding:0.6rem 1.1rem; font-size:0.85rem; font-weight:600; cursor:pointer; border:1px solid var(--line); background:var(--card); color:var(--steel); font-family:'IBM Plex Sans',sans-serif; display:flex; align-items:center; gap:6px; transition:all 0.15s ease;">
+                <i data-lucide="sliders" style="width:15px; height:15px;"></i> Module Permissions & Role Settings
+              </button>
+              <button type="button" class="role-sub-btn" onclick="showRoleSubSection('assignment', this)" style="padding:0.6rem 1.1rem; font-size:0.85rem; font-weight:600; cursor:pointer; border:1px solid var(--line); background:var(--card); color:var(--steel); font-family:'IBM Plex Sans',sans-serif; display:flex; align-items:center; gap:6px; transition:all 0.15s ease;">
+                <i data-lucide="users" style="width:15px; height:15px;"></i> Personnel Role Assignment
+              </button>
             </div>
             <button onclick="renderAdminRolesList()" class="ticket-btn secondary" style="padding:0.5rem 1rem; font-size:0.8rem; display:flex; align-items:center; gap:6px;">
               <i data-lucide="refresh-cw" style="width:14px; height:14px;"></i> Refresh Roles
             </button>
           </div>
 
-          <!-- ROLE CARDS OVERVIEW -->
-          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:1.5rem; margin-bottom:2.5rem;">
-              
-              <!-- ADMIN -->
-              <div style="background:var(--card); border:1px solid var(--ink); padding:1.5rem; position:relative; box-shadow:4px 4px 0 rgba(29,36,48,0.12); border-radius:2px;">
-                  <span class="stamp delete" style="position:absolute; top:1.5rem; right:1.5rem; font-family:'IBM Plex Mono',monospace;">ADMIN</span>
-                  <div style="font-weight:700; color:var(--ink); font-size:1.1rem; margin-bottom:0.2rem;">Administrator</div>
-                  <div id="roles-admin-count" style="font-family:'IBM Plex Mono',monospace; font-size:0.75rem; color:var(--steel); margin-bottom:1.2rem;">— USERS IN ROLE</div>
-                  <div style="font-size:0.8rem; color:var(--steel); margin-bottom:1rem;">Full system authorization, pricing controls, user administration, and system audit logs.</div>
-                  
-                  <div style="border-top:1px dashed var(--line); padding-top:0.75rem;">
-                      <div style="display:flex; justify-content:space-between; margin-bottom:0.4rem; font-size:0.85rem; color:var(--ink);">
-                          <span>Appointments & Calendar</span>
-                          <span style="color:var(--green); font-weight:700;">Full</span>
-                      </div>
-                      <div style="display:flex; justify-content:space-between; margin-bottom:0.4rem; font-size:0.85rem; color:var(--ink);">
-                          <span>Customer Directory</span>
-                          <span style="color:var(--green); font-weight:700;">Full</span>
-                      </div>
-                      <div style="display:flex; justify-content:space-between; margin-bottom:0.4rem; font-size:0.85rem; color:var(--ink);">
-                          <span>Invoices & Billing</span>
-                          <span style="color:var(--green); font-weight:700;">Full</span>
-                      </div>
-                      <div style="display:flex; justify-content:space-between; font-size:0.85rem; color:var(--ink);">
-                          <span>Admin & System Settings</span>
-                          <span style="color:var(--green); font-weight:700;">Full</span>
-                      </div>
-                  </div>
-              </div>
-              
-              <!-- USER (FIELD TECHNICIAN) -->
-              <div style="background:var(--card); border:1px solid var(--ink); padding:1.5rem; position:relative; box-shadow:4px 4px 0 rgba(29,36,48,0.12); border-radius:2px;">
-                  <span class="stamp auth" style="position:absolute; top:1.5rem; right:1.5rem; font-family:'IBM Plex Mono',monospace; background:var(--blue); color:var(--card);">USER</span>
-                  <div style="font-weight:700; color:var(--ink); font-size:1.1rem; margin-bottom:0.2rem;">Field Technician</div>
-                  <div id="roles-user-count" style="font-family:'IBM Plex Mono',monospace; font-size:0.75rem; color:var(--steel); margin-bottom:1.2rem;">— USERS IN ROLE</div>
-                  <div style="font-size:0.8rem; color:var(--steel); margin-bottom:1rem;">Access to field service tickets, task execution, appointments, and client contact information.</div>
-                  
-                  <div style="border-top:1px dashed var(--line); padding-top:0.75rem;">
-                      <div style="display:flex; justify-content:space-between; margin-bottom:0.4rem; font-size:0.85rem; color:var(--ink);">
-                          <span>Appointments & Calendar</span>
-                          <span style="color:var(--green); font-weight:700;">Read / Write</span>
-                      </div>
-                      <div style="display:flex; justify-content:space-between; margin-bottom:0.4rem; font-size:0.85rem; color:var(--ink);">
-                          <span>Customer Directory</span>
-                          <span style="color:var(--steel);">View Only</span>
-                      </div>
-                      <div style="display:flex; justify-content:space-between; margin-bottom:0.4rem; font-size:0.85rem; color:var(--ink);">
-                          <span>Invoices & Billing</span>
-                          <span style="color:#b91c1c;">No Access</span>
-                      </div>
-                      <div style="display:flex; justify-content:space-between; font-size:0.85rem; color:var(--ink);">
-                          <span>Admin & System Settings</span>
-                          <span style="color:#b91c1c;">No Access</span>
-                      </div>
-                  </div>
-              </div>
+          <!-- SUB-PANE 1: ROLE-BASED ACCESS & SETTINGS (OVERVIEW) -->
+          <div id="role-sub-overview" class="role-sub-pane" style="display:block;">
+            <div style="margin-bottom:1.5rem;">
+              <h2 style="font-size:1.3rem; font-weight:700; color:var(--ink); margin:0 0 0.3rem;">Role-Based Access & Settings</h2>
+              <p style="font-size:0.85rem; color:var(--steel); margin:0;">Overview of security clearance tiers, role definitions, and default authorization levels.</p>
+            </div>
 
-              <!-- ACCOUNTING (FINANCE) -->
-              <div style="background:var(--card); border:1px solid var(--ink); padding:1.5rem; position:relative; box-shadow:4px 4px 0 rgba(29,36,48,0.12); border-radius:2px;">
-                  <span class="stamp create" style="position:absolute; top:1.5rem; right:1.5rem; font-family:'IBM Plex Mono',monospace; background:var(--green); color:var(--card);">FINANCE</span>
-                  <div style="font-weight:700; color:var(--ink); font-size:1.1rem; margin-bottom:0.2rem;">Accounting & Finance</div>
-                  <div id="roles-finance-count" style="font-family:'IBM Plex Mono',monospace; font-size:0.75rem; color:var(--steel); margin-bottom:1.2rem;">— USERS IN ROLE</div>
-                  <div style="font-size:0.8rem; color:var(--steel); margin-bottom:1rem;">Financial ledger oversight, invoicing, payment tracking, and customer balance auditing.</div>
-                  
-                  <div style="border-top:1px dashed var(--line); padding-top:0.75rem;">
-                      <div style="display:flex; justify-content:space-between; margin-bottom:0.4rem; font-size:0.85rem; color:var(--ink);">
-                          <span>Appointments & Calendar</span>
-                          <span style="color:var(--steel);">View Only</span>
-                      </div>
-                      <div style="display:flex; justify-content:space-between; margin-bottom:0.4rem; font-size:0.85rem; color:var(--ink);">
-                          <span>Customer Directory</span>
-                          <span style="color:var(--green); font-weight:700;">Full</span>
-                      </div>
-                      <div style="display:flex; justify-content:space-between; margin-bottom:0.4rem; font-size:0.85rem; color:var(--ink);">
-                          <span>Invoices & Billing</span>
-                          <span style="color:var(--green); font-weight:700;">Full</span>
-                      </div>
-                      <div style="display:flex; justify-content:space-between; font-size:0.85rem; color:var(--ink);">
-                          <span>Admin & System Settings</span>
-                          <span style="color:#b91c1c;">No Access</span>
-                      </div>
-                  </div>
-              </div>
+            <!-- ROLE CARDS OVERVIEW -->
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:1.5rem; margin-bottom:2rem;">
+                
+                <!-- ADMIN -->
+                <div style="background:var(--card); border:1px solid var(--ink); padding:1.5rem; position:relative; box-shadow:4px 4px 0 rgba(29,36,48,0.12); border-radius:2px;">
+                    <span class="stamp delete" style="position:absolute; top:1.5rem; right:1.5rem; font-family:'IBM Plex Mono',monospace;">ADMIN</span>
+                    <div style="font-weight:700; color:var(--ink); font-size:1.1rem; margin-bottom:0.2rem;">Administrator</div>
+                    <div id="roles-admin-count" style="font-family:'IBM Plex Mono',monospace; font-size:0.75rem; color:var(--steel); margin-bottom:1.2rem;">— USERS IN ROLE</div>
+                    <div style="font-size:0.8rem; color:var(--steel); margin-bottom:1rem;">Full system authorization, pricing controls, user administration, and system audit logs.</div>
+                    
+                    <div style="border-top:1px dashed var(--line); padding-top:0.75rem;">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:0.4rem; font-size:0.85rem; color:var(--ink);">
+                            <span>Appointments & Calendar</span>
+                            <span style="color:var(--green); font-weight:700;">Full</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; margin-bottom:0.4rem; font-size:0.85rem; color:var(--ink);">
+                            <span>Customer Directory</span>
+                            <span style="color:var(--green); font-weight:700;">Full</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; margin-bottom:0.4rem; font-size:0.85rem; color:var(--ink);">
+                            <span>Invoices & Billing</span>
+                            <span style="color:var(--green); font-weight:700;">Full</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; font-size:0.85rem; color:var(--ink);">
+                            <span>Admin & System Settings</span>
+                            <span style="color:var(--green); font-weight:700;">Full</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- USER (FIELD TECHNICIAN) -->
+                <div style="background:var(--card); border:1px solid var(--ink); padding:1.5rem; position:relative; box-shadow:4px 4px 0 rgba(29,36,48,0.12); border-radius:2px;">
+                    <span class="stamp auth" style="position:absolute; top:1.5rem; right:1.5rem; font-family:'IBM Plex Mono',monospace; background:var(--blue); color:var(--card);">USER</span>
+                    <div style="font-weight:700; color:var(--ink); font-size:1.1rem; margin-bottom:0.2rem;">Field Technician</div>
+                    <div id="roles-user-count" style="font-family:'IBM Plex Mono',monospace; font-size:0.75rem; color:var(--steel); margin-bottom:1.2rem;">— USERS IN ROLE</div>
+                    <div style="font-size:0.8rem; color:var(--steel); margin-bottom:1rem;">Access to field service tickets, task execution, appointments, and client contact information.</div>
+                    
+                    <div style="border-top:1px dashed var(--line); padding-top:0.75rem;">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:0.4rem; font-size:0.85rem; color:var(--ink);">
+                            <span>Appointments & Calendar</span>
+                            <span style="color:var(--green); font-weight:700;">Read / Write</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; margin-bottom:0.4rem; font-size:0.85rem; color:var(--ink);">
+                            <span>Customer Directory</span>
+                            <span style="color:var(--steel);">View Only</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; margin-bottom:0.4rem; font-size:0.85rem; color:var(--ink);">
+                            <span>Invoices & Billing</span>
+                            <span style="color:#b91c1c;">No Access</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; font-size:0.85rem; color:var(--ink);">
+                            <span>Admin & System Settings</span>
+                            <span style="color:#b91c1c;">No Access</span>
+                        </div>
+                    </div>
+                </div>
 
+                <!-- ACCOUNTING (FINANCE) -->
+                <div style="background:var(--card); border:1px solid var(--ink); padding:1.5rem; position:relative; box-shadow:4px 4px 0 rgba(29,36,48,0.12); border-radius:2px;">
+                    <span class="stamp create" style="position:absolute; top:1.5rem; right:1.5rem; font-family:'IBM Plex Mono',monospace; background:var(--green); color:var(--card);">FINANCE</span>
+                    <div style="font-weight:700; color:var(--ink); font-size:1.1rem; margin-bottom:0.2rem;">Accounting & Finance</div>
+                    <div id="roles-finance-count" style="font-family:'IBM Plex Mono',monospace; font-size:0.75rem; color:var(--steel); margin-bottom:1.2rem;">— USERS IN ROLE</div>
+                    <div style="font-size:0.8rem; color:var(--steel); margin-bottom:1rem;">Financial ledger oversight, invoicing, payment tracking, and customer balance auditing.</div>
+                    
+                    <div style="border-top:1px dashed var(--line); padding-top:0.75rem;">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:0.4rem; font-size:0.85rem; color:var(--ink);">
+                            <span>Appointments & Calendar</span>
+                            <span style="color:var(--steel);">View Only</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; margin-bottom:0.4rem; font-size:0.85rem; color:var(--ink);">
+                            <span>Customer Directory</span>
+                            <span style="color:var(--green); font-weight:700;">Full</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; margin-bottom:0.4rem; font-size:0.85rem; color:var(--ink);">
+                            <span>Invoices & Billing</span>
+                            <span style="color:var(--green); font-weight:700;">Full</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; font-size:0.85rem; color:var(--ink);">
+                            <span>Admin & System Settings</span>
+                            <span style="color:#b91c1c;">No Access</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- PERMISSION MATRIX DETAILS / ROLE HIERARCHY -->
+            <div style="background:var(--paper); border:1px dashed var(--line); border-radius:2px; padding:1.25rem;">
+                <h4 style="font-size:0.9rem; font-weight:700; color:var(--ink); margin:0 0 0.5rem; text-transform:uppercase; font-family:'IBM Plex Mono',monospace;">Role Hierarchy Information</h4>
+                <ul style="margin:0; padding-left:1.2rem; font-size:0.82rem; color:var(--steel); line-height:1.6;">
+                    <li><strong>Administrator:</strong> Has unrestricted access to all modules, including database sync, admin ledger, performance metrics, and personnel creation.</li>
+                    <li><strong>Financial (Accounting):</strong> Has full access to the Invoices tab, revenue reporting, and customer billing records.</li>
+                    <li><strong>Field Technician (User):</strong> Default role for new personnel. Default password is <code>1234</code>. Allowed to view services, appointments, and execute scheduled jobs.</li>
+                </ul>
+            </div>
           </div>
 
-          <!-- PERSONNEL ROLE ASSIGNMENT TABLE -->
-          <div style="background:var(--card); border:1px solid var(--ink); border-radius:2px; padding:1.5rem; box-shadow:4px 4px 0 rgba(29,36,48,0.12); margin-bottom:2.5rem;">
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; border-bottom:1px solid var(--line); padding-bottom:0.75rem;">
-                  <div>
-                      <h3 style="font-size:1.1rem; font-weight:700; color:var(--ink); margin:0 0 0.2rem;">Personnel Role Assignment</h3>
-                      <p style="font-size:0.8rem; color:var(--steel); margin:0;">Select and instantly update clearance level for any personnel in Turso DB.</p>
-                  </div>
-              </div>
-              <div style="overflow-x:auto;">
-                  <table style="width:100%; border-collapse:collapse; text-align:left;">
-                      <thead>
-                          <tr style="border-bottom:2px solid var(--ink); font-family:'IBM Plex Mono',monospace; font-size:0.72rem; color:var(--steel); text-transform:uppercase;">
-                              <th style="padding:0.75rem 1rem;">Personnel / Username</th>
-                              <th style="padding:0.75rem 1rem;">Current Role</th>
-                              <th style="padding:0.75rem 1rem;">Change Clearance</th>
-                              <th style="padding:0.75rem 1rem; text-align:right;">Action</th>
-                          </tr>
-                      </thead>
-                      <tbody id="admin-roles-user-table-body">
-                          <tr><td colspan="4" style="text-align:center; padding:1.5rem; color:var(--steel); font-family:'IBM Plex Mono',monospace;">Loading personnel role records...</td></tr>
-                      </tbody>
-                  </table>
-              </div>
+          <!-- SUB-PANE 2: MODULE PERMISSIONS & ROLE SETTINGS -->
+          <div id="role-sub-permissions" class="role-sub-pane" style="display:none;">
+            <div style="background:var(--card); border:1px solid var(--ink); border-radius:2px; padding:1.5rem; box-shadow:4px 4px 0 rgba(29,36,48,0.12); margin-bottom:2rem;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; border-bottom:1px solid var(--line); padding-bottom:0.75rem; flex-wrap:wrap; gap:0.5rem;">
+                    <div>
+                        <h3 style="font-size:1.1rem; font-weight:700; color:var(--ink); margin:0 0 0.2rem;">Module Permissions & Role Settings</h3>
+                        <p style="font-size:0.8rem; color:var(--steel); margin:0;">Configure access rights across portal modules for each security tier.</p>
+                    </div>
+                    <button id="btn-save-role-settings" onclick="adminSaveRoleSettings()" class="ticket-btn primary" style="padding:6px 14px; font-size:0.8rem; font-weight:600; cursor:pointer;">
+                        <i data-lucide="shield-check" style="width:14px; height:14px; vertical-align:middle; margin-right:4px;"></i> Save Role Settings
+                    </button>
+                </div>
+
+                <div style="overflow-x:auto;">
+                    <table style="width:100%; border-collapse:collapse; text-align:left; font-size:0.85rem;">
+                        <thead>
+                            <tr style="border-bottom:2px solid var(--ink); font-family:'IBM Plex Mono',monospace; font-size:0.72rem; color:var(--steel); text-transform:uppercase;">
+                                <th style="padding:0.75rem 1rem;">Portal Module</th>
+                                <th style="padding:0.75rem 1rem; text-align:center;">Administrator</th>
+                                <th style="padding:0.75rem 1rem; text-align:center;">Accounting & Finance</th>
+                                <th style="padding:0.75rem 1rem; text-align:center;">Field Technician (User)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr style="border-bottom:1px solid var(--paper);">
+                                <td style="padding:0.75rem 1rem; font-weight:600; color:var(--ink);">📅 Appointments & Calendar</td>
+                                <td style="padding:0.75rem 1rem; text-align:center;"><span style="color:var(--green); font-weight:700;">Full Access</span></td>
+                                <td style="padding:0.75rem 1rem; text-align:center;">
+                                    <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
+                                        <input type="checkbox" id="perm-acc-calendar" checked style="accent-color:var(--ink);"> View Only
+                                    </label>
+                                </td>
+                                <td style="padding:0.75rem 1rem; text-align:center;">
+                                    <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
+                                        <input type="checkbox" id="perm-user-calendar" checked style="accent-color:var(--ink);"> Read / Write
+                                    </label>
+                                </td>
+                            </tr>
+                            <tr style="border-bottom:1px solid var(--paper);">
+                                <td style="padding:0.75rem 1rem; font-weight:600; color:var(--ink);">👥 Customer Directory</td>
+                                <td style="padding:0.75rem 1rem; text-align:center;"><span style="color:var(--green); font-weight:700;">Full Access</span></td>
+                                <td style="padding:0.75rem 1rem; text-align:center;">
+                                    <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
+                                        <input type="checkbox" id="perm-acc-customers" checked style="accent-color:var(--ink);"> Full Access
+                                    </label>
+                                </td>
+                                <td style="padding:0.75rem 1rem; text-align:center;">
+                                    <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
+                                        <input type="checkbox" id="perm-user-customers" checked style="accent-color:var(--ink);"> View Only
+                                    </label>
+                                </td>
+                            </tr>
+                            <tr style="border-bottom:1px solid var(--paper);">
+                                <td style="padding:0.75rem 1rem; font-weight:600; color:var(--ink);">💳 Invoices & Billing</td>
+                                <td style="padding:0.75rem 1rem; text-align:center;"><span style="color:var(--green); font-weight:700;">Full Access</span></td>
+                                <td style="padding:0.75rem 1rem; text-align:center;">
+                                    <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
+                                        <input type="checkbox" id="perm-acc-invoices" checked style="accent-color:var(--ink);"> Full Access
+                                    </label>
+                                </td>
+                                <td style="padding:0.75rem 1rem; text-align:center;">
+                                    <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
+                                        <input type="checkbox" id="perm-user-invoices" style="accent-color:var(--ink);"> Allow Invoicing
+                                    </label>
+                                </td>
+                            </tr>
+                            <tr style="border-bottom:1px solid var(--paper);">
+                                <td style="padding:0.75rem 1rem; font-weight:600; color:var(--ink);">⚙️ Admin Panel & Personnel</td>
+                                <td style="padding:0.75rem 1rem; text-align:center;"><span style="color:var(--green); font-weight:700;">Full Access</span></td>
+                                <td style="padding:0.75rem 1rem; text-align:center;"><span style="color:#b91c1c; font-weight:600;">Restricted</span></td>
+                                <td style="padding:0.75rem 1rem; text-align:center;"><span style="color:#b91c1c; font-weight:600;">Restricted</span></td>
+                            </tr>
+                            <tr>
+                                <td style="padding:0.75rem 1rem; font-weight:600; color:var(--ink);">🏷️ Pricing & Service Catalog</td>
+                                <td style="padding:0.75rem 1rem; text-align:center;"><span style="color:var(--green); font-weight:700;">Full Access</span></td>
+                                <td style="padding:0.75rem 1rem; text-align:center;">
+                                    <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
+                                        <input type="checkbox" id="perm-acc-pricing" checked style="accent-color:var(--ink);"> Edit Pricing
+                                    </label>
+                                </td>
+                                <td style="padding:0.75rem 1rem; text-align:center;">
+                                    <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
+                                        <input type="checkbox" id="perm-user-pricing" style="accent-color:var(--ink);"> View Only
+                                    </label>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
           </div>
 
-          <!-- ROLE PERMISSION MATRIX & CLEARANCE SETTINGS -->
-          <div style="background:var(--card); border:1px solid var(--ink); border-radius:2px; padding:1.5rem; box-shadow:4px 4px 0 rgba(29,36,48,0.12); margin-bottom:2.5rem;">
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; border-bottom:1px solid var(--line); padding-bottom:0.75rem; flex-wrap:wrap; gap:0.5rem;">
-                  <div>
-                      <h3 style="font-size:1.1rem; font-weight:700; color:var(--ink); margin:0 0 0.2rem;">Module Permissions & Role Settings</h3>
-                      <p style="font-size:0.8rem; color:var(--steel); margin:0;">Configure access rights across portal modules for each security tier.</p>
-                  </div>
-                  <button id="btn-save-role-settings" onclick="adminSaveRoleSettings()" class="ticket-btn primary" style="padding:6px 14px; font-size:0.8rem; font-weight:600; cursor:pointer;">
-                      <i data-lucide="shield-check" style="width:14px; height:14px; vertical-align:middle; margin-right:4px;"></i> Save Role Settings
-                  </button>
-              </div>
-
-              <div style="overflow-x:auto;">
-                  <table style="width:100%; border-collapse:collapse; text-align:left; font-size:0.85rem;">
-                      <thead>
-                          <tr style="border-bottom:2px solid var(--ink); font-family:'IBM Plex Mono',monospace; font-size:0.72rem; color:var(--steel); text-transform:uppercase;">
-                              <th style="padding:0.75rem 1rem;">Portal Module</th>
-                              <th style="padding:0.75rem 1rem; text-align:center;">Administrator</th>
-                              <th style="padding:0.75rem 1rem; text-align:center;">Accounting & Finance</th>
-                              <th style="padding:0.75rem 1rem; text-align:center;">Field Technician (User)</th>
-                          </tr>
-                      </thead>
-                      <tbody>
-                          <tr style="border-bottom:1px solid var(--paper);">
-                              <td style="padding:0.75rem 1rem; font-weight:600; color:var(--ink);">📅 Appointments & Calendar</td>
-                              <td style="padding:0.75rem 1rem; text-align:center;"><span style="color:var(--green); font-weight:700;">Full Access</span></td>
-                              <td style="padding:0.75rem 1rem; text-align:center;">
-                                  <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
-                                      <input type="checkbox" id="perm-acc-calendar" checked style="accent-color:var(--ink);"> View Only
-                                  </label>
-                              </td>
-                              <td style="padding:0.75rem 1rem; text-align:center;">
-                                  <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
-                                      <input type="checkbox" id="perm-user-calendar" checked style="accent-color:var(--ink);"> Read / Write
-                                  </label>
-                              </td>
-                          </tr>
-                          <tr style="border-bottom:1px solid var(--paper);">
-                              <td style="padding:0.75rem 1rem; font-weight:600; color:var(--ink);">👥 Customer Directory</td>
-                              <td style="padding:0.75rem 1rem; text-align:center;"><span style="color:var(--green); font-weight:700;">Full Access</span></td>
-                              <td style="padding:0.75rem 1rem; text-align:center;">
-                                  <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
-                                      <input type="checkbox" id="perm-acc-customers" checked style="accent-color:var(--ink);"> Full Access
-                                  </label>
-                              </td>
-                              <td style="padding:0.75rem 1rem; text-align:center;">
-                                  <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
-                                      <input type="checkbox" id="perm-user-customers" checked style="accent-color:var(--ink);"> View Only
-                                  </label>
-                              </td>
-                          </tr>
-                          <tr style="border-bottom:1px solid var(--paper);">
-                              <td style="padding:0.75rem 1rem; font-weight:600; color:var(--ink);">💳 Invoices & Billing</td>
-                              <td style="padding:0.75rem 1rem; text-align:center;"><span style="color:var(--green); font-weight:700;">Full Access</span></td>
-                              <td style="padding:0.75rem 1rem; text-align:center;">
-                                  <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
-                                      <input type="checkbox" id="perm-acc-invoices" checked style="accent-color:var(--ink);"> Full Access
-                                  </label>
-                              </td>
-                              <td style="padding:0.75rem 1rem; text-align:center;">
-                                  <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
-                                      <input type="checkbox" id="perm-user-invoices" style="accent-color:var(--ink);"> Allow Invoicing
-                                  </label>
-                              </td>
-                          </tr>
-                          <tr style="border-bottom:1px solid var(--paper);">
-                              <td style="padding:0.75rem 1rem; font-weight:600; color:var(--ink);">⚙️ Admin Panel & Personnel</td>
-                              <td style="padding:0.75rem 1rem; text-align:center;"><span style="color:var(--green); font-weight:700;">Full Access</span></td>
-                              <td style="padding:0.75rem 1rem; text-align:center;"><span style="color:#b91c1c; font-weight:600;">Restricted</span></td>
-                              <td style="padding:0.75rem 1rem; text-align:center;"><span style="color:#b91c1c; font-weight:600;">Restricted</span></td>
-                          </tr>
-                          <tr>
-                              <td style="padding:0.75rem 1rem; font-weight:600; color:var(--ink);">🏷️ Pricing & Service Catalog</td>
-                              <td style="padding:0.75rem 1rem; text-align:center;"><span style="color:var(--green); font-weight:700;">Full Access</span></td>
-                              <td style="padding:0.75rem 1rem; text-align:center;">
-                                  <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
-                                      <input type="checkbox" id="perm-acc-pricing" checked style="accent-color:var(--ink);"> Edit Pricing
-                                  </label>
-                              </td>
-                              <td style="padding:0.75rem 1rem; text-align:center;">
-                                  <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
-                                      <input type="checkbox" id="perm-user-pricing" style="accent-color:var(--ink);"> View Only
-                                  </label>
-                              </td>
-                          </tr>
-                      </tbody>
-                  </table>
-              </div>
-          </div>
-
-          <!-- PERMISSION MATRIX DETAILS -->
-          <div style="background:var(--paper); border:1px dashed var(--line); border-radius:2px; padding:1.25rem;">
-              <h4 style="font-size:0.9rem; font-weight:700; color:var(--ink); margin:0 0 0.5rem; text-transform:uppercase; font-family:'IBM Plex Mono',monospace;">Role Hierarchy Information</h4>
-              <ul style="margin:0; padding-left:1.2rem; font-size:0.82rem; color:var(--steel); line-height:1.6;">
-                  <li><strong>Administrator:</strong> Has unrestricted access to all modules, including database sync, admin ledger, performance metrics, and personnel creation.</li>
-                  <li><strong>Financial (Accounting):</strong> Has full access to the Invoices tab, revenue reporting, and customer billing records.</li>
-                  <li><strong>Field Technician (User):</strong> Default role for new personnel. Default password is <code>1234</code>. Allowed to view services, appointments, and execute scheduled jobs.</li>
-              </ul>
+          <!-- SUB-PANE 3: PERSONNEL ROLE ASSIGNMENT -->
+          <div id="role-sub-assignment" class="role-sub-pane" style="display:none;">
+            <div style="background:var(--card); border:1px solid var(--ink); border-radius:2px; padding:1.5rem; box-shadow:4px 4px 0 rgba(29,36,48,0.12); margin-bottom:2rem;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; border-bottom:1px solid var(--line); padding-bottom:0.75rem; flex-wrap:wrap; gap:0.75rem;">
+                    <div>
+                        <h3 style="font-size:1.1rem; font-weight:700; color:var(--ink); margin:0 0 0.2rem;">Personnel Role Assignment</h3>
+                        <p style="font-size:0.8rem; color:var(--steel); margin:0;">Select and instantly update clearance level for any personnel in Turso DB.</p>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:0.5rem;">
+                        <input type="text" placeholder="Search personnel..." oninput="adminFilterPersonnelRoles(this.value)" style="padding:0.45rem 0.75rem; border:1px solid var(--ink); background:var(--card); font-family:'IBM Plex Sans',sans-serif; font-size:0.82rem; border-radius:2px; min-width:220px;">
+                    </div>
+                </div>
+                <div style="overflow-x:auto;">
+                    <table style="width:100%; border-collapse:collapse; text-align:left;">
+                        <thead>
+                            <tr style="border-bottom:2px solid var(--ink); font-family:'IBM Plex Mono',monospace; font-size:0.72rem; color:var(--steel); text-transform:uppercase;">
+                                <th style="padding:0.75rem 1rem;">Personnel / Username</th>
+                                <th style="padding:0.75rem 1rem;">Current Role</th>
+                                <th style="padding:0.75rem 1rem;">Change Clearance</th>
+                                <th style="padding:0.75rem 1rem; text-align:right;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-roles-user-table-body">
+                            <tr><td colspan="4" style="text-align:center; padding:1.5rem; color:var(--steel); font-family:'IBM Plex Mono',monospace;">Loading personnel role records...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
           </div>
 
       </div>
@@ -1718,143 +1763,170 @@
 </div>
 
 <!-- QUICK ADD MODAL -->
-<div id="quick-add-modal" class="modal-overlay hidden" style="z-index: 3005;">
-  <div class="modal-content" style="max-width: 600px; width: 90%; border-radius: 20px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);">
-    <div class="modal-header" style="border-bottom: 1px solid var(--paper); padding-bottom: 1rem;">
-      <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--ink);">Book Appointment</h2>
-      <button class="close-btn" style="font-size: 1.5rem; color: var(--steel); background: transparent; border: none; cursor: pointer;" onclick="document.getElementById('quick-add-modal').classList.add('hidden')">&times;</button>
+<div id="quick-add-modal" class="modal-overlay hidden" style="z-index: 3005; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+  <div class="modal-content" style="max-width: 1040px; width: 94vw; border-radius: 16px; background: var(--card, #ffffff); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.3); border: 1px solid rgba(100, 116, 139, 0.2); overflow: hidden;">
+    
+    <!-- Modal Header -->
+    <div class="modal-header" style="border-bottom: 1px solid #E2E8F0; padding: 1rem 1.5rem; display: flex; justify-content: space-between; align-items: center; background: #FAFBFD;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <div style="width: 32px; height: 32px; border-radius: 8px; background: var(--ink, #1D2430); color: #fff; display: flex; align-items: center; justify-content: center;">
+          <i data-lucide="calendar" style="width: 16px; height: 16px;"></i>
+        </div>
+        <div>
+          <h2 style="font-size: 1.15rem; font-weight: 700; color: var(--ink, #1D2430); margin: 0; line-height: 1.2;">Book Appointment</h2>
+          <span style="font-size: 11px; color: var(--steel, #66707C); font-weight: 500;">Select customer and schedule service appointment</span>
+        </div>
+      </div>
+      <button class="close-btn" style="font-size: 1.4rem; color: var(--steel, #66707C); background: transparent; border: none; cursor: pointer; padding: 4px 8px; border-radius: 6px; line-height: 1;" onclick="document.getElementById('quick-add-modal').classList.add('hidden')">&times;</button>
     </div>
-    <div class="modal-body" style="display:flex; flex-direction:column; gap:1.25rem; margin-top:1.25rem; max-height: 80vh; overflow-y: auto; padding-right: 5px;">
+
+    <!-- Modal Body: 2-Column Responsive Grid (No vertical scroll) -->
+    <div class="modal-body" style="padding: 1.25rem 1.5rem; display: grid; grid-template-columns: 1.1fr 1fr; gap: 1.5rem; align-items: start; box-sizing: border-box;">
+      
+      <!-- COLUMN 1: Customer Search & Verified CRM Info -->
+      <div style="display: flex; flex-direction: column; gap: 10px;">
         
         <!-- Search Section -->
         <div class="field" style="margin-bottom: 0;">
-            <label style="color:var(--steel); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.05em;">Search Customer</label>
-            <input type="text" id="qa-customer-search" class="gc-search-input" placeholder="Search by Company Name, CRM ID or Postcode..." list="vtiger-customer-list" oninput="autoFillQuickAdd()" style="background:var(--card); color:var(--ink); border: 1px solid var(--steel); border-radius: 10px; padding: 10px 14px; outline: none; font-size: 13px; font-weight: 500; width: 100%; box-sizing: border-box;">
+          <label style="color:var(--steel, #66707C); font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:0.05em; display:block; margin-bottom: 4px;">Search Customer</label>
+          <div style="position: relative;">
+            <input type="text" id="qa-customer-search" class="gc-search-input" placeholder="Search by Company Name, CRM ID or Postcode..." list="vtiger-customer-list" oninput="autoFillQuickAdd()" style="background:var(--card, #fff); color:var(--ink, #1D2430); border: 1px solid var(--steel, #94A3B8); border-radius: 8px; padding: 8px 12px; outline: none; font-size: 13px; font-weight: 500; width: 100%; box-sizing: border-box; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--ink, #1D2430)'" onblur="this.style.borderColor='var(--steel, #94A3B8)'">
+          </div>
         </div>
 
-        <div style="border-top: 1px dashed var(--paper); margin: 5px 0;"></div>
+        <!-- Customer Info Section (Auto-filled) -->
+        <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+            <span style="font-size: 11px; font-weight: 800; color: var(--steel, #64748B); text-transform: uppercase; letter-spacing: 0.05em;">Customer Information (Auto-filled)</span>
+            <span style="font-size: 10px; color: #94A3B8; font-weight: 600;">CRM Verified</span>
+          </div>
 
-        <!-- Customer Info Section (Auto-filled, Read-only) -->
-        <div style="background: var(--card); border: 1px solid var(--paper); border-radius: 12px; padding: 1.25rem; display: flex; flex-direction: column; gap: 10px;">
-            <p style="font-size: 11px; font-weight: 800; color: var(--steel); text-transform: uppercase; margin: 0 0 5px 0; letter-spacing: 0.05em;">Customer Information (Auto-filled)</p>
-            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 10px;">
-                <div class="field" style="margin:0;">
-                    <label style="font-size: 10px; color: var(--steel); margin-bottom: 2px;">Customer (Company Name)</label>
-                    <input type="text" id="qa-company-name" readonly placeholder="Auto-filled" style="background:var(--card); color:var(--ink); font-weight: 600; font-size: 13px; padding: 8px 12px; border: 1px solid var(--paper); border-radius: 8px; width: 100%; box-sizing: border-box;">
-                </div>
-                <div class="field" style="margin:0;">
-                    <label style="font-size: 10px; color: var(--steel); margin-bottom: 2px;">Customer Number</label>
-                    <input type="text" id="qa-company-id" readonly placeholder="Auto-filled" style="background:var(--card); color:var(--ink); font-weight: 600; font-size: 13px; padding: 8px 12px; border: 1px solid var(--paper); border-radius: 8px; width: 100%; box-sizing: border-box;">
-                </div>
-            </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                <div class="field" style="margin:0;">
-                    <label style="font-size: 10px; color: var(--steel); margin-bottom: 2px;">Postcode</label>
-                    <input type="text" id="qa-postcode" readonly placeholder="Auto-filled" style="background:var(--card); color:var(--ink); font-weight: 600; font-size: 13px; padding: 8px 12px; border: 1px solid var(--paper); border-radius: 8px; width: 100%; box-sizing: border-box;">
-                </div>
-                <div class="field" style="margin:0;">
-                    <label style="font-size: 10px; color: var(--steel); margin-bottom: 2px;">Contract Status</label>
-                    <input type="text" id="qa-status" readonly placeholder="Auto-filled" style="background:var(--card); color:var(--ink); font-weight: 700; font-size: 13px; padding: 8px 12px; border: 1px solid var(--paper); border-radius: 8px; width: 100%; box-sizing: border-box; text-align: center;">
-                </div>
+          <!-- Company Name & Customer Number -->
+          <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 8px;">
+            <div class="field" style="margin:0;">
+              <label style="font-size: 10px; color: var(--steel, #64748B); font-weight:600; margin-bottom: 2px; display:block;">Customer (Company Name)</label>
+              <input type="text" id="qa-company-name" readonly placeholder="Auto-filled" style="background:#fff; color:var(--ink, #1D2430); font-weight: 600; font-size: 12px; padding: 7px 10px; border: 1px solid #CBD5E1; border-radius: 6px; width: 100%; box-sizing: border-box;">
             </div>
             <div class="field" style="margin:0;">
-                <label style="font-size: 10px; color: var(--steel); margin-bottom: 2px;">Full Address</label>
-                <input type="text" id="qa-address" readonly placeholder="Auto-filled" style="background:var(--card); color:var(--ink); font-weight: 500; font-size: 13px; padding: 8px 12px; border: 1px solid var(--paper); border-radius: 8px; width: 100%; box-sizing: border-box;">
+              <label style="font-size: 10px; color: var(--steel, #64748B); font-weight:600; margin-bottom: 2px; display:block;">Customer Number</label>
+              <input type="text" id="qa-company-id" readonly placeholder="Auto-filled" style="background:#fff; color:var(--ink, #1D2430); font-weight: 600; font-size: 12px; padding: 7px 10px; border: 1px solid #CBD5E1; border-radius: 6px; width: 100%; box-sizing: border-box;">
             </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                <div class="field" style="margin:0;">
-                    <label style="font-size: 10px; color: var(--steel); margin-bottom: 2px;">Primary Contact</label>
-                    <input type="text" id="qa-contact" readonly placeholder="Auto-filled" style="background:var(--card); color:var(--ink); font-weight: 500; font-size: 13px; padding: 8px 12px; border: 1px solid var(--paper); border-radius: 8px; width: 100%; box-sizing: border-box;">
-                </div>
-                <div class="field" style="margin:0;">
-                    <label style="font-size: 10px; color: var(--steel); margin-bottom: 2px;">Phone Number</label>
-                    <input type="text" id="qa-phone" readonly placeholder="Auto-filled" style="background:var(--card); color:var(--ink); font-weight: 500; font-size: 13px; padding: 8px 12px; border: 1px solid var(--paper); border-radius: 8px; width: 100%; box-sizing: border-box;">
-                </div>
-            </div>
-        </div>
-
-        <!-- Appointment Scheduling Fields -->
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-            <div class="field">
-                <label style="color:var(--steel); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.05em;">Department</label>
-                <select id="qa-service-category" onchange="updateQaSubServices()" style="background:var(--card) url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%2364748b%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e') no-repeat right 12px center; background-size: 14px; color:var(--ink); border: 1px solid var(--steel); border-radius: 10px; padding: 10px 14px; outline: none; font-size: 13px; font-weight: 600; cursor: pointer; width: 100%; box-sizing: border-box; -webkit-appearance: none; -moz-appearance: none; appearance: none; padding-right: 36px !important;">
-                    <option value="S1">MENU UPDATE</option>
-                    <option value="S2">CREDIT CARD</option>
-                    <option value="S3">DATA RESET</option>
-                    <option value="S4">SERVICE</option>
-                    <option value="S5">OTHER</option>
-                    <option value="S6">TILL SETUP</option>
-                </select>
-            </div>
-            <div class="field">
-                <label style="color:var(--steel); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.05em;">Sub Service</label>
-                <select id="qa-sub-service" style="background:var(--card) url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%2364748b%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e') no-repeat right 12px center; background-size: 14px; color:var(--ink); border: 1px solid var(--steel); border-radius: 10px; padding: 10px 14px; outline: none; font-size: 13px; font-weight: 600; cursor: pointer; width: 100%; box-sizing: border-box; -webkit-appearance: none; -moz-appearance: none; appearance: none; padding-right: 36px !important;">
-                </select>
-            </div>
-        </div>
-
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-            <div class="field">
-                <label style="color:var(--steel); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.05em;">Appointment Date</label>
-                <input type="date" id="qa-date" style="background:var(--card); color:var(--ink); border: 1px solid var(--steel); border-radius: 10px; padding: 10px 14px; outline: none; font-size: 13px; font-weight: 600; width: 100%; box-sizing: border-box;">
-            </div>
-            <div class="field">
-                <label style="color:var(--steel); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.05em;">Appointment Time</label>
-                <select id="qa-time" style="background:var(--card) url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%2364748b%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e') no-repeat right 12px center; background-size: 14px; color:var(--ink); border: 1px solid var(--steel); border-radius: 10px; padding: 10px 14px; outline: none; font-size: 13px; font-weight: 600; cursor: pointer; width: 100%; box-sizing: border-box; -webkit-appearance: none; -moz-appearance: none; appearance: none; padding-right: 36px !important;">
-                </select>
-            </div>
-        </div>
-
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-            <div class="field">
-                <label style="color:var(--steel); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.05em;">Estimated Duration (mins)</label>
-                <input type="number" id="qa-duration" value="30" min="5" step="5" style="background:var(--card); color:var(--ink); border: 1px solid var(--steel); border-radius: 10px; padding: 10px 14px; outline: none; font-size: 13px; font-weight: 600; width: 100%; box-sizing: border-box;">
-            </div>
-            <div class="field">
-                <label style="color:var(--steel); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.05em;">Assigned Engineer</label>
-                <select id="qa-staff-select" style="background:var(--card) url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%2364748b%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e') no-repeat right 12px center; background-size: 14px; color:var(--ink); border: 1px solid var(--steel); border-radius: 10px; padding: 10px 14px; outline: none; font-size: 13px; font-weight: 600; cursor: pointer; width: 100%; box-sizing: border-box; -webkit-appearance: none; -moz-appearance: none; appearance: none; padding-right: 36px !important;">
-                </select>
-            </div>
-        </div>
-
-        <!-- Priority Select Button Group -->
-        <div class="field" style="margin-bottom: 0;">
-            <label style="color:var(--steel); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.05em;">Priority</label>
-            <div style="display: flex; gap: 8px; margin-top: 4px;">
-                <label style="flex: 1; text-align: center; padding: 10px; border: 1px solid var(--steel); border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 13px; background: var(--paper); color: var(--ink); border-color: var(--steel);" class="priority-btn" id="lbl-priority-normal">
-                    <input type="radio" name="qa-priority" value="Normal" checked style="display:none;" onchange="updatePriorityUI('Normal')"> Normal
-                </label>
-                <label style="flex: 1; text-align: center; padding: 10px; border: 1px solid var(--steel); border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 13px; background: var(--card);" class="priority-btn" id="lbl-priority-urgent">
-                    <input type="radio" name="qa-priority" value="Urgent" style="display:none;" onchange="updatePriorityUI('Urgent')"> Urgent
-                </label>
-                <label style="flex: 1; text-align: center; padding: 10px; border: 1px solid var(--steel); border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 13px; background: var(--card);" class="priority-btn" id="lbl-priority-emergency">
-                    <input type="radio" name="qa-priority" value="Emergency" style="display:none;" onchange="updatePriorityUI('Emergency')"> Emergency
-                </label>
-            </div>
-        </div>
-
-        <div class="field">
-            <label style="color:var(--steel); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.05em;">Notes</label>
-            <textarea id="qa-notes" rows="3" placeholder="Enter appointment details/notes..." style="background:var(--card); color:var(--ink); border: 1px solid var(--steel); border-radius: 10px; padding: 12px 16px; outline: none; font-size: 13px; font-weight: 500; font-family: inherit; width: 100%; box-sizing: border-box; resize: vertical;"></textarea>
-        </div>
-
-        <!-- Meta Info (Read-only, hidden/subtle) -->
-        <div style="background:var(--paper); padding:12px; border-radius:10px; display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:5px; display: none;">
-          <div class="field" style="margin:0;">
-            <label style="font-size:10px; margin-bottom:2px;">Created By</label>
-            <input type="text" id="qa-created-by" readonly style="font-size:12px; padding:6px 10px; background:white;">
           </div>
+
+          <!-- Postcode & Contract Status -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+            <div class="field" style="margin:0;">
+              <label style="font-size: 10px; color: var(--steel, #64748B); font-weight:600; margin-bottom: 2px; display:block;">Postcode</label>
+              <input type="text" id="qa-postcode" readonly placeholder="Auto-filled" style="background:#fff; color:var(--ink, #1D2430); font-weight: 600; font-size: 12px; padding: 7px 10px; border: 1px solid #CBD5E1; border-radius: 6px; width: 100%; box-sizing: border-box;">
+            </div>
+            <div class="field" style="margin:0;">
+              <label style="font-size: 10px; color: var(--steel, #64748B); font-weight:600; margin-bottom: 2px; display:block;">Contract Status</label>
+              <input type="text" id="qa-status" readonly placeholder="Auto-filled" style="background:#fff; color:var(--ink, #1D2430); font-weight: 700; font-size: 12px; padding: 7px 10px; border: 1px solid #CBD5E1; border-radius: 6px; width: 100%; box-sizing: border-box; text-align: center;">
+            </div>
+          </div>
+
+          <!-- Full Address -->
           <div class="field" style="margin:0;">
-            <label style="font-size:10px; margin-bottom:2px;">Registration Time</label>
-            <input type="text" id="qa-reg-time" readonly style="font-size:12px; padding:6px 10px; background:white;">
+            <label style="font-size: 10px; color: var(--steel, #64748B); font-weight:600; margin-bottom: 2px; display:block;">Full Address</label>
+            <input type="text" id="qa-address" readonly placeholder="Auto-filled" style="background:#fff; color:var(--ink, #1D2430); font-weight: 500; font-size: 12px; padding: 7px 10px; border: 1px solid #CBD5E1; border-radius: 6px; width: 100%; box-sizing: border-box;">
+          </div>
+
+          <!-- Primary Contact & Phone -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+            <div class="field" style="margin:0;">
+              <label style="font-size: 10px; color: var(--steel, #64748B); font-weight:600; margin-bottom: 2px; display:block;">Primary Contact</label>
+              <input type="text" id="qa-contact" readonly placeholder="Auto-filled" style="background:#fff; color:var(--ink, #1D2430); font-weight: 500; font-size: 12px; padding: 7px 10px; border: 1px solid #CBD5E1; border-radius: 6px; width: 100%; box-sizing: border-box;">
+            </div>
+            <div class="field" style="margin:0;">
+              <label style="font-size: 10px; color: var(--steel, #64748B); font-weight:600; margin-bottom: 2px; display:block;">Phone Number</label>
+              <input type="text" id="qa-phone" readonly placeholder="Auto-filled" style="background:#fff; color:var(--ink, #1D2430); font-weight: 500; font-size: 12px; padding: 7px 10px; border: 1px solid #CBD5E1; border-radius: 6px; width: 100%; box-sizing: border-box;">
+            </div>
           </div>
         </div>
+
+        <!-- Hidden Meta Inputs -->
+        <input type="hidden" id="qa-created-by">
+        <input type="hidden" id="qa-reg-time">
+      </div>
+
+      <!-- COLUMN 2: Scheduling, Priority, Notes & Save -->
+      <div style="display: flex; flex-direction: column; gap: 10px;">
         
-        <div style="margin-top:10px; text-align:right; border-top: 1px solid var(--paper); padding-top: 1rem;">
-            <button class="btn btn-primary" onclick="submitQuickAdd()" style="width: 100%; justify-content: center; padding: 14px; font-weight: 700; border-radius: 10px;">
-              <i data-lucide="check-circle" style="width:18px; height:18px; margin-right: 6px;"></i> Save Appointment
-            </button>
+        <!-- Department & Sub Service -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+          <div class="field" style="margin:0;">
+            <label style="color:var(--steel, #66707C); font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:0.05em; display:block; margin-bottom: 3px;">Department</label>
+            <select id="qa-service-category" onchange="updateQaSubServices()" style="background:var(--card, #fff) url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%2364748b%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e') no-repeat right 10px center; background-size: 12px; color:var(--ink, #1D2430); border: 1px solid var(--steel, #94A3B8); border-radius: 8px; padding: 7px 10px; outline: none; font-size: 12px; font-weight: 600; cursor: pointer; width: 100%; box-sizing: border-box; appearance: none; padding-right: 28px !important;">
+              <option value="S1">MENU UPDATE</option>
+              <option value="S2">CREDIT CARD</option>
+              <option value="S3">DATA RESET</option>
+              <option value="S4">SERVICE</option>
+              <option value="S5">OTHER</option>
+              <option value="S6">TILL SETUP</option>
+            </select>
+          </div>
+          <div class="field" style="margin:0;">
+            <label style="color:var(--steel, #66707C); font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:0.05em; display:block; margin-bottom: 3px;">Sub Service</label>
+            <select id="qa-sub-service" style="background:var(--card, #fff) url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%2364748b%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e') no-repeat right 10px center; background-size: 12px; color:var(--ink, #1D2430); border: 1px solid var(--steel, #94A3B8); border-radius: 8px; padding: 7px 10px; outline: none; font-size: 12px; font-weight: 600; cursor: pointer; width: 100%; box-sizing: border-box; appearance: none; padding-right: 28px !important;">
+            </select>
+          </div>
         </div>
+
+        <!-- Appointment Date & Appointment Time -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+          <div class="field" style="margin:0;">
+            <label style="color:var(--steel, #66707C); font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:0.05em; display:block; margin-bottom: 3px;">Appointment Date</label>
+            <input type="date" id="qa-date" style="background:var(--card, #fff); color:var(--ink, #1D2430); border: 1px solid var(--steel, #94A3B8); border-radius: 8px; padding: 7px 10px; outline: none; font-size: 12px; font-weight: 600; width: 100%; box-sizing: border-box;">
+          </div>
+          <div class="field" style="margin:0;">
+            <label style="color:var(--steel, #66707C); font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:0.05em; display:block; margin-bottom: 3px;">Appointment Time</label>
+            <select id="qa-time" style="background:var(--card, #fff) url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%2364748b%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e') no-repeat right 10px center; background-size: 12px; color:var(--ink, #1D2430); border: 1px solid var(--steel, #94A3B8); border-radius: 8px; padding: 7px 10px; outline: none; font-size: 12px; font-weight: 600; cursor: pointer; width: 100%; box-sizing: border-box; appearance: none; padding-right: 28px !important;">
+            </select>
+          </div>
+        </div>
+
+        <!-- Duration & Assigned Engineer -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+          <div class="field" style="margin:0;">
+            <label style="color:var(--steel, #66707C); font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:0.05em; display:block; margin-bottom: 3px;">Estimated Duration (mins)</label>
+            <input type="number" id="qa-duration" value="30" min="5" step="5" style="background:var(--card, #fff); color:var(--ink, #1D2430); border: 1px solid var(--steel, #94A3B8); border-radius: 8px; padding: 7px 10px; outline: none; font-size: 12px; font-weight: 600; width: 100%; box-sizing: border-box;">
+          </div>
+          <div class="field" style="margin:0;">
+            <label style="color:var(--steel, #66707C); font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:0.05em; display:block; margin-bottom: 3px;">Assigned Engineer</label>
+            <select id="qa-staff-select" style="background:var(--card, #fff) url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%2364748b%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e') no-repeat right 10px center; background-size: 12px; color:var(--ink, #1D2430); border: 1px solid var(--steel, #94A3B8); border-radius: 8px; padding: 7px 10px; outline: none; font-size: 12px; font-weight: 600; cursor: pointer; width: 100%; box-sizing: border-box; appearance: none; padding-right: 28px !important;">
+            </select>
+          </div>
+        </div>
+
+        <!-- Priority Select -->
+        <div class="field" style="margin:0;">
+          <label style="color:var(--steel, #66707C); font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:0.05em; display:block; margin-bottom: 3px;">Priority</label>
+          <div style="display: flex; gap: 8px;">
+            <label style="flex: 1; text-align: center; padding: 7px; border: 1px solid var(--steel, #94A3B8); border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 12px; background: var(--paper, #F1F5F9); color: var(--ink, #1D2430); transition: all 0.15s;" class="priority-btn" id="lbl-priority-normal">
+              <input type="radio" name="qa-priority" value="Normal" checked style="display:none;" onchange="updatePriorityUI('Normal')"> Normal
+            </label>
+            <label style="flex: 1; text-align: center; padding: 7px; border: 1px solid #CBD5E1; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 12px; background: #fff; color: #334155; transition: all 0.15s;" class="priority-btn" id="lbl-priority-urgent">
+              <input type="radio" name="qa-priority" value="Urgent" style="display:none;" onchange="updatePriorityUI('Urgent')"> Urgent
+            </label>
+            <label style="flex: 1; text-align: center; padding: 7px; border: 1px solid #CBD5E1; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 12px; background: #fff; color: #334155; transition: all 0.15s;" class="priority-btn" id="lbl-priority-emergency">
+              <input type="radio" name="qa-priority" value="Emergency" style="display:none;" onchange="updatePriorityUI('Emergency')"> Emergency
+            </label>
+          </div>
+        </div>
+
+        <!-- Notes -->
+        <div class="field" style="margin:0;">
+          <label style="color:var(--steel, #66707C); font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:0.05em; display:block; margin-bottom: 3px;">Notes</label>
+          <textarea id="qa-notes" rows="2" placeholder="Enter appointment details/notes..." style="background:var(--card, #fff); color:var(--ink, #1D2430); border: 1px solid var(--steel, #94A3B8); border-radius: 8px; padding: 7px 10px; outline: none; font-size: 12px; font-weight: 500; font-family: inherit; width: 100%; box-sizing: border-box; resize: none; height: 48px;"></textarea>
+        </div>
+
+        <!-- Submit Button -->
+        <div style="margin-top: 4px;">
+          <button class="btn btn-primary" onclick="submitQuickAdd()" style="width: 100%; justify-content: center; padding: 10px; font-weight: 700; font-size: 13px; border-radius: 8px; background: var(--ink, #1D2430); color: #fff; cursor: pointer; display: flex; align-items: center; border: none; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); transition: opacity 0.2s;" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
+            <i data-lucide="check-circle" style="width:16px; height:16px; margin-right: 6px;"></i> Save Appointment
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -1971,7 +2043,7 @@
 <script src="antigravity/agents/sync.agent.js?v=5"></script>
 <!-- Antigravity Tools -->
 <script src="antigravity/tools/logger.tool.js?v=5"></script>
-<script src="antigravity/tools/supabase.tool.js?v=5"></script>
+<script src="antigravity/tools/turso.tool.js?v=6"></script>
 <!-- Entry Point -->
 <script src="antigravity/index.js?v=5"></script>
 
@@ -1981,6 +2053,7 @@
 <script src="app.js?v=20261013"></script>
   <div id="toast-container" style="position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 2000; display: flex; flex-direction: column; gap: 10px;"></div>
 <script src="js/gc_calendar.js?v=5"></script>
+<script src="js/command_palette.js?v=1"></script>
 <script>
   if(typeof lucide !== 'undefined') lucide.createIcons();
   

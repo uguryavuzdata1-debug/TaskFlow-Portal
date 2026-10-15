@@ -42,9 +42,9 @@ window.showTab = showTab;
 window.showInvoiceTab = showInvoiceTab;
 window.showDataSubTab = showDataSubTab;
 window.showSettingsSubTab = showSettingsSubTab;
-window.toggleMainForm = toggleMainForm;
-window.selectCategory = selectCategory;
-window.updateDynamicFields = updateDynamicFields;
+window.toggleMainForm = window.toggleMainForm || toggleMainForm;
+if (typeof selectCategory !== 'undefined') window.selectCategory = window.selectCategory || selectCategory;
+if (typeof updateDynamicFields !== 'undefined') window.updateDynamicFields = window.updateDynamicFields || updateDynamicFields;
 window.calculateDuration = calculateDuration;
 window.calculatePrice = calculatePrice;
 window.resetForm = resetForm;
@@ -1383,176 +1383,8 @@ function logout() {
     showToast('Logged out successfully.', 'success');
     setTimeout(() => window.location.reload(), 1000);
 }
+// Note: selectCategory, toggleMainForm and updateDynamicFields are handled comprehensively in js/ui.js.
 
-function selectCategory(cat, dept) { 
-    resetForm(); 
-    const el = document.getElementById('f-service-type');
-    if (el) {
-        const exists = Array.from(el.options).some(opt => opt.value === cat);
-        if (!exists) {
-            const opt = document.createElement('option');
-            opt.value = cat;
-            const catMap = {
-                'S1': 'MENU UPDATE',
-                'S2': 'CREDIT CARD',
-                'S3': 'DATA RESET',
-                'S4': 'SERVICE',
-                'S5': 'OTHER',
-                'S6': 'TILL SETUP'
-            };
-            opt.text = catMap[cat] || cat;
-            el.add(opt);
-        }
-        el.value = cat; 
-        el.disabled = true; // Lock the category when coming from a tile
-    }
-    
-    const deptEl = document.getElementById('f-department');
-    if (deptEl) {
-        deptEl.value = dept || '';
-    }
-    
-    const catDispEl = document.getElementById('f-service-type-display');
-    if (catDispEl) {
-        const catMap = {
-            'S1': 'MENU UPDATE',
-            'S2': 'CREDIT CARD',
-            'S3': 'DATA RESET',
-            'S4': 'SERVICE',
-            'S5': 'OTHER',
-            'S6': 'TILL SETUP'
-        };
-        catDispEl.value = catMap[cat] || cat;
-    }
-    
-    updateDynamicFields(); 
-    toggleMainForm('form'); 
-}
-
-function toggleMainForm(s) { ['dashboard-home', 'dashboard-category-selection', 'dashboard-form-container'].forEach(v => { const el = document.getElementById(v); if (el) el.style.display = 'none'; }); if (s === 'category') document.getElementById('dashboard-category-selection').style.display = 'block'; else if (s === 'form') document.getElementById('dashboard-form-container').style.display = 'block'; else document.getElementById('dashboard-home').style.display = 'block'; }
-function updateDynamicFields() {
-    const mainSelect = document.getElementById('f-service-type');
-    if (!mainSelect) return;
-    
-    const main = mainSelect.value;
-    const subServices = appState.settings?.sub_services || 
-                        (typeof defaultSeeds !== 'undefined' ? defaultSeeds.sub_services : null) || 
-                        (typeof LOCAL_SUB_SERVICES !== 'undefined' ? LOCAL_SUB_SERVICES : null);
-    let opts = [];
-    if (subServices) {
-        if (Array.isArray(subServices)) {
-            opts = subServices.filter(s => s.service_name === main).map(s => s.name);
-        } else if (typeof subServices === 'object') {
-            opts = subServices[main] || [];
-        }
-    }
-    
-    const subSelect = document.getElementById('f-sub-service');
-    if (subSelect) {
-        subSelect.innerHTML = opts.map(o => `<option value="${o}">${o}</option>`).join('');
-    }
-    
-    let extra = ''; 
-    if (main === 'S1') {
-        extra = `
-            <div style="background: #FBF9F3; padding: 15px 25px; border-radius: 12px; border: 1px dashed #66707C; margin-top: 20px; margin-bottom: 25px;">
-                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 600; color: #1D2430;">
-                    <input type="checkbox" id="f-s1-no-appointment" onchange="calculatePrice()" style="width: 18px; height: 18px; cursor: pointer;">
-                    <span>Urgent / No Prior Appointment (+£25.00 Service Fee)</span>
-                </label>
-            </div>`;
-    } else if (main === 'S2') {
-        extra = `
-            <div style="background: #FBF9F3; padding: 25px; border-radius: 12px; border: 1px dashed #66707C; margin-top: 20px; margin-bottom: 25px;">
-                <div class="grid-3">
-                    <div class="field">
-                        <label>IKA App <span style="color:red">*</span></label>
-                        <select id="f-ika-app">
-                            <option value="No">No</option>
-                            <option value="Yes">Yes</option>
-                        </select>
-                    </div>
-                    <div class="field">
-                        <label>Card Company <span style="color:red">*</span></label>
-                        <select id="f-card-company">
-                            <option value="">Select company</option>
-                            ${(appState.settings.card_companies || []).map(opt => `<option value="${opt.name}">${opt.name}</option>`).join('')}
-                        </select>
-                    </div>
-                    <div class="field">
-                        <label>Local Settings <span style="color:red">*</span></label>
-                        <select id="f-local-settings" onchange="handleLocalSettingsChange(this)">
-                            <option value="">Select settings</option>
-                            ${(appState.settings.cc_local_settings || []).map(opt => `<option value="${opt.name}">${opt.name}</option>`).join('')}
-                        </select>
-                    </div>
-                </div>
-                <div class="grid-2" style="margin-top: 20px;">
-                    <div class="field">
-                        <label>Sector <span style="color:red">*</span></label>
-                        <select id="f-s2-sector">
-                            <option value="">Select sector</option>
-                            ${LOCAL_SECTORS.map(sec => `<option value="${sec}">${sec}</option>`).join('')}
-                        </select>
-                    </div>
-                    <div class="field">
-                        <label>Card Setup Number <span style="color:red">*</span></label>
-                        <input type="text" id="f-setup-number" placeholder="Enter number">
-                    </div>
-                </div>
-            </div>`;
-    } else if (main === 'S6') {
-        const staffOptions = (appState.settings.personnel || []).map(name => `<option value="${name}">${name}</option>`).join('');
-        extra = `
-            <div style="background: #FBF9F3; padding: 25px; border-radius: 12px; border: 1px dashed #4C5FA6; margin-top: 20px; margin-bottom: 25px;">
-                <div class="grid-4">
-                    <div class="field"><label>Quote No. <span style="color:red">*</span></label><input type="text" id="f-s6-quote" placeholder="CRM Quote#"></div>
-                    <div class="field"><label>System Type <span style="color:red">*</span></label><select id="f-s6-type">
-                        <option value="">Select type</option>
-                        ${LOCAL_SYS_TYPES.map(t => `<option value="${t}">${t}</option>`).join('')}
-                    </select></div>
-                    <div class="field"><label>Till Model <span style="color:red">*</span></label><select id="f-s6-model">
-                        <option value="">Select Model</option>
-                        ${(appState.settings.till_models || []).map(m => `<option value="${m.name}">${m.name}</option>`).join('')}
-                    </select></div>
-                    <div class="field"><label>CPU <span style="color:red">*</span></label><select id="f-s6-cpu">
-                        <option value="">Select CPU</option>
-                        ${(appState.settings.till_cpu || []).map(c => `<option value="${c.name}">${c.name}</option>`).join('')}
-                    </select></div>
-                </div>
-                <div class="grid-4" style="margin-top: 20px;">
-                    <div class="field"><label>OS Version <span style="color:red">*</span></label><select id="f-s6-os">
-                        <option value="">Select OS</option>
-                        ${(appState.settings.operating_systems || []).map(os => `<option value="${os.name}">${os.name}</option>`).join('')}
-                    </select></div>
-                    <div class="field"><label>App Version <span style="color:red">*</span></label><input type="text" id="f-s6-app-ver" placeholder="e.g. v2.4.5"></div>
-                    <div class="field"><label>Sector <span style="color:red">*</span></label><select id="f-s6-sector">
-                        <option value="">Select sector</option>
-                        ${LOCAL_SECTORS.map(sec => `<option value="${sec}">${sec}</option>`).join('')}
-                    </select></div>
-                    <div class="field"><label>Service Option <span style="color:red">*</span></label><select id="f-s6-option">
-                        <option value="">Select option</option>
-                        ${((appState.settings.sub_services || {})['S6'] || []).map(opt => `<option value="${opt}">${opt}</option>`).join('')}
-                    </select></div>
-                </div>
-                <div class="grid-3" style="margin-top: 20px;">
-                    <div class="field"><label>Till Programmer <span style="color:red">*</span></label><select id="f-s6-prog-till">${staffOptions}</select></div>
-                    <div class="field"><label>Image Programmer <span style="color:red">*</span></label><select id="f-s6-prog-img">${staffOptions}</select></div>
-                    <div class="field"><label>Programmers -> Menu <span style="color:red">*</span></label><input type="text" id="f-s6-prog-menu" placeholder="Name"></div>
-                </div>
-            </div>`;
-    }
-    
-    const container = document.getElementById('dynamic-fields-container');
-    if (container) {
-        container.innerHTML = extra + `
-            <div class="field" style="margin-top: 25px; margin-bottom: 25px;">
-                <label>Work Details</label>
-                <textarea id="f-desc" style="min-height:90px;" placeholder="Describe the work performed..."></textarea>
-            </div>`;
-    }
-    calculateDuration();
-}
 
 function renderServiceSelects() {
     const services = appState.settings.services || [];
@@ -1914,130 +1746,8 @@ function resetForm() {
     updatePriceFieldAccessibility();
     updateDynamicFields();
 }
+// Note: master-form submit handler is handled in js/ui.js.
 
-document.getElementById('master-form').addEventListener('submit', async (e) => {
-    e.preventDefault(); const btn = e.target.querySelector('button[type="submit"]'); btn.innerText = 'Saving...'; btn.disabled = true;
-    let description = document.getElementById('f-desc').value;
-    const main = document.getElementById('f-service-type').value;
-    
-    // Collect dynamic fields if S1
-    if (main === 'S1') {
-        const urgent = document.getElementById('f-s1-no-appointment')?.checked ? 'Yes' : 'No';
-        if (urgent === 'Yes') {
-            description = `[URGENT / NO APPOINTMENT: Yes] (+£25.00 Service Fee)\n\n${description}`;
-        }
-    }
-    // Collect dynamic fields if S2
-    else if (main === 'S2') {
-        const ika = document.getElementById('f-ika-app').value;
-        const local = document.getElementById('f-local-settings')?.value || '';
-        const sector = document.getElementById('f-s2-sector')?.value || '';
-        const setupNum = document.getElementById('f-setup-number')?.value || '';
-        const company = document.getElementById('f-card-company')?.value || '';
-        description = `[IKA APP: ${ika}] [SETTINGS: ${local}] [SECTOR: ${sector}] [SETUP #: ${setupNum}] [CARD CO: ${company}]\n\n${description}`;
-    } 
-    // Collect dynamic fields if S6
-    else if (main === 'S6') {
-        const quote = document.getElementById('f-s6-quote').value;
-        const type = document.getElementById('f-s6-type').value;
-        const model = document.getElementById('f-s6-model').value;
-        const cpu = document.getElementById('f-s6-cpu').value;
-        const os = document.getElementById('f-s6-os').value;
-        const appV = document.getElementById('f-s6-app-ver').value;
-        const sector = document.getElementById('f-s6-sector').value;
-        const opt = document.getElementById('f-s6-option').value;
-        const pTill = document.getElementById('f-s6-prog-till').value;
-        const pImg = document.getElementById('f-s6-prog-img').value;
-        const pMenu = document.getElementById('f-s6-prog-menu').value;
-
-        description = `--- TECHNICAL SPECIFICATIONS (TILL SETUP) ---\n` +
-                     `Quote: ${quote} | Type: ${type} | Model: ${model}\n` +
-                     `CPU: ${cpu} | OS: ${os} | App Ver: ${appV}\n` +
-                     `Sector: ${sector} | Service: ${opt}\n` +
-                     `Programmers -> Till: ${pTill}, Image: ${pImg}, Menu: ${pMenu}\n` +
-                     `-------------------------------------------\n\n${description}`;
-    }
-
-    const finalPrice = parseFloat(document.getElementById('f-price').value) || 0;
-    const paymentStatus = document.getElementById('f-payment-status').value;
-    const isContract = document.getElementById('f-status').value === 'Contract';
-    
-    const isInvoiceRequired = finalPrice > 0 || paymentStatus === 'Chargeable' || !isContract;
-    const recStatus = isInvoiceRequired ? 'Pending' : 'Completed';
-    
-    // Serialize description metadata
-    const estPrice = parseFloat(document.getElementById('f-est-price').value) || 0;
-    const deptVal = document.getElementById('f-department').value;
-    const metadata = {
-        vat: finalPrice * 0.20,
-        invoiceNotes: '',
-        estimatedPrice: estPrice,
-        department: deptVal
-    };
-    
-    const finalDescription = serializeMetadata(metadata, description);
-    
-    const rec = { 
-        "CRM TICKET": document.getElementById('f-crm-ticket').value, 
-        "INV NO": document.getElementById('f-invoice-no').value, 
-        COMPANY: document.getElementById('f-company').value, 
-        POSTCODE: document.getElementById('f-postcode').value, 
-        USER: appState.currentUser,
-        "MAIN SERVICE": main, 
-        "SUB SERVICE": document.getElementById('f-sub-service').value, 
-        "START TIME": document.getElementById('f-start-time').value, 
-        "END TIME": document.getElementById('f-end-time').value, 
-        DURATION: parseInt(document.getElementById('f-duration').value) || 0, 
-        PRICE: finalPrice, 
-        "PAYMENT STATUS": paymentStatus, 
-        DESCRIPTION: finalDescription, 
-        STATUS: recStatus, 
-        invoiced: false 
-    };
-    try { 
-        const { data, error } = await sbClient.from('records').insert([rec]).select();
-        if (error) throw error;
-        if (data && data.length > 0) {
-            const r = data[0];
-            const parsed = parseMetadata(r.DESCRIPTION || r.description || '');
-            const priceVal = parseFloat(r.PRICE || r.price || 0);
-            appState.tickets.unshift({
-                id: r.id, 
-                dbId: (r.ID || r.db_id || r.id || 'N/A').toString().split('-')[0].substring(0, 5).toUpperCase(), 
-                crmTicket: r['CRM TICKET'] || r.crm_ticket || 'N/A', 
-                timestamp: r.TIMESTAMP || r.timestamp || new Date().toISOString(),
-                company: r.COMPANY || r.company_name, 
-                companyId: r.COMPANY_ID || r.company_id, 
-                postcode: r.POSTCODE || r.postcode,
-                user: r.USER || r.staff_user, 
-                mainService: r['MAIN SERVICE'] || r.service_type, 
-                subService: r['SUB SERVICE'] || r.sub_service,
-                startTime: r['START TIME'] || r.start_time, 
-                endTime: r['END TIME'] || r.end_time, 
-                duration: r.DURATION || r.duration,
-                price: priceVal, 
-                paymentStatus: r['PAYMENT STATUS'] || r.payment_status, 
-                description: parsed.details, 
-                rawDescription: r.DESCRIPTION || r.description || '',
-                status: r.STATUS || r.status, 
-                invoiced: r.invoiced === true || (r.STATUS !== 'Pending' && r.STATUS !== 'Logged'), 
-                invoiceDate: r['INV DATE'] || r.invoice_date, 
-                invoiceNo: r['INV NO'] || r.invoice_no,
-                vat: parsed.metadata.vat !== undefined ? parsed.metadata.vat : (priceVal * 0.20),
-                invoiceNotes: parsed.metadata.invoiceNotes || '',
-                estimatedPrice: parsed.metadata.estimatedPrice || 0,
-                department: parsed.metadata.department || ''
-            });
-            updateDataStats();
-        }
-        showAlert('Success', 'Record saved!', '✅');
-        toggleMainForm('home');
-        renderAll();
-    } catch (err) { 
-        showAlert('Error', err.message, '❌'); 
-    }
-    finally { btn.innerText = 'Process Transaction'; btn.disabled = false; }
-});
 function updateStats() {
     updateDataStats();
 }
@@ -2598,13 +2308,18 @@ window.createAppointmentForSlot = function(dateStr, timeStr, companyName = '') {
     if (qaModal) {
         qaModal.classList.remove('hidden');
         if(window.initPickers) window.initPickers();
+        if(typeof lucide !== 'undefined') lucide.createIcons();
     }
     
     // Populate personnel if not done
     populateStaffDropdowns();
     
     // Reset quick add fields
-    document.getElementById('qa-customer-search').value = companyName || '';
+    const searchInput = document.getElementById('qa-customer-search');
+    if (searchInput) {
+        searchInput.value = companyName || '';
+        setTimeout(() => searchInput.focus(), 60);
+    }
     document.getElementById('qa-date').value = dateStr || new Date().toISOString().split('T')[0];
     document.getElementById('qa-company-name').value = '';
     document.getElementById('qa-company-id').value = '';
@@ -2617,9 +2332,9 @@ window.createAppointmentForSlot = function(dateStr, timeStr, companyName = '') {
     const qaStatus = document.getElementById('qa-status');
     if (qaStatus) {
         qaStatus.value = 'Checking...';
-        qaStatus.style.setProperty('background', '#FBF9F3', 'important');
-        qaStatus.style.setProperty('color', '#1D2430', 'important');
-        qaStatus.style.fontWeight = '500';
+        qaStatus.style.setProperty('background', '#F8FAFC', 'important');
+        qaStatus.style.setProperty('color', '#64748B', 'important');
+        qaStatus.style.fontWeight = '600';
     }
     
     const serviceCat = document.getElementById('qa-service-category');
@@ -2627,22 +2342,38 @@ window.createAppointmentForSlot = function(dateStr, timeStr, companyName = '') {
         serviceCat.value = 'S1';
     }
     
-    // Populate times dropdown in qa-time if it's empty
+    // Populate times dropdown in qa-time (07:00 to 21:00 with 30-min intervals)
     const qaTimeSelect = document.getElementById('qa-time');
-    if (qaTimeSelect && qaTimeSelect.options.length === 0) {
-        let timesHtml = '';
-        for (let h = 9; h <= 18; h++) {
-            const tStr = `${String(h).padStart(2,'0')}:00`;
-            timesHtml += `<option value="${tStr}">${tStr}</option>`;
+    if (qaTimeSelect) {
+        if (qaTimeSelect.options.length < 20) {
+            let timesHtml = '';
+            for (let h = 7; h <= 21; h++) {
+                const hStr = String(h).padStart(2, '0');
+                timesHtml += `<option value="${hStr}:00">${hStr}:00</option>`;
+                if (h < 21) {
+                    timesHtml += `<option value="${hStr}:30">${hStr}:30</option>`;
+                }
+            }
+            qaTimeSelect.innerHTML = timesHtml;
         }
-        qaTimeSelect.innerHTML = timesHtml;
+        if (timeStr) {
+            let exists = Array.from(qaTimeSelect.options).some(o => o.value === timeStr);
+            if (!exists) {
+                const opt = document.createElement('option');
+                opt.value = timeStr;
+                opt.textContent = timeStr;
+                qaTimeSelect.appendChild(opt);
+            }
+            qaTimeSelect.value = timeStr;
+        } else {
+            qaTimeSelect.value = '09:00';
+        }
     }
-    if (timeStr) qaTimeSelect.value = timeStr;
     
     // Populate Assigned Engineer select options
     const qaStaffSelect = document.getElementById('qa-staff-select');
     if (qaStaffSelect && qaStaffSelect.options.length === 0) {
-        const personnel = appState.settings.personnel || [];
+        const personnel = appState.settings?.personnel || [];
         qaStaffSelect.innerHTML = personnel.map(p => `<option value="${p}">${p}</option>`).join('');
     }
     if (qaStaffSelect && appState.currentUser) qaStaffSelect.value = appState.currentUser;
@@ -2796,18 +2527,18 @@ window.submitQuickAdd = async function() {
 window.autoFillQuickAdd = function() {
     const searchInput = document.getElementById('qa-customer-search');
     if (!searchInput) return;
-    const searchVal = searchInput.value;
+    const searchVal = (searchInput.value || '').trim();
     if (!searchVal) return;
+    const q = searchVal.toLowerCase();
     
-    const customer = (appState.customers || []).find(c => {
-        const name = (c.COMPANY || '').toLowerCase();
-        const cid = (c['CUSTOMER ID'] || '').toLowerCase();
-        const pc = (c.POSTCODE || '').toLowerCase();
-        return name === searchVal.toLowerCase() || 
-               cid === searchVal.toLowerCase() || 
-               pc === searchVal.toLowerCase() ||
-               searchVal.toLowerCase().includes(name) ||
-               searchVal.toLowerCase().includes(cid);
+    const custSource = (typeof allCustomersCache !== 'undefined' && allCustomersCache.length > 0) ? allCustomersCache : (appState.customers || []);
+    const customer = custSource.find(c => {
+        const name = (c.organization_name || c.COMPANY || '').toLowerCase();
+        const cid = (c.organization_number || c['CUSTOMER ID'] || '').toLowerCase();
+        const pc = (c.billing_postal_code || c.POSTCODE || '').toLowerCase();
+        return (name && (name === q || q.includes(name) || name.includes(q))) ||
+               (cid && (cid === q || q.includes(cid) || cid.includes(q))) ||
+               (pc && (pc === q || q.includes(pc) || pc.includes(q)));
     });
 
     const companyEl = document.getElementById('qa-company-name');
@@ -2819,14 +2550,14 @@ window.autoFillQuickAdd = function() {
     const statusEl = document.getElementById('qa-status');
 
     if (customer) {
-        companyEl.value = customer.COMPANY || '';
-        companyIdEl.value = customer['CUSTOMER ID'] || '';
-        postcodeEl.value = customer.POSTCODE || '';
-        addressEl.value = customer.ADDRESS1 || customer.ADDRESS2 || 'N/A';
-        contactEl.value = customer.CONTACT_NAME || 'N/A';
-        phoneEl.value = customer.PHONE || 'N/A';
+        companyEl.value = customer.organization_name || customer.COMPANY || '';
+        companyIdEl.value = customer.organization_number || customer['CUSTOMER ID'] || '';
+        postcodeEl.value = customer.billing_postal_code || customer.POSTCODE || '';
+        addressEl.value = customer.billing_address || customer.ADDRESS1 || customer.ADDRESS2 || 'N/A';
+        contactEl.value = customer.contact_name || customer.CONTACT_NAME || 'N/A';
+        phoneEl.value = customer.phone || customer.PHONE || 'N/A';
         
-        const statusVal = customer['SERVICE STATUS'] || 'No Contract';
+        const statusVal = customer.service_status || customer['SERVICE STATUS'] || 'Contract';
         statusEl.value = statusVal;
         
         const isContract = statusVal.toLowerCase().includes('contract') || statusVal.toLowerCase().includes('var');

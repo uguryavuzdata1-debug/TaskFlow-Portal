@@ -354,6 +354,46 @@ async function adminChangeUserRole(userId, userName) {
 window.adminChangeUserRole = adminChangeUserRole;
 
 // ============================================================
+// ROLE SETTINGS & ACCESS - SUB-SECTION TAB SWITCHER
+// ============================================================
+function showRoleSubSection(tabName, btn) {
+    document.querySelectorAll('.role-sub-pane').forEach(function(pane) {
+        pane.style.display = 'none';
+    });
+    document.querySelectorAll('.role-sub-btn').forEach(function(b) {
+        b.style.borderColor = 'var(--line, #cbd5e1)';
+        b.style.background = 'var(--card, #ffffff)';
+        b.style.color = 'var(--steel, #64748b)';
+        b.classList.remove('active');
+    });
+    var target = document.getElementById('role-sub-' + tabName);
+    if (target) {
+        target.style.display = 'block';
+    }
+    if (btn) {
+        btn.style.borderColor = 'var(--ink, #1d2430)';
+        btn.style.background = 'var(--ink, #1d2430)';
+        btn.style.color = 'var(--card, #ffffff)';
+        btn.classList.add('active');
+    }
+    if (tabName === 'assignment' || tabName === 'overview') {
+        if (typeof renderAdminRolesList === 'function') renderAdminRolesList();
+    }
+    if (window.lucide) lucide.createIcons();
+}
+window.showRoleSubSection = showRoleSubSection;
+
+function adminFilterPersonnelRoles(query) {
+    var q = (query || '').toLowerCase().trim();
+    var rows = document.querySelectorAll('#admin-roles-user-table-body tr');
+    rows.forEach(function(row) {
+        var text = row.textContent.toLowerCase();
+        row.style.display = text.includes(q) ? '' : 'none';
+    });
+}
+window.adminFilterPersonnelRoles = adminFilterPersonnelRoles;
+
+// ============================================================
 // ADMIN SAVE / LOAD ROLE PERMISSIONS SETTINGS
 // ============================================================
 async function adminSaveRoleSettings() {

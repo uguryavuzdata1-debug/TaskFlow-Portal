@@ -159,16 +159,79 @@ All critical issues identified in PROJECT_AUDIT.md have been resolved. The appli
 
 ---
 
-## 🎯 Project Status
+---
 
-**Overall Status:** ✅ **READY FOR PRODUCTION**
+## 🚀 October 14, 2026 – Major Architecture & Modernization Upgrades
 
-All critical issues have been resolved. The TaskFlow Portal is now:
-- ✅ Functionally complete
-- ✅ Error-free
-- ✅ Ready for user testing
-- ✅ Documented and audited
+### 1. **Turso Cloud Migration & Supabase Removal**
+- ✅ Removed obsolete `@supabase/supabase-js` from `package.json`.
+- ✅ Cleaned `index.html` and migrated to dedicated `antigravity/tools/turso.tool.js`.
+- ✅ Confirmed native libSQL pipeline and direct SQL execution via `js/turso.js`.
 
-**Date Completed:** June 17, 2026  
-**Time to Completion:** ~45 minutes from audit to fixes
+### 2. **Global Command Palette / Spotlight Search (`Ctrl + K`)**
+- ✅ Implemented `js/command_palette.js` with instant client-side and server-side lookup.
+- ✅ Added keyboard shortcuts (`Ctrl + K`, Arrow Up/Down, Enter, Esc).
+- ✅ Added top navigation shortcut button with search icon and key hint.
+- ✅ Direct navigation to customer slide-over detail panel on selection.
+
+### 3. **API Performance, Health & Sync Monitoring**
+- ✅ Added `GET /api/health` endpoint returning uptime, memory usage, and live Turso DB latency.
+- ✅ Added `GET /api/sync/status` endpoint streaming live metrics from Python CRM sync daemon.
+- ✅ Upgraded `GET /api/customers` with server-side filtering (`q`, `limit`, `offset`) keeping full backward compatibility.
+- ✅ Upgraded CRM Sync Status Badge click event from raw `alert()` to a modern interactive modal.
+
+### 4. **Workspace Sanitization & Archive**
+- ✅ Archived 25+ one-off legacy patch scripts and redundant build files to `tools/legacy_archive/`.
+- ✅ Reduced root directory footprint and improved maintainability.
+
+---
+
+---
+
+## 🔒 October 15, 2026 – Comprehensive Security Hardening & Implementation
+
+### 1. **Client-Side Turso Token Removal (Stage 1 - Complete)**
+- ✅ Completely removed `TURSO_CONFIG.token` (libSQL JWT) from `js/turso.js`.
+- ✅ Blocked direct client connections to external Turso HTTP pipeline.
+- ✅ Replaced with secure server-side proxy `POST /api/query` in `server.js` forwarding authorized SQL queries.
+- ✅ Turso credentials now reside exclusively on the server in `.env`.
+
+### 2. **JWT Authentication & RBAC Authorization (Stage 2 - Complete)**
+- ✅ Implemented `POST /api/auth/login` issuing signed JWT Bearer tokens with 7-day expiration.
+- ✅ Added `GET /api/auth/me` for seamless session recovery and verification.
+- ✅ Integrated `authMiddleware` across all data endpoints (`/api/users`, `/api/customers`, `/api/tickets`, `/api/invoices`, `/api/quotes`, `/api/records`, `/api/appointments`, `/api/query`, etc.).
+- ✅ Enforced Role-Based Access Control (`requireRole(['Admin'])`) on critical operations (user creation/deletion, settings).
+- ✅ Protected Python CRM background sync daemon via loopback verification.
+
+### 3. **Network & Request Hardening (Stage 3 - Complete)**
+- ✅ Restricted CORS policy to allowed origins (`http://localhost:3000`, `http://127.0.0.1:3000`) instead of wildcard `*`.
+- ✅ Integrated `express-rate-limit`: general API limited to 180 req/min, login protected by 10 req/min brute-force limit.
+- ✅ Added whitelist enforcement for dynamic module tables (`products`, `contacts`, `contracts`, `comments`, `documents`).
+
+### 4. **Bcrypt Password Hashing & Security Alarms (Stage 4 - Complete)**
+- ✅ Converted all existing user passwords in the Turso database to strong `bcryptjs` hashes.
+- ✅ Sanitized `GET /api/users` so passwords or hashes are never leaked to clients.
+- ✅ Added `POST /api/auth/change-password` for secure self-service password updates.
+- ✅ Built Telegram Security Alert dispatcher (`sendSecurityAlert`) triggering on:
+  - Repeated failed login attempts (>= 5 failures within 15 min).
+  - Bulk record deletion attempts (> 10 records).
+  - Unauthorized administrative DDL or user manipulation attempts.
+
+### 5. **Testing & Verification**
+- ✅ Validated end-to-end authentication flow, session persistence, and RBAC via automated tests.
+- ✅ Conducted live browser validation of the login experience, Command Palette (`Ctrl + K`), and Live CRM Sync Modal.
+
+---
+
+## 🎯 Current Project Status
+**Overall Status:** ✅ **PRODUCTION-READY, HARDENED & SECURED**  
+- **Database:** Turso Cloud (libSQL via server proxy)
+- **Authentication:** JWT Bearer & Bcrypt Hashing
+- **Protection:** Rate Limiting, RBAC & Telegram Security Alarms
+- **Sync Engine:** Active with Live UI Monitoring
+**Server Port:** 3000 (`http://localhost:3000/`)  
+**Database:** Turso Cloud (libSQL)  
+**CRM Sync:** Vtiger CRM ➡️ Turso Cloud (Active Daemon)  
+**Last Verified:** October 14, 2026
+
 

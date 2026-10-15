@@ -1,36 +1,660 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
+const { rateLimit } = require('express-rate-limit');
 const { createClient } = require('@libsql/client');
+const fs = require('fs');
+const path = require('path');
+const { runReport, getLocalDateString, buildReportMessage, fetchDailyData, sendTelegramMessage } = require('./telegram_reporter');
 
 const app = express();
-app.use(cors());
+
+// ============================================================
+// 0. GÜVENLİK: HTTP GÜVENLİK BAŞLIKLARI (Helmet)
+// ============================================================
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false
+}));
+
+// ============================================================
+// 1. GÜVENLİK: CORS YAPILANDIRMASI (Hardened)
+// ============================================================
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  'http://localhost:5500',
+  'http://127.0.0.1:5500'
+];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    // Tarayıcı dışı (curl, local sync script'ler, sunucu içi istekler) veya izin verilen kaynaklar
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('CORS Policy: Bu kaynaktan erişim engellendi (' + origin + ')'));
+    }
+  },
+  credentials: true
+}));
+
 app.use(express.json({ limit: '50mb' }));
 
-// Initialize Turso DB connection
+// ============================================================
+// 2. GÜVENLİK: RATE LIMITING (İstek Kotaları & DoS Koruması)
+// ============================================================
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 dakika
+  max: 180, // Dakikada en fazla 180 istek
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Çok fazla istek yapıldı. Lütfen 1 dakika sonra tekrar deneyin.' }
+});
+app.use('/api/', apiLimiter);
+
+const loginLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 dakika
+  max: 10, // Dakikada en fazla 10 giriş denemesi (brute-force koruması)
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Çok fazla giriş denemesi yapıldı. Lütfen 1 dakika sonra tekrar deneyin.' }
+});
+
+// ============================================================
+// 3. VERİTABANI BAĞLANTISI (Turso libSQL)
+// ============================================================
 const db = createClient({
   url: process.env.TURSO_DATABASE_URL,
   authToken: process.env.TURSO_AUTH_TOKEN,
 });
 
-// GET USERS
-app.get('/api/users', async (req, res) => {
+const JWT_SECRET = process.env.JWT_SECRET || 'taskflow_secure_portal_jwt_2026_default';
+const crmStatsPath = 'D:\\AI\\AI WORKS\\Works_CRM\\Source\\daily_sync_stats.json';
+
+// ============================================================
+// 4. TELEGRAM GÜVENLİK ALARMI BİLDİRİM MOTORU
+// ============================================================
+async function sendSecurityAlert(title, details, severity = 'WARNING') {
   try {
-    const result = await db.execute('SELECT * FROM users');
+    const now = new Date().toLocaleString('tr-TR');
+    const icon = severity === 'CRITICAL' ? '🚨🚨🚨' : '⚠️';
+    const msg = `<b>${icon} TASKFLOW GÜVENLİK ALARMI</b>\n\n` +
+                `<b>Konu:</b> ${title}\n` +
+                `<b>Seviye:</b> ${severity}\n` +
+                `<b>Tarih/Saat:</b> ${now}\n` +
+                `<b>Detaylar:</b>\n<code>${details}</code>`;
+    if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID) {
+      await sendTelegramMessage(msg);
+      console.log(`[SECURITY ALERT] Telegram'a güvenlik uyarısı gönderildi: ${title}`);
+    } else {
+      console.warn(`[SECURITY ALERT (No Telegram Config)] ${title} - ${details}`);
+    }
+  } catch (err) {
+    console.error('[SECURITY ALERT ERROR]', err.message);
+  }
+}
+
+// Başarısız Giriş Takibi (Brute-Force Tespiti)
+const failedLoginMap = new Map(); // IP -> { count, firstFailedAt }
+function recordFailedLogin(ip, username) {
+  const now = Date.now();
+  const rec = failedLoginMap.get(ip) || { count: 0, firstFailedAt: now };
+  if (now - rec.firstFailedAt > 15 * 60 * 1000) {
+    rec.count = 1;
+    rec.firstFailedAt = now;
+  } else {
+    rec.count += 1;
+  }
+  failedLoginMap.set(ip, rec);
+
+  if (rec.count >= 5) {
+    sendSecurityAlert(
+      'Olası Brute-Force Saldırısı (5+ Hatalı Giriş)',
+      `IP: ${ip}\nKullanıcı: ${username}\nDeneme Sayısı: ${rec.count}\nSon 15 dakika içinde ardışık başarısız giriş denemeleri yapıldı.`,
+      'CRITICAL'
+    );
+  }
+}
+
+function clearFailedLogin(ip) {
+  failedLoginMap.delete(ip);
+}
+
+// ============================================================
+// 5. İKİLİ KULLANICI MİMARİSİ: vt_users (CRM) & taskflow_users (Portal)
+// ============================================================
+async function initUserTables() {
+  try {
+    // 1. CRM Senkronizasyon Tablosu (vt_users - Salt CRM Teknisyen / Atanan Kullanıcılar)
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS vt_users (
+        id TEXT PRIMARY KEY,
+        user_name TEXT,
+        first_name TEXT,
+        last_name TEXT,
+        full_name TEXT,
+        email TEXT,
+        role_name TEXT,
+        status TEXT DEFAULT 'Active',
+        created_at TEXT DEFAULT (datetime('now'))
+      )
+    `);
+
+    // Başlangıç VTiger CRM kullanıcılarını yükle (Eğer boşsa)
+    const countCheck = await db.execute('SELECT COUNT(*) as cnt FROM vt_users');
+    const cnt = countCheck.rows[0]?.cnt || 0;
+    if (cnt === 0) {
+      console.log('[DB] vt_users tablosu CRM teknisyenleri ile dolduruluyor...');
+      const defaultCRMUsers = [
+        ['19x1',  'admin',            'ismail',   'Administrator',  'ismail Administrator', 'support@taskflow.com', 'Administrator'],
+        ['19x5',  'uguryavuz',        'Ugur',     'Yavuz',          'Ugur Yavuz',           'ugur@taskflow.com',    'Technician'],
+        ['19x6',  'ahmetbaltaci',     'Ahmet',    'Baltaci',        'Ahmet Baltaci',        'ahmet@taskflow.com',   'Technician'],
+        ['19x7',  'ibrahimahmet',     'Ibrahim',  'Ahmet',          'Ibrahim Ahmet',        'ibrahim@taskflow.com', 'Sales & Quotes'],
+        ['19x8',  'alpayburc',        'Alpay',    'Burc',           'Alpay Burc',           'alpay@taskflow.com',   'Sales & Contracts'],
+        ['19x9',  'ugurisikcevahir',  'ugur',     'isikcevahir',    'ugur isikcevahir',     'ugur.i@taskflow.com',  'Technician'],
+        ['19x10', 'osmanakgul',       'Osman',    'Akgul',          'Osman Akgul',          'osman@taskflow.com',   'Sales'],
+        ['19x11', 'support',          'Support',  'User',           'Support User',         'support@taskflow.com', 'Support']
+      ];
+      for (const u of defaultCRMUsers) {
+        await db.execute({
+          sql: `INSERT OR REPLACE INTO vt_users (id, user_name, first_name, last_name, full_name, email, role_name, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'Active')`,
+          args: u
+        });
+      }
+      console.log('[DB] vt_users CRM personelleri başarıyla eklendi.');
+    }
+
+    // 2. TaskFlow Portal Kullanıcıları Tablosu (taskflow_users)
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS taskflow_users (
+        id TEXT PRIMARY KEY,
+        full_name TEXT NOT NULL,
+        username TEXT UNIQUE NOT NULL,
+        email TEXT,
+        role TEXT NOT NULL DEFAULT 'User',
+        status TEXT NOT NULL DEFAULT 'ACTIVE',
+        password_hash TEXT,
+        vt_user_id TEXT,
+        avatar_url TEXT,
+        created_at TEXT DEFAULT (datetime('now'))
+      )
+    `);
+
+    // Mevcut 'users' tablosundaki kayıtları 'taskflow_users' tablosuna aktar
+    try {
+      const existingUsers = await db.execute('SELECT * FROM users');
+      if (existingUsers.rows && existingUsers.rows.length > 0) {
+        for (const u of existingUsers.rows) {
+          const uname = u.username || (u.full_name ? u.full_name.toLowerCase().replace(/\s+/g, '') : u.id);
+          const phash = u.password_hash || (u.password ? bcrypt.hashSync(u.password, 10) : null);
+          await db.execute({
+            sql: `INSERT OR IGNORE INTO taskflow_users (id, full_name, username, email, role, status, password_hash, created_at)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            args: [u.id, u.full_name || uname, uname, u.email || null, u.role || 'User', u.status || 'ACTIVE', phash, u.created_at || new Date().toISOString()]
+          });
+        }
+      }
+    } catch (e) {
+      // users tablosu yoksa veya hata verirse devam et
+    }
+    // 3. Randevular Tablosu (appointments)
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS appointments (
+        id TEXT PRIMARY KEY,
+        subject TEXT,
+        eventstatus TEXT DEFAULT 'Planned',
+        date_start TEXT,
+        time_start TEXT,
+        due_date TEXT,
+        time_end TEXT,
+        parent_id TEXT,
+        customer_name TEXT,
+        assigned_user_id TEXT,
+        description TEXT,
+        createdtime TEXT DEFAULT (datetime('now')),
+        modifiedtime TEXT DEFAULT (datetime('now'))
+      )
+    `);
+
+    console.log('[DB] Veritabanı tabloları (vt_users, taskflow_users, appointments) hazır.');
+  } catch (err) {
+    console.error('[DB INIT ERROR]', err.message);
+  }
+}
+initUserTables();
+
+// ============================================================
+// 5b. ŞİFRELEME: DÜZ METİN ŞİFRELERİN BCRYPT İLE OTOMATİK DÖNÜŞTÜRÜLMESİ
+// ============================================================
+async function migratePlaintextPasswords() {
+  try {
+    const res = await db.execute('SELECT id, password, password_hash FROM users WHERE password_hash IS NULL AND password IS NOT NULL');
+    if (res.rows && res.rows.length > 0) {
+      console.log(`[AUTH] ${res.rows.length} kullanıcının şifresi bcrypt ile hash'leniyor...`);
+      for (const u of res.rows) {
+        if (u.password && typeof u.password === 'string' && u.password.trim().length > 0) {
+          const hash = bcrypt.hashSync(u.password.trim(), 10);
+          await db.execute({
+            sql: 'UPDATE users SET password_hash = ? WHERE id = ?',
+            args: [hash, u.id]
+          });
+          // Also update in taskflow_users
+          await db.execute({
+            sql: 'UPDATE taskflow_users SET password_hash = ? WHERE id = ?',
+            args: [hash, u.id]
+          });
+        }
+      }
+      console.log(`[AUTH] Tüm kullanıcı şifreleri başarıyla bcrypt hash'ine dönüştürüldü.`);
+    }
+  } catch (err) {
+    console.error('[AUTH MIGRATION ERROR]', err.message);
+  }
+}
+migratePlaintextPasswords();
+
+// ============================================================
+// 6. YETKİLENDİRME ARA KATMANLARI (Auth & RBAC Middleware)
+// ============================================================
+function isLocalhost(req) {
+  const ip = req.ip || req.connection?.remoteAddress || req.socket?.remoteAddress;
+  return ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1' || ip === 'localhost';
+}
+
+const SYNC_ENDPOINTS = [
+  '/api/customers',
+  '/api/invoices',
+  '/api/appointments',
+  '/api/tickets',
+  '/api/quotes',
+  '/api/products',
+  '/api/contacts',
+  '/api/contracts',
+  '/api/comments',
+  '/api/documents',
+  '/api/sync-logs',
+  '/api/sync-logs/clear'
+];
+
+function authMiddleware(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.substring(7).trim();
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET);
+      req.user = decoded;
+      return next();
+    } catch (err) {
+      return res.status(401).json({ error: 'Geçersiz veya süresi dolmuş oturum anahtarı (JWT).' });
+    }
+  }
+
+  // Yerel Python CRM senkronizasyon motoru (python-requests) için izin ver
+  const isLocal = isLocalhost(req);
+  const userAgent = (req.headers['user-agent'] || '').toLowerCase();
+  const isPythonSync = userAgent.includes('python-requests');
+  const isBrowser = req.headers['sec-fetch-mode'] || req.headers['origin'] || req.headers['referer'];
+  const isSyncPath = SYNC_ENDPOINTS.some(p => req.path === p || req.originalUrl?.startsWith(p));
+
+  if (isLocal && !isBrowser && (isPythonSync || isSyncPath)) {
+    req.user = { id: 'SYNC-DAEMON', username: 'local_sync_daemon', role: 'Admin', isInternal: true };
+    return next();
+  }
+
+  return res.status(401).json({ error: 'Yetkisiz erişim. Lütfen giriş yapın.' });
+}
+
+function requireRole(allowedRoles = []) {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Yetkilendirme gerekli.' });
+    }
+    if (allowedRoles.includes(req.user.role) || req.user.role === 'Admin') {
+      return next();
+    }
+    sendSecurityAlert(
+      'Yetkisiz Rol İle İşlem Denemesi',
+      `Kullanıcı: ${req.user.username} (Rol: ${req.user.role})\nİstenen Yol: ${req.method} ${req.originalUrl}`,
+      'WARNING'
+    );
+    return res.status(403).json({ error: 'Bu işlem için yetkiniz bulunmamaktadır.' });
+  };
+}
+
+// ============================================================
+// 7. PUBLIC SİSTEM VE DURUM UÇ NOKTALARI
+// ============================================================
+
+// HEALTH CHECK
+app.get('/api/health', async (req, res) => {
+  let dbStatus = 'disconnected';
+  let dbLatencyMs = null;
+  try {
+    const t0 = Date.now();
+    await db.execute('SELECT 1');
+    dbLatencyMs = Date.now() - t0;
+    dbStatus = 'connected';
+  } catch (err) {
+    dbStatus = `error: ${err.message}`;
+  }
+
+  res.json({
+    status: dbStatus === 'connected' ? 'ok' : 'degraded',
+    service: 'TaskFlow Portal API',
+    timestamp: new Date().toISOString(),
+    uptimeSeconds: Math.floor(process.uptime()),
+    database: {
+      provider: 'Turso Cloud (libSQL)',
+      status: dbStatus,
+      latencyMs: dbLatencyMs
+    },
+    security: {
+      auth: 'JWT & RBAC Active',
+      bcrypt: 'Active',
+      rateLimiting: 'Active',
+      cors: 'Restricted'
+    },
+    memory: {
+      rssMB: Math.round(process.memoryUsage().rss / 1024 / 1024),
+      heapUsedMB: Math.round(process.memoryUsage().heapUsed / 1024 / 1024)
+    }
+  });
+});
+
+// SYNC STATUS FROM PYTHON CRM ENGINE
+app.get('/api/sync/status', (req, res) => {
+  try {
+    if (fs.existsSync(crmStatsPath)) {
+      const data = JSON.parse(fs.readFileSync(crmStatsPath, 'utf8'));
+      const fileStats = fs.statSync(crmStatsPath);
+      res.json({
+        success: true,
+        lastModified: fileStats.mtime.toISOString(),
+        stats: data
+      });
+    } else {
+      res.json({
+        success: false,
+        message: 'daily_sync_stats.json not found',
+        stats: null
+      });
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================
+// 8. KİMLİK DOĞRULAMA (AUTH) UÇ NOKTALARI
+// ============================================================
+
+// LOGIN
+app.post('/api/auth/login', loginLimiter, async (req, res) => {
+  const { username, password } = req.body || {};
+  const ip = req.ip || req.connection?.remoteAddress || 'unknown';
+
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Kullanıcı adı ve şifre zorunludur.' });
+  }
+
+  const cleanUser = String(username).trim();
+  const cleanPass = String(password).trim();
+  const userUpper = cleanUser.toUpperCase();
+
+  // 1. Master Admin Bypass
+  if (userUpper === 'ADMIN' && (cleanPass === 'admin' || cleanPass === '1234')) {
+    clearFailedLogin(ip);
+    const adminUser = {
+      id: 'U-001',
+      username: 'admin',
+      full_name: 'System Admin',
+      role: 'Admin',
+      status: 'ACTIVE'
+    };
+    const token = jwt.sign(adminUser, JWT_SECRET, { expiresIn: '7d' });
+    return res.json({ success: true, token, user: adminUser });
+  }
+
+  try {
+    // 2. Veritabanından Kullanıcıyı Sorgula (Önce taskflow_users, yoksa users)
+    let queryRes = await db.execute({
+      sql: `SELECT id, username, full_name, role, status, email, NULL as password, password_hash, vt_user_id 
+            FROM taskflow_users 
+            WHERE LOWER(username) = LOWER(?) OR LOWER(full_name) = LOWER(?) OR LOWER(email) = LOWER(?)
+            LIMIT 1`,
+      args: [cleanUser, cleanUser, cleanUser]
+    });
+
+    if (!queryRes.rows || queryRes.rows.length === 0) {
+      queryRes = await db.execute({
+        sql: `SELECT id, username, full_name, role, status, email, password, password_hash, NULL as vt_user_id 
+              FROM users 
+              WHERE LOWER(username) = LOWER(?) OR LOWER(full_name) = LOWER(?) OR LOWER(email) = LOWER(?)
+              LIMIT 1`,
+        args: [cleanUser, cleanUser, cleanUser]
+      });
+    }
+
+    if (!queryRes.rows || queryRes.rows.length === 0) {
+      recordFailedLogin(ip, cleanUser);
+      return res.status(401).json({ error: 'Kullanıcı bulunamadı.' });
+    }
+
+    const dbUser = queryRes.rows[0];
+
+    // Aktiflik kontrolü
+    if (dbUser.status === 'INACTIVE') {
+      return res.status(403).json({ error: 'Bu kullanıcı hesabı askıya alınmıştır.' });
+    }
+
+    // Şifre kontrolü (bcrypt hash veya eski düz metin ile kontrol edip hash'e yükseltme)
+    let passwordValid = false;
+    if (dbUser.password_hash) {
+      passwordValid = bcrypt.compareSync(cleanPass, dbUser.password_hash);
+    } else if (dbUser.password) {
+      passwordValid = (dbUser.password === cleanPass);
+      if (passwordValid) {
+        // Otomatik bcrypt yükseltmesi
+        const newHash = bcrypt.hashSync(cleanPass, 10);
+        await db.execute({
+          sql: 'UPDATE users SET password_hash = ? WHERE id = ?',
+          args: [newHash, dbUser.id]
+        });
+        try {
+          await db.execute({
+            sql: 'UPDATE taskflow_users SET password_hash = ? WHERE id = ?',
+            args: [newHash, dbUser.id]
+          });
+        } catch(e) {}
+      }
+    }
+
+    if (!passwordValid) {
+      recordFailedLogin(ip, cleanUser);
+      return res.status(401).json({ error: 'Hatalı şifre.' });
+    }
+
+    clearFailedLogin(ip);
+
+    const userPayload = {
+      id: dbUser.id,
+      username: dbUser.username || cleanUser,
+      full_name: dbUser.full_name || cleanUser,
+      role: dbUser.role || 'User',
+      email: dbUser.email || null,
+      status: dbUser.status || 'ACTIVE',
+      vt_user_id: dbUser.vt_user_id || null
+    };
+
+    const token = jwt.sign(userPayload, JWT_SECRET, { expiresIn: '7d' });
+    res.json({ success: true, token, user: userPayload });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// CURRENT USER VERIFICATION
+app.get('/api/auth/me', authMiddleware, (req, res) => {
+  res.json({ success: true, user: req.user });
+});
+
+// PASSWORD CHANGE (My Preferences)
+app.post('/api/auth/change-password', authMiddleware, async (req, res) => {
+  try {
+    const { newPassword } = req.body;
+    if (!newPassword || newPassword.length < 3) {
+      return res.status(400).json({ error: 'Şifre en az 3 karakter olmalıdır.' });
+    }
+
+    const userId = req.user.id;
+    const hash = bcrypt.hashSync(newPassword.trim(), 10);
+
+    await db.execute({
+      sql: 'UPDATE users SET password_hash = ?, password = NULL WHERE id = ?',
+      args: [hash, userId]
+    });
+
+    res.json({ success: true, message: 'Şifreniz başarıyla güncellendi.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================
+// 9. GÜVENLİ VERİTABANI PROXY KÖPRÜSÜ (Client Direct Turso yerine)
+// ============================================================
+app.post('/api/query', authMiddleware, async (req, res) => {
+  try {
+    const { sql, args = [] } = req.body;
+    if (!sql || typeof sql !== 'string') {
+      return res.status(400).json({ error: 'SQL ifadesi zorunludur.' });
+    }
+
+    const cleanSql = sql.trim();
+    const upper = cleanSql.toUpperCase();
+
+    // 1. Kritik DDL Engelleme
+    if (upper.startsWith('DROP ') || upper.startsWith('ALTER ') || upper.startsWith('TRUNCATE ')) {
+      if (req.user?.role !== 'Admin') {
+        await sendSecurityAlert('Yetkisiz DDL Komutu Engellendi', `Kullanıcı: ${req.user?.username}\nSorgu: ${cleanSql}`, 'CRITICAL');
+        return res.status(403).json({ error: 'Veritabanı yapısal değişiklikleri için Admin yetkisi gereklidir.' });
+      }
+    }
+
+    // 2. Toplu Kayıt Silme Tespiti & Alarmlar
+    if (upper.startsWith('DELETE ') || upper.includes(' DELETE FROM ')) {
+      if (!upper.includes(' WHERE ')) {
+        await sendSecurityAlert('Filtresiz Toplu Kayıt Silme Uyarısı', `Kullanıcı: ${req.user?.username}\nSorgu: ${cleanSql}`, 'CRITICAL');
+      }
+    }
+
+    // 3. Kullanıcı Tablosu Koruma (Yalnızca Admin veya kendi profilini güncelleyen kullanıcı)
+    if ((upper.includes('UPDATE USERS') || upper.includes('DELETE FROM USERS') || upper.includes('INSERT INTO USERS')) && req.user?.role !== 'Admin') {
+      const isSelfUpdate = upper.startsWith('UPDATE USERS SET') && (cleanSql.includes('avatar_url') || cleanSql.includes('full_name') || cleanSql.includes('email')) && args.includes(req.user?.id);
+      if (!isSelfUpdate) {
+        await sendSecurityAlert('Yetkisiz Kullanıcı Tablosu Müdahalesi', `Kullanıcı: ${req.user?.username} (Rol: ${req.user?.role})\nSorgu: ${cleanSql}`, 'WARNING');
+        return res.status(403).json({ error: 'Kullanıcı tablosunu değiştirme yetkiniz yoktur.' });
+      }
+    }
+
+    const result = await db.execute({ sql: cleanSql, args });
+
+    // 10'dan fazla kayıt silindiyse güvenlik alarmı gönder
+    if (upper.startsWith('DELETE ') && (result.rowsAffected || 0) > 10) {
+      await sendSecurityAlert(
+        'Toplu Kayıt Silindi (>10 Kayıt)',
+        `Kullanıcı: ${req.user?.username}\nSilinen Kayıt Sayısı: ${result.rowsAffected}\nSorgu: ${cleanSql}`,
+        'WARNING'
+      );
+    }
+
+    res.json({
+      success: true,
+      rows: result.rows || [],
+      rowsAffected: result.rowsAffected || 0
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================
+// 10. KULLANICI YÖNETİMİ (Users API - Sanitized & RBAC)
+// ============================================================
+
+// ============================================================
+// 10. VTIGER CRM USERS API (vt_users - Salt CRM Teknisyen / Atanan Kullanıcılar)
+// ============================================================
+app.get(['/api/vt-users', '/api/vt_users'], authMiddleware, async (req, res) => {
+  try {
+    const result = await db.execute('SELECT id, user_name, first_name, last_name, full_name, email, role_name, status FROM vt_users ORDER BY full_name ASC');
     res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// CREATE / UPDATE USER
-app.post('/api/users', async (req, res) => {
+app.post(['/api/vt-users', '/api/vt_users'], authMiddleware, async (req, res) => {
   try {
-    const { id, full_name, username, email, role, status, password, password_hash } = req.body;
+    const { id, user_name, first_name, last_name, full_name, email, role_name, status } = req.body;
+    if (!id) return res.status(400).json({ error: 'VTiger user ID gereklidir.' });
+    const fname = full_name || `${first_name || ''} ${last_name || ''}`.trim() || user_name;
+    await db.execute({
+      sql: `INSERT INTO vt_users (id, user_name, first_name, last_name, full_name, email, role_name, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+              user_name=excluded.user_name,
+              first_name=excluded.first_name,
+              last_name=excluded.last_name,
+              full_name=excluded.full_name,
+              email=excluded.email,
+              role_name=excluded.role_name,
+              status=excluded.status`,
+      args: [id, user_name || '', first_name || '', last_name || '', fname, email || '', role_name || 'Technician', status || 'Active']
+    });
+    res.json({ success: true, id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================
+// 10b. TASKFLOW PORTAL KULLANICILARI (taskflow_users & users Mirror)
+// ============================================================
+
+// GET USERS (taskflow_users ile sorgula, users ile geriye dönük uyumlu kal)
+app.get(['/api/users', '/api/taskflow-users'], authMiddleware, async (req, res) => {
+  try {
+    let result = await db.execute('SELECT id, full_name, username, email, role, status, vt_user_id, avatar_url, created_at FROM taskflow_users ORDER BY full_name ASC');
+    if (!result.rows || result.rows.length === 0) {
+      result = await db.execute('SELECT id, full_name, username, email, role, status, NULL as vt_user_id, avatar_url, created_at FROM users ORDER BY full_name ASC');
+    }
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// CREATE / UPDATE USER (Admin Only - taskflow_users & users senkron)
+app.post(['/api/users', '/api/taskflow-users'], authMiddleware, requireRole(['Admin']), async (req, res) => {
+  try {
+    const { id, full_name, username, email, role, status, password, password_hash, vt_user_id } = req.body;
     const userId = id || ('U-' + Date.now());
     const uname = username || (full_name ? full_name.toLowerCase().replace(/\s+/g, '') : userId);
+
+    let finalHash = password_hash || null;
+    if (password && typeof password === 'string' && password.trim().length > 0) {
+      finalHash = bcrypt.hashSync(password.trim(), 10);
+    }
+
+    // 1. TaskFlow Users tablosuna yaz
     await db.execute({
-      sql: `INSERT INTO users (id, full_name, username, email, role, status, password, password_hash) 
+      sql: `INSERT INTO taskflow_users (id, full_name, username, email, role, status, password_hash, vt_user_id) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
               full_name=excluded.full_name,
@@ -38,31 +662,78 @@ app.post('/api/users', async (req, res) => {
               email=excluded.email,
               role=excluded.role,
               status=excluded.status,
-              password=excluded.password,
-              password_hash=excluded.password_hash`,
-      args: [userId, full_name, uname, email || null, role || 'User', status || 'ACTIVE', password || '1234', password_hash || null]
+              vt_user_id=COALESCE(excluded.vt_user_id, taskflow_users.vt_user_id),
+              password_hash=COALESCE(excluded.password_hash, taskflow_users.password_hash)`,
+      args: [userId, full_name, uname, email || null, role || 'User', status || 'ACTIVE', finalHash, vt_user_id || null]
     });
-    res.json({ success: true, id: userId });
+
+    // 2. Legacy users tablosuna aynala
+    try {
+      await db.execute({
+        sql: `INSERT INTO users (id, full_name, username, email, role, status, password, password_hash) 
+              VALUES (?, ?, ?, ?, ?, ?, NULL, ?)
+              ON CONFLICT(id) DO UPDATE SET
+                full_name=excluded.full_name,
+                username=excluded.username,
+                email=excluded.email,
+                role=excluded.role,
+                status=excluded.status,
+                password=NULL,
+                password_hash=COALESCE(excluded.password_hash, users.password_hash)`,
+        args: [userId, full_name, uname, email || null, role || 'User', status || 'ACTIVE', finalHash]
+      });
+    } catch (e) { /* ignore */ }
+
+    res.json({ success: true, id: userId, username: uname });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// DELETE USER
-app.delete('/api/users/:id', async (req, res) => {
+// UPDATE USER ROLE (Admin Only - taskflow_users & users senkron)
+app.patch(['/api/users/:id/role', '/api/taskflow-users/:id/role'], authMiddleware, requireRole(['Admin']), async (req, res) => {
+  try {
+    const { role } = req.body;
+    if (!role) return res.status(400).json({ error: 'Role parametresi zorunludur.' });
+    await db.execute({
+      sql: 'UPDATE taskflow_users SET role = ? WHERE id = ?',
+      args: [role, req.params.id]
+    });
+    try {
+      await db.execute({
+        sql: 'UPDATE users SET role = ? WHERE id = ?',
+        args: [role, req.params.id]
+      });
+    } catch (e) {}
+    res.json({ success: true, role });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE USER (Admin Only)
+app.delete(['/api/users/:id', '/api/taskflow-users/:id'], authMiddleware, requireRole(['Admin']), async (req, res) => {
   try {
     await db.execute({
-      sql: 'DELETE FROM users WHERE id = ?',
+      sql: 'DELETE FROM taskflow_users WHERE id = ?',
       args: [req.params.id]
     });
+    try {
+      await db.execute({
+        sql: 'DELETE FROM users WHERE id = ?',
+        args: [req.params.id]
+      });
+    } catch (e) {}
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// LOGS
-app.get('/api/logs', async (req, res) => {
+// ============================================================
+// 11. SİSTEM LOGLARI
+// ============================================================
+app.get('/api/logs', authMiddleware, async (req, res) => {
   try {
     const result = await db.execute('SELECT * FROM system_logs ORDER BY timestamp DESC LIMIT 100');
     res.json(result.rows);
@@ -71,12 +742,12 @@ app.get('/api/logs', async (req, res) => {
   }
 });
 
-app.post('/api/logs', async (req, res) => {
+app.post('/api/logs', authMiddleware, async (req, res) => {
   try {
     const { user_id, action, details, timestamp } = req.body;
     await db.execute({
       sql: 'INSERT INTO system_logs (user_id, action, details, timestamp) VALUES (?, ?, ?, ?)',
-      args: [user_id, action, details, timestamp]
+      args: [user_id || req.user?.username || 'System', action, details, timestamp || new Date().toISOString()]
     });
     res.json({ success: true });
   } catch (err) {
@@ -84,9 +755,46 @@ app.post('/api/logs', async (req, res) => {
   }
 });
 
-// CUSTOMERS
-app.get('/api/customers', async (req, res) => {
+// ============================================================
+// 12. MÜŞTERİLER (Customers API)
+// ============================================================
+app.get('/api/customers', authMiddleware, async (req, res) => {
   try {
+    const { q, limit, offset, search } = req.query;
+    const searchTerm = (q || search || '').trim();
+
+    if (searchTerm) {
+      const term = `%${searchTerm}%`;
+      const lim = parseInt(limit) || 100;
+      const off = parseInt(offset) || 0;
+
+      const countRes = await db.execute({
+        sql: `SELECT COUNT(*) as total FROM vt_customers 
+              WHERE organization_name LIKE ? OR primary_phone LIKE ? OR organization_number LIKE ? OR billing_postal_code LIKE ?`,
+        args: [term, term, term, term]
+      });
+      const total = Number(countRes.rows[0]?.total || 0);
+
+      const result = await db.execute({
+        sql: `SELECT * FROM vt_customers 
+              WHERE organization_name LIKE ? OR primary_phone LIKE ? OR organization_number LIKE ? OR billing_postal_code LIKE ?
+              ORDER BY organization_name ASC LIMIT ? OFFSET ?`,
+        args: [term, term, term, term, lim, off]
+      });
+
+      return res.json({ rows: result.rows, total, limit: lim, offset: off });
+    }
+
+    if (limit) {
+      const lim = parseInt(limit);
+      const off = parseInt(offset) || 0;
+      const result = await db.execute({
+        sql: `SELECT * FROM vt_customers ORDER BY organization_name ASC LIMIT ? OFFSET ?`,
+        args: [lim, off]
+      });
+      return res.json(result.rows);
+    }
+
     const result = await db.execute('SELECT * FROM vt_customers');
     res.json(result.rows);
   } catch (err) {
@@ -94,7 +802,7 @@ app.get('/api/customers', async (req, res) => {
   }
 });
 
-app.post('/api/customers', async (req, res) => {
+app.post('/api/customers', authMiddleware, async (req, res) => {
   try {
     const customers = Array.isArray(req.body) ? req.body : [req.body];
     const queries = customers.map(c => ({
@@ -122,8 +830,7 @@ app.post('/api/customers', async (req, res) => {
         c.primary_email, c.primary_phone, c.description
       ]
     }));
-    
-    // Execute all in a batch
+
     await db.batch(queries);
     res.json({ success: true, count: customers.length });
   } catch (err) {
@@ -131,8 +838,10 @@ app.post('/api/customers', async (req, res) => {
   }
 });
 
-// INVOICES
-app.get('/api/invoices', async (req, res) => {
+// ============================================================
+// 13. FATURALAR (Invoices API)
+// ============================================================
+app.get('/api/invoices', authMiddleware, async (req, res) => {
   try {
     const result = await db.execute('SELECT * FROM invoices');
     res.json(result.rows);
@@ -141,7 +850,7 @@ app.get('/api/invoices', async (req, res) => {
   }
 });
 
-app.post('/api/invoices', async (req, res) => {
+app.post('/api/invoices', authMiddleware, async (req, res) => {
   try {
     const items = Array.isArray(req.body) ? req.body : [req.body];
     const queries = items.map(c => ({
@@ -172,8 +881,10 @@ app.post('/api/invoices', async (req, res) => {
   }
 });
 
-// APPOINTMENTS (EVENTS)
-app.get('/api/appointments', async (req, res) => {
+// ============================================================
+// 14. RANDEVULAR / ETKİNLİKLER (Appointments API)
+// ============================================================
+app.get('/api/appointments', authMiddleware, async (req, res) => {
   try {
     const result = await db.execute('SELECT * FROM appointments');
     res.json(result.rows);
@@ -182,7 +893,7 @@ app.get('/api/appointments', async (req, res) => {
   }
 });
 
-app.post('/api/appointments', async (req, res) => {
+app.post('/api/appointments', authMiddleware, async (req, res) => {
   try {
     const items = Array.isArray(req.body) ? req.body : [req.body];
     const queries = items.map(c => ({
@@ -213,8 +924,10 @@ app.post('/api/appointments', async (req, res) => {
   }
 });
 
-// RECORDS / TICKETS
-app.get('/api/records', async (req, res) => {
+// ============================================================
+// 15. SERVİS KAYITLARI (Records API)
+// ============================================================
+app.get('/api/records', authMiddleware, async (req, res) => {
   try {
     const result = await db.execute('SELECT * FROM records ORDER BY created_at DESC');
     res.json(result.rows);
@@ -223,7 +936,7 @@ app.get('/api/records', async (req, res) => {
   }
 });
 
-app.post('/api/records', async (req, res) => {
+app.post('/api/records', authMiddleware, async (req, res) => {
   try {
     const r = req.body;
     const id = r.id || ('REC-' + Date.now());
@@ -263,7 +976,7 @@ app.post('/api/records', async (req, res) => {
   }
 });
 
-app.delete('/api/records/:id', async (req, res) => {
+app.delete('/api/records/:id', authMiddleware, async (req, res) => {
   try {
     await db.execute({
       sql: 'DELETE FROM records WHERE id = ?',
@@ -275,9 +988,10 @@ app.delete('/api/records/:id', async (req, res) => {
   }
 });
 
-
-// TICKETS
-app.get('/api/tickets', async (req, res) => {
+// ============================================================
+// 16. DESTEK BİLETLERİ (Tickets API)
+// ============================================================
+app.get('/api/tickets', authMiddleware, async (req, res) => {
   try {
     const { parent_id, customer_id } = req.query;
     const cid = parent_id || customer_id;
@@ -294,11 +1008,11 @@ app.get('/api/tickets', async (req, res) => {
   }
 });
 
-app.post('/api/tickets', async (req, res) => {
+app.post('/api/tickets', authMiddleware, async (req, res) => {
   try {
     const items = Array.isArray(req.body) ? req.body : [req.body];
     const queries = items.map(t => {
-      const id = t.id || ('TCK-' + Date.now() + '-' + Math.floor(Math.random()*1000));
+      const id = t.id || ('TCK-' + Date.now() + '-' + Math.floor(Math.random() * 1000));
       return {
         sql: `INSERT INTO vt_tickets (
           id, ticket_no, ticket_title, ticketstatus, ticketpriorities, ticketseverities,
@@ -335,7 +1049,7 @@ app.post('/api/tickets', async (req, res) => {
   }
 });
 
-app.delete('/api/tickets/:id', async (req, res) => {
+app.delete('/api/tickets/:id', authMiddleware, async (req, res) => {
   try {
     await db.execute({ sql: 'DELETE FROM vt_tickets WHERE id = ?', args: [req.params.id] });
     res.json({ success: true });
@@ -344,8 +1058,10 @@ app.delete('/api/tickets/:id', async (req, res) => {
   }
 });
 
-// QUOTES
-app.get('/api/quotes', async (req, res) => {
+// ============================================================
+// 17. TEKLİFLER (Quotes API)
+// ============================================================
+app.get('/api/quotes', authMiddleware, async (req, res) => {
   try {
     const { account_id, customer_id } = req.query;
     const cid = account_id || customer_id;
@@ -362,11 +1078,11 @@ app.get('/api/quotes', async (req, res) => {
   }
 });
 
-app.post('/api/quotes', async (req, res) => {
+app.post('/api/quotes', authMiddleware, async (req, res) => {
   try {
     const items = Array.isArray(req.body) ? req.body : [req.body];
     const queries = items.map(q => {
-      const id = q.id || ('QUO-' + Date.now() + '-' + Math.floor(Math.random()*1000));
+      const id = q.id || ('QUO-' + Date.now() + '-' + Math.floor(Math.random() * 1000));
       return {
         sql: `INSERT INTO vt_quotes (
           id, quote_no, subject, quotestage, validtill, hdnGrandTotal,
@@ -401,7 +1117,7 @@ app.post('/api/quotes', async (req, res) => {
   }
 });
 
-app.delete('/api/quotes/:id', async (req, res) => {
+app.delete('/api/quotes/:id', authMiddleware, async (req, res) => {
   try {
     await db.execute({ sql: 'DELETE FROM vt_quotes WHERE id = ?', args: [req.params.id] });
     res.json({ success: true });
@@ -410,8 +1126,10 @@ app.delete('/api/quotes/:id', async (req, res) => {
   }
 });
 
-// SERVICES
-app.get('/api/services', async (req, res) => {
+// ============================================================
+// 18. HİZMETLER & AYARLAR (Services & Settings API)
+// ============================================================
+app.get('/api/services', authMiddleware, async (req, res) => {
   try {
     const result = await db.execute('SELECT * FROM services');
     res.json(result.rows);
@@ -420,8 +1138,7 @@ app.get('/api/services', async (req, res) => {
   }
 });
 
-// SETTINGS
-app.get('/api/settings', async (req, res) => {
+app.get('/api/settings', authMiddleware, async (req, res) => {
   try {
     const result = await db.execute('SELECT * FROM app_settings');
     const settings = {};
@@ -434,7 +1151,7 @@ app.get('/api/settings', async (req, res) => {
   }
 });
 
-app.post('/api/settings', async (req, res) => {
+app.post('/api/settings', authMiddleware, requireRole(['Admin']), async (req, res) => {
   try {
     const { id, data } = req.body;
     const strData = typeof data === 'string' ? data : JSON.stringify(data);
@@ -448,12 +1165,18 @@ app.post('/api/settings', async (req, res) => {
   }
 });
 
-// ==========================================
-// NEW MODULES (Products, Contacts, Contracts, Comments, Documents)
-// ==========================================
+// ============================================================
+// 19. DİNAMİK MODÜLLER (Products, Contacts, Contracts, Comments, Documents - Whitelisted)
+// ============================================================
+const ALLOWED_MODULES = ['products', 'contacts', 'contracts', 'comments', 'documents'];
+
 const createGenericEndpoints = (moduleName) => {
+  if (!ALLOWED_MODULES.includes(moduleName)) {
+    throw new Error(`Güvenlik Uyarısı: Geçersiz modül '${moduleName}'`);
+  }
+
   const tableName = 'vt_' + moduleName;
-  app.get(`/api/${moduleName}`, async (req, res) => {
+  app.get(`/api/${moduleName}`, authMiddleware, async (req, res) => {
     try {
       const result = await db.execute(`SELECT * FROM ${tableName}`);
       const data = result.rows.map(r => {
@@ -465,7 +1188,7 @@ const createGenericEndpoints = (moduleName) => {
     }
   });
 
-  app.post(`/api/${moduleName}`, async (req, res) => {
+  app.post(`/api/${moduleName}`, authMiddleware, async (req, res) => {
     try {
       const items = Array.isArray(req.body) ? req.body : [req.body];
       const queries = items.map(item => ({
@@ -481,12 +1204,12 @@ const createGenericEndpoints = (moduleName) => {
   });
 };
 
-['products', 'contacts', 'contracts', 'comments', 'documents'].forEach(createGenericEndpoints);
+ALLOWED_MODULES.forEach(createGenericEndpoints);
 
-// ==========================================
-// SYNC LOGS
-// ==========================================
-app.get('/api/sync-logs', async (req, res) => {
+// ============================================================
+// 20. SYNC LOGS (Senkronizasyon Günlükleri)
+// ============================================================
+app.get('/api/sync-logs', authMiddleware, async (req, res) => {
   try {
     const result = await db.execute('SELECT * FROM sync_logs ORDER BY timestamp DESC LIMIT 100');
     res.json(result.rows);
@@ -495,7 +1218,7 @@ app.get('/api/sync-logs', async (req, res) => {
   }
 });
 
-app.post('/api/sync-logs', async (req, res) => {
+app.post('/api/sync-logs', authMiddleware, async (req, res) => {
   try {
     const logData = req.body;
     await db.execute({
@@ -508,7 +1231,7 @@ app.post('/api/sync-logs', async (req, res) => {
   }
 });
 
-app.delete('/api/sync-logs/clear', async (req, res) => {
+app.delete('/api/sync-logs/clear', authMiddleware, async (req, res) => {
   try {
     await db.execute('DELETE FROM sync_logs');
     res.json({ success: true, message: 'Logs cleared' });
@@ -517,15 +1240,13 @@ app.delete('/api/sync-logs/clear', async (req, res) => {
   }
 });
 
-// ==========================================
-// TELEGRAM DAILY REPORT (17:50 SCHEDULE)
-// ==========================================
-const { runReport, getLocalDateString, buildReportMessage, fetchDailyData } = require('./telegram_reporter');
-
+// ============================================================
+// 21. TELEGRAM GÜN SONU RAPORLAMA (17:50 SCHEDULE)
+// ============================================================
 let lastReportSentDate = null;
 
 // Status & Configuration Check
-app.get('/api/telegram/status', (req, res) => {
+app.get('/api/telegram/status', authMiddleware, (req, res) => {
   res.json({
     configured: !!(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID),
     hasToken: !!process.env.TELEGRAM_BOT_TOKEN,
@@ -536,7 +1257,7 @@ app.get('/api/telegram/status', (req, res) => {
 });
 
 // Preview Report Text
-app.get('/api/telegram/preview', async (req, res) => {
+app.get('/api/telegram/preview', authMiddleware, requireRole(['Admin']), async (req, res) => {
   try {
     const targetDate = req.query.date || getLocalDateString();
     const data = await fetchDailyData(targetDate);
@@ -548,7 +1269,7 @@ app.get('/api/telegram/preview', async (req, res) => {
 });
 
 // Manual Trigger / Send Now
-app.post('/api/telegram/send-report', async (req, res) => {
+app.post('/api/telegram/send-report', authMiddleware, requireRole(['Admin']), async (req, res) => {
   try {
     const targetDate = req.body?.date || req.query?.date || getLocalDateString();
     const dryRun = req.body?.dryRun === true;
@@ -570,7 +1291,7 @@ setInterval(async () => {
     const minutes = now.getMinutes();
     const today = getLocalDateString(now);
 
-    // Trigger at 17:50 (within 17:50 - 17:54 window once per day)
+    // Saat 17:50 - 17:54 aralığında günde bir kez tetikle
     if (hours === 17 && minutes >= 50 && minutes < 55) {
       if (lastReportSentDate !== today) {
         console.log(`[SCHEDULE] Saat 17:50 - Gün sonu Telegram raporu tetikleniyor (${today})...`);
@@ -584,18 +1305,59 @@ setInterval(async () => {
   } catch (err) {
     console.error('[SCHEDULE ERROR] 17:50 rapor gönderim hatası:', err.message);
   }
-}, 30 * 1000); // Check every 30 seconds
+}, 30 * 1000); // 30 saniyede bir kontrol et
 
+// ============================================================
+// 22. GÜVENLİ STATİK DOSYA SUNUMU (Source Leak & Traversal Koruması)
+// ============================================================
+const ALLOWED_STATIC_FILES = new Set([
+  '/',
+  '/index.html',
+  '/style.css',
+  '/app.js',
+  '/manifest.json',
+  '/service-worker.js',
+  '/ika.PNG',
+  '/ika2.PNG'
+]);
 
-// SERVE STATIC FILES
-const path = require('path');
-app.use(express.static(__dirname));
+const ALLOWED_STATIC_DIRS = ['/js/', '/css/', '/antigravity/'];
+
+app.use((req, res, next) => {
+  // API rotalarını middleware zincirine bırak
+  if (req.path.startsWith('/api/')) {
+    return next();
+  }
+
+  // Yalnızca izin verilen istemci varlıklarını sun
+  const isAllowedFile = ALLOWED_STATIC_FILES.has(req.path);
+  const isAllowedDir = ALLOWED_STATIC_DIRS.some(dir => req.path.startsWith(dir));
+
+  if (isAllowedFile || isAllowedDir) {
+    return express.static(__dirname, { dotfiles: 'ignore' })(req, res, next);
+  }
+
+  // Sunucu dosyaları, araçlar, dokümanlar ve gizli dosyalar tamamen 404 ile korunur
+  res.status(404).send('Not Found');
+});
+
+// GLOBAL ERROR HANDLER
+app.use((err, req, res, next) => {
+  console.error('[API ERROR]', err.message);
+  res.status(err.status || 500).json({
+    error: err.message || 'Internal Server Error',
+    path: req.path
+  });
+});
 
 // START SERVER
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`TaskFlow Turso API Server running on port ${PORT}`);
-  console.log(`[TELEGRAM] Gün sonu raporlama zamanlayıcısı aktif (Her gün 17:50)`);
+  console.log(`=======================================================`);
+  console.log(` TaskFlow Secure API Server running on port ${PORT}`);
+  console.log(` [SECURITY] JWT Auth & RBAC Middleware: ACTIVE`);
+  console.log(` [SECURITY] Rate Limiting (180/min, login 10/min): ACTIVE`);
+  console.log(` [SECURITY] Telegram Security Alerts: ACTIVE`);
+  console.log(` [TELEGRAM] Daily 17:50 Report Scheduler: ACTIVE`);
+  console.log(`=======================================================`);
 });
-
-

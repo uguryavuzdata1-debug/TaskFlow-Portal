@@ -1,141 +1,128 @@
 // ============================================================
-// TURSO DATABASE CLIENT FOR TASKFLOW
-// Database: https://app.turso.tech/uguryavuz/databases/taskflow/data
+// TURSO DATABASE CLIENT FOR TASKFLOW (SECURE PROXY ADAPTER)
+// All database queries are routed via local Express API (/api/query).
+// Client contains ZERO credentials, tokens or database keys.
 // ============================================================
 
 const TURSO_CONFIG = {
-    pipelineUrl: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.protocol === 'file:' ? 'https://taskflow-uguryavuz.aws-eu-west-1.turso.io/v2/pipeline' : '/turso',
-    token: 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3OTA0MTMwMDcsImlkIjoiMDFhMGRjZWUtMDIwMS03ZWU3LTliMTMtODk0N2IzYjhjM2ZjIiwia2lkIjoiUGlXX2U0VkRpd1lqdmRHSTg3cGxydE4tY1RhZWdGbG5UeE5fbUlIT0VGYyIsInJpZCI6IjU2OWJhMWM0LTFmZTQtNDQ5Yi04NzM0LTAxOWQ5ZTYyZTQ3NyJ9.ABiOIIp6m7eAvpVfObbk4sT56NkuH5uWuLwyGsrTJdbyq-f8JchXdW0M_JGr72Wpfxf6QCrbIl-N_YVe7DSZBg',
-    localApiUrl: 'http://localhost:3000/api'
+    apiUrl: '/api/query',
+    localApiUrl: '/api'
 };
 
-// Convert Turso pipeline response format into array of plain JS objects
-function parseTursoResponse(data) {
-    if (!data || !data.results || !data.results[0]) return [];
-    const res = data.results[0];
-    if (res.type === 'error') {
-        throw new Error(res.error?.message || 'Turso query error');
-    }
-    const result = res.response?.result;
-    if (!result || !result.cols || !result.rows) return [];
-    
-    const cols = result.cols.map(c => c.name);
-    return result.rows.map(row => {
-        const item = {};
-        cols.forEach((col, idx) => {
-            const cell = row[idx];
-            item[col] = cell && cell.value !== undefined ? cell.value : null;
-        });
-        return item;
-    });
+// Helper: Get JWT token from local or session storage
+function getAuthToken() {
+    return localStorage.getItem('taskflow_token') || sessionStorage.getItem('taskflow_token') || '';
 }
 
-// Convert JavaScript arguments into Turso pipeline argument format
-function formatTursoArgs(args = []) {
-    return args.map(a => {
-        if (a === null || a === undefined) return { type: 'null' };
-        if (typeof a === 'number') {
-            return { type: Number.isInteger(a) ? 'integer' : 'float', value: String(a) };
-        }
-        return { type: 'text', value: String(a) };
-    });
-}
-
-// Direct SQL Execution on Turso (with fallback to local API server)
+// Secure SQL Execution on Server API Proxy
 async function tursoExecute(sql, args = []) {
-    // 1. Try direct Turso HTTP pipeline first
+    const token = getAuthToken();
     try {
-        const response = await fetch(TURSO_CONFIG.pipelineUrl, {
+        const response = await fetch(TURSO_CONFIG.apiUrl, {
             method: 'POST',
             headers: {
-                'Authorization': 'Bearer ' + TURSO_CONFIG.token,
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Authorization': token ? ('Bearer ' + token) : ''
             },
             body: JSON.stringify({
-                requests: [
-                    {
-                        type: 'execute',
-                        stmt: {
-                            sql: sql,
-                            args: formatTursoArgs(args)
-                        }
-                    }
-                ]
+                sql: sql,
+                args: args
             })
         });
 
         if (response.ok) {
             const data = await response.json();
-            return parseTursoResponse(data);
+            return data.rows || [];
         }
-    } catch (directErr) {
-        console.warn('[Turso] Direct pipeline fetch failed, trying local API server...', directErr.message);
-    }
 
-    // 2. Fallback to local Express API server if running
-    try {
-        const lower = sql.trim().toLowerCase();
-        if (lower.startsWith('select * from users')) {
-            const r = await fetch(TURSO_CONFIG.localApiUrl + '/users');
-            return await r.json();
-        } else if (lower.startsWith('select') && lower.includes('from vt_customers')) {
-            const r = await fetch(TURSO_CONFIG.localApiUrl + '/customers');
-            return await r.json();
-        } else if (lower.startsWith('select * from records')) {
-            const r = await fetch(TURSO_CONFIG.localApiUrl + '/records');
-            return await r.json();
-        } else if (lower.startsWith('select * from vt_tickets')) {
-            const r = await fetch(TURSO_CONFIG.localApiUrl + '/vt_tickets');
-            return await r.json();
-        } else if (lower.startsWith('select * from vt_quotes')) {
-            const r = await fetch(TURSO_CONFIG.localApiUrl + '/vt_quotes');
-            return await r.json();
+        if (response.status === 401) {
+            console.warn('[Turso] Oturum doğrulanamadı (401). Giriş ekranına yönlendiriliyor...');
         }
-    } catch (localErr) {
-        console.warn('[Turso] Local API server fallback also failed:', localErr.message);
-    }
 
-    return [];
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || `Sorgu hatası (HTTP ${response.status})`);
+    } catch (err) {
+        console.error('[Turso Query Error]', err.message, { sql, args });
+        throw err;
+    }
 }
 
 // High-level Turso operations
 const turso = {
     execute: tursoExecute,
 
-    // Users
+    // 1. TaskFlow Portal Users (taskflow_users)
     async getUsers() {
-        return await tursoExecute('SELECT * FROM users ORDER BY full_name ASC');
+        try {
+            return await tursoExecute('SELECT id, full_name, username, email, role, status, vt_user_id, avatar_url, created_at FROM taskflow_users ORDER BY full_name ASC');
+        } catch (e) {
+            return await tursoExecute('SELECT id, full_name, username, email, role, status, NULL as vt_user_id, avatar_url, created_at FROM users ORDER BY full_name ASC');
+        }
     },
 
     async addUser(user) {
         const id = user.id || ('U-' + Date.now());
         const username = user.username || (user.full_name ? user.full_name.toLowerCase().replace(/\s+/g, '') : id);
-        const sql = `INSERT INTO users (id, full_name, username, email, role, status, password) 
-                     VALUES (?, ?, ?, ?, ?, ?, ?)
-                     ON CONFLICT(id) DO UPDATE SET
-                       full_name=excluded.full_name,
-                       username=excluded.username,
-                       email=excluded.email,
-                       role=excluded.role,
-                       status=excluded.status,
-                       password=excluded.password`;
-        await tursoExecute(sql, [
-            id,
-            user.full_name || '',
-            username,
-            user.email || null,
-            user.role || 'User',
-            user.status || 'ACTIVE',
-            user.password || '1234'
-        ]);
+        
+        // 1. Insert into taskflow_users
+        try {
+            const sqlTf = `INSERT INTO taskflow_users (id, full_name, username, email, role, status, password_hash, vt_user_id) 
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                           ON CONFLICT(id) DO UPDATE SET
+                             full_name=excluded.full_name,
+                             username=excluded.username,
+                             email=excluded.email,
+                             role=excluded.role,
+                             status=excluded.status,
+                             vt_user_id=COALESCE(excluded.vt_user_id, taskflow_users.vt_user_id),
+                             password_hash=COALESCE(excluded.password_hash, taskflow_users.password_hash)`;
+            await tursoExecute(sqlTf, [
+                id,
+                user.full_name || '',
+                username,
+                user.email || null,
+                user.role || 'User',
+                user.status || 'ACTIVE',
+                user.password_hash || null,
+                user.vt_user_id || null
+            ]);
+        } catch (e) {
+            console.warn('[turso.addUser] taskflow_users write failed, writing to users:', e);
+        }
+
+        // 2. Mirror into users table for backwards compatibility
+        try {
+            const sqlLegacy = `INSERT INTO users (id, full_name, username, email, role, status, password, password_hash) 
+                               VALUES (?, ?, ?, ?, ?, ?, NULL, ?)
+                               ON CONFLICT(id) DO UPDATE SET
+                                 full_name=excluded.full_name,
+                                 username=excluded.username,
+                                 email=excluded.email,
+                                 role=excluded.role,
+                                 status=excluded.status,
+                                 password=NULL,
+                                 password_hash=COALESCE(excluded.password_hash, users.password_hash)`;
+            await tursoExecute(sqlLegacy, [
+                id,
+                user.full_name || '',
+                username,
+                user.email || null,
+                user.role || 'User',
+                user.status || 'ACTIVE',
+                user.password_hash || null
+            ]);
+        } catch (e) { /* ignore */ }
+
         return { id, username, ...user };
     },
 
     async removeUser(id) {
+        try { await tursoExecute('DELETE FROM taskflow_users WHERE id = ?', [id]); } catch(e) {}
         return await tursoExecute('DELETE FROM users WHERE id = ?', [id]);
     },
 
     async updateUserRole(id, role) {
+        try { await tursoExecute('UPDATE taskflow_users SET role = ? WHERE id = ?', [role, id]); } catch(e) {}
         return await tursoExecute('UPDATE users SET role = ? WHERE id = ?', [role, id]);
     },
 
@@ -145,7 +132,29 @@ const turso = {
         const setClauses = keys.map(k => `${k} = ?`).join(', ');
         const vals = keys.map(k => fields[k]);
         vals.push(id);
+        try { await tursoExecute(`UPDATE taskflow_users SET ${setClauses} WHERE id = ?`, vals); } catch(e) {}
         return await tursoExecute(`UPDATE users SET ${setClauses} WHERE id = ?`, vals);
+    },
+
+    // 2. CRM Technicians & Assigned Users (vt_users)
+    async getVtUsers() {
+        return await tursoExecute('SELECT id, user_name, first_name, last_name, full_name, email, role_name, status FROM vt_users ORDER BY full_name ASC');
+    },
+
+    async resolveVtUserName(userId) {
+        if (!userId) return '-';
+        if (typeof window !== 'undefined' && window._vtUsersCache && window._vtUsersCache[userId]) {
+            return window._vtUsersCache[userId];
+        }
+        try {
+            const res = await tursoExecute('SELECT full_name FROM vt_users WHERE id = ? LIMIT 1', [userId]);
+            if (res && res.length > 0 && res[0].full_name) {
+                if (!window._vtUsersCache) window._vtUsersCache = {};
+                window._vtUsersCache[userId] = res[0].full_name;
+                return res[0].full_name;
+            }
+        } catch(e) {}
+        return userId;
     },
 
     // Customers
@@ -310,10 +319,11 @@ const turso = {
 
 window.turso = turso;
 window.tursoClient = turso;
+window.tursoExecute = tursoExecute;
 
 // ============================================================
 // TURSO TO SUPABASE COMPATIBILITY ADAPTER
-// Guarantees zero breakage for any legacy sbClient.from(...) calls
+// Guarantees zero breakage for legacy sbClient.from(...) calls
 // ============================================================
 function createTursoSbAdapter() {
     return {
@@ -423,7 +433,6 @@ function createTursoSbAdapter() {
 
                         // 1. SELECT
                         if (queryType === 'select') {
-                            // Handle special virtual tables
                             if (actualTable === 'permissions') {
                                 resultData = [
                                     { id: 'role-1', role_name: 'Admin', access_level: 100 },
@@ -561,4 +570,4 @@ function createTursoSbAdapter() {
 
 // Set up global Turso and sbClient adapter
 window.sbClient = createTursoSbAdapter();
-console.log('TaskFlow: Turso Database Connected & Adapter active (https://app.turso.tech/uguryavuz/databases/taskflow/data)');
+console.log('TaskFlow: Secure Turso Adapter Active (Direct Token Removed, Proxied via /api/query)');

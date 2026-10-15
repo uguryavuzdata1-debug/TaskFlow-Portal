@@ -222,7 +222,7 @@ input::placeholder, textarea::placeholder {
 
 .tiles-grid { 
   display: grid; 
-  grid-template-columns: repeat(3, 1fr); 
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); 
   gap: 20px; 
   margin-bottom: 32px;
 }
@@ -1926,3 +1926,15 @@ input[type="time"], input[type="date"] {
 .dropdown-btn-right {
   margin-left: auto;
 }
+
+/* Role Settings Sub-Section Navigation Tabs */
+.role-sub-btn {
+  transition: all 0.15s ease-in-out;
+  border-radius: 2px;
+}
+.role-sub-btn:hover:not(.active) {
+  background: var(--paper, #f8fafc) !important;
+  color: var(--ink, #1d2430) !important;
+  border-color: var(--ink, #1d2430) !important;
+}
+

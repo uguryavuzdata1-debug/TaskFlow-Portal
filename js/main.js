@@ -65,36 +65,65 @@ window.editCCLocal = editCCLocal;
 document.addEventListener('DOMContentLoaded', async () => { 
     if (window.lucide) lucide.createIcons();
     
-    // Always init app first to get users/settings
-    await initApp();
+    const token = localStorage.getItem('taskflow_token') || sessionStorage.getItem('taskflow_token');
+    if (token) {
+        try {
+            const res = await fetch('/api/auth/me', {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
 
-    const savedUser = localStorage.getItem('taskflow_user');
-    if (savedUser) {
-        document.getElementById('login-remember').checked = true;
-        appState.currentUser = savedUser;
-        document.getElementById('current-user-name').innerText = appState.currentUser;
-        
-        const auth = appState.settings.users_auth || {};
-        const userData = auth[appState.currentUser] || (appState.currentUser === 'ADMIN' ? { role: 'Admin' } : { role: 'User' });
-        appState.currentUserRole = userData.role || (appState.currentUser === 'ADMIN' ? 'Admin' : 'User');
-        appState.currentUserData = userData;
+            if (res.ok) {
+                const data = await res.json();
+                if (data.success && data.user) {
+                    const savedUser = localStorage.getItem('taskflow_user');
+                    if (savedUser && document.getElementById('login-remember')) {
+                        document.getElementById('login-remember').checked = true;
+                    }
 
-        document.body.classList.remove('is-logged-out'); 
-        document.getElementById('login-screen').classList.add('hidden');
-        document.getElementById('main-nav').classList.remove('hidden'); 
-        document.getElementById('main-content').classList.remove('hidden');
-        
-        // Re-apply role-based UI restrictions
-        document.querySelectorAll('.sidebar-link').forEach(btn => {
-            if (btn.id.startsWith('set-btn-') && btn.id !== 'set-btn-account') {
-                btn.style.display = (appState.currentUserRole === 'Admin') ? 'flex' : 'none';
+                    appState.currentUser = data.user.full_name || data.user.username;
+                    appState.currentUserRole = data.user.role || 'User';
+                    appState.currentUserData = data.user;
+
+                    if (document.getElementById('current-user-name')) {
+                        document.getElementById('current-user-name').innerText = appState.currentUser;
+                    }
+
+                    document.body.classList.remove('is-logged-out'); 
+                    document.getElementById('login-screen').classList.add('hidden');
+                    document.getElementById('main-nav').classList.remove('hidden'); 
+                    document.getElementById('main-content').classList.remove('hidden');
+
+                    // Authenticated, now load application data
+                    await initApp();
+
+                    // Re-apply role-based UI restrictions
+                    document.querySelectorAll('.sidebar-link').forEach(btn => {
+                        if (btn.id.startsWith('set-btn-') && btn.id !== 'set-btn-account') {
+                            btn.style.display = (appState.currentUserRole === 'Admin') ? 'flex' : 'none';
+                        }
+                    });
+
+                    if (typeof showTab === 'function') showTab(appState.activeTab || 'dashboard');
+                    if (typeof updateDashboardKPIs === 'function') updateDashboardKPIs();
+                    if (typeof renderDashboardSchedule === 'function') renderDashboardSchedule();
+                    if (typeof renderDashboardActivity === 'function') renderDashboardActivity();
+                    return;
+                }
             }
-        });
-
-        if (typeof showTab === 'function') showTab(appState.activeTab || 'dashboard');
-        if (typeof updateDashboardKPIs === 'function') updateDashboardKPIs();
-        if (typeof renderDashboardSchedule === 'function') renderDashboardSchedule();
-        if (typeof renderDashboardActivity === 'function') renderDashboardActivity();
+        } catch (err) {
+            console.warn('[Session] Token verification error:', err);
+        }
     }
+
+    // Not authenticated - show login screen
+    localStorage.removeItem('taskflow_token');
+    sessionStorage.removeItem('taskflow_token');
+    document.body.classList.add('is-logged-out');
+    const loginScreen = document.getElementById('login-screen');
+    if (loginScreen) loginScreen.classList.remove('hidden');
+    const nav = document.getElementById('main-nav');
+    if (nav) nav.classList.add('hidden');
+    const main = document.getElementById('main-content');
+    if (main) main.classList.add('hidden');
 });
 

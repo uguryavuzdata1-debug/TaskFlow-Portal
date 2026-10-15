@@ -1,6 +1,6 @@
 # Vtiger CRM - Turso Cloud Veritabanı Senkronizasyon Sistemi
 
-Bu sistem, **Vtiger CRM** verilerini (Müşteriler, Biletler, Teklifler, Randevular ve Faturalar) otomatik olarak **Turso Cloud (libSQL)** veritabanına aktarmak, iki yönlü güncel tutmak ve TaskFlow Portal arayüzüne bağlamak için tasarlanmıştır.
+Bu sistem, **Vtiger CRM** verilerini (Müşteriler, Biletler, Teklifler, Randevular, Faturalar, Sözleşmeler ve Dokümanlar) otomatik olarak **Turso Cloud (libSQL)** veritabanına aktarmak, iki yönlü güncel tutmak ve TaskFlow Portal arayüzüne bağlamak için tasarlanmıştır.
 
 > **Önemli Not:** Sistem tamamen **Turso Cloud** veritabanına taşınmış olup, eski Supabase bağımlılıkları bütünüyle kaldırılmıştır.
 
@@ -13,6 +13,7 @@ Bu sistem, **Vtiger CRM** verilerini (Müşteriler, Biletler, Teklifler, Randevu
 * **Vtiger CRM URL:** `http://ikacrm.ikaepos.com/vtigercrm`
 * **Vtiger API Kullanıcı:** `ugur`
 * **Lokal Node Köprüsü:** `http://localhost:3000/api`
+* **Canlı Senkronizasyon Durum API'si:** `http://localhost:3000/api/sync/status`
 
 ---
 
@@ -35,22 +36,22 @@ CRM kayıtları (biletler, sözleşmeler ve teklifler) incelenerek doğrulanmı�
 
 ## 3. Senkronize Edilen Tablolar ve Otomatik Eşleşmeler
 
-### 1. `tickets` Tablosu
-* **`customer_name` Eşleşmesi:** Biletin `parent_id` değeri ile `customers.id` ilişkilendirilerek müşteri unvanı (`organization_name`) otomatik doldurulur.
+### 1. `vt_tickets` Tablosu
+* **`customer_name` Eşleşmesi:** Biletin `parent_id` değeri ile `vt_customers.id` ilişkilendirilerek müşteri unvanı (`organization_name`) otomatik doldurulur.
 * **`assigned_user_id` Eşleşmesi:** Ham ID'ler (örn: `19x5`, `19x9`, `19x6`) yukarıdaki tabloya göre doğrudan kullanıcı isimlerine çevrilir.
 
-### 2. `quotes` Tablosu
-* **`customer_name` Eşleşmesi:** Teklifin `account_id` değeri ile `customers.id` ilişkilendirilerek müşteri unvanı doldurulur.
+### 2. `vt_quotes` Tablosu
+* **`customer_name` Eşleşmesi:** Teklifin `account_id` değeri ile `vt_customers.id` ilişkilendirilerek müşteri unvanı doldurulur.
 * **`assigned_user_id` Eşleşmesi:** Teklifi hazırlayan kullanıcı isimleri otomatik çözümlenir (örn: `19x7` -> `Ibrahim Ahmet`, `19x8` -> `Alpay Burc`).
 
-### 3. `customers` Tablosu
-* CRM'deki tüm müşteri hesapları (Hesap No, Adres, Posta Kodu, İletişim, Notlar vb.) Turso'ya aktarılır.
+### 3. `vt_customers` Tablosu
+* CRM'deki tüm müşteri hesapları (Hesap No, Adres, Posta Kodu, İletişim, AnyDesk Till Notları vb.) Turso'ya aktarılır.
 
 ### 4. `appointments` Tablosu
 * Vtiger `Events` kayıtları tarih, saat, konu ve atanan teknisyen adıyla senkronize edilir.
 
-### 5. `users` Tablosu
-* Portal ve CRM'de aktif olan ekip üyeleri listesi (şifre, rol, kullanıcı adı).
+### 5. `vt_products`, `vt_contracts`, `vt_documents`, `vt_comments` Tabloları
+* Vtiger'daki ürünler, servis sözleşmeleri, ekli belgeler ve yorumlar da JSON yapısıyla tam otomatik senkronize edilmektedir.
 
 ---
 
@@ -60,19 +61,25 @@ Senkronizasyon betikleri `D:\AI\AI WORKS\Works_CRM\Source` altında yer almaktad
 
 | Betik Adı | Görevi |
 | :--- | :--- |
-| `sync_all_turso.py` | 5 modülün tamamını (Müşteriler, Biletler, Teklifler, Randevular, Faturalar) sırayla Turso'ya senkronize eder. |
+| `sync_all_turso.py` | 10 modülün tamamını sırayla Turso'ya senkronize eder ve `daily_sync_stats.json` dosyasını günceller. |
 | `sync_turso_tickets.py` | Biletleri çeker, müşteri ve kullanıcı isimlerini eşleştirerek Turso'ya yazar. |
 | `sync_turso_quotes.py` | Teklifleri çeker, müşteri ve kullanıcı isimlerini eşleştirerek Turso'ya yazar. |
 | `sync_turso_customers.py` | Müşteri veritabanını günceller. |
 | `sync_turso_events.py` | Randevu/Etkinlikleri isim çözümlemesi ile Turso'ya yazar. |
 | `sync_turso_invoices.py` | Faturaları Turso'ya yazar. |
+| `sync_turso_contracts.py` | Servis sözleşmelerini senkronize eder. |
+| `sync_turso_documents.py` | Belgeleri senkronize eder. |
 
-### Manuel Çalıştırma:
-```cmd
-D:\AI\AI WORKS\Works_CRM\run_turso_sync.bat
+### Arka Plan Servisini Başlatma (Tavsiye Edilen):
+```powershell
+powershell -ExecutionPolicy Bypass -File "h:\UGUR AI\Unfinished Work\TO DO\run_services.ps1"
 ```
 
-### Arka Planda Sessiz Çalıştırma:
-```cmd
-wscript "D:\AI\AI WORKS\Works_CRM\run_turso_sync_silent.vbs"
-```
+---
+
+## 5. Portal Canlı İzleme ve Kontrol
+TaskFlow Portal arayüzünde üst gezinme çubuğundaki **`CRM: Aktif`** rozetine tıklandığında:
+* Son eşitleme saati,
+* Gün içinde aktarılan bilet, müşteri, teklif sayıları ve tur sayısı,
+* Arka plan senkronizasyon motorunun canlı sağlık durumu
+görsel ve interaktif bir pencere üzerinden takip edilebilir.

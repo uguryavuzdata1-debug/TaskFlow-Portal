@@ -1144,19 +1144,21 @@ function logout() {
 function selectCategory(cat, dept) { 
     resetForm(); 
     const el = document.getElementById('f-service-type');
+    const catMap = {
+        'S1': 'MENU UPDATE',
+        'S2': 'CREDIT CARD',
+        'S3': 'DATA RESET',
+        'S4': 'SERVICE',
+        'S5': 'OTHER',
+        'S6': 'TILL SETUP',
+        'S8': 'SOFTWARING',
+        'S9': 'HARDWARE'
+    };
     if (el) {
         const exists = Array.from(el.options).some(opt => opt.value === cat);
         if (!exists) {
             const opt = document.createElement('option');
             opt.value = cat;
-            const catMap = {
-                'S1': 'MENU UPDATE',
-                'S2': 'CREDIT CARD',
-                'S3': 'DATA RESET',
-                'S4': 'SERVICE',
-                'S5': 'OTHER',
-                'S6': 'TILL SETUP'
-            };
             opt.text = catMap[cat] || cat;
             el.add(opt);
         }
@@ -1166,19 +1168,11 @@ function selectCategory(cat, dept) {
     
     const deptEl = document.getElementById('f-department');
     if (deptEl) {
-        deptEl.value = dept || '';
+        deptEl.value = dept || catMap[cat] || '';
     }
     
     const catDispEl = document.getElementById('f-service-type-display');
     if (catDispEl) {
-        const catMap = {
-            'S1': 'MENU UPDATE',
-            'S2': 'CREDIT CARD',
-            'S3': 'DATA RESET',
-            'S4': 'SERVICE',
-            'S5': 'OTHER',
-            'S6': 'TILL SETUP'
-        };
         catDispEl.value = catMap[cat] || cat;
     }
     
@@ -1192,123 +1186,433 @@ function updateDynamicFields() {
     if (!mainSelect) return;
     
     const main = mainSelect.value;
-    const subServices = appState.settings?.sub_services || 
-                        (typeof defaultSeeds !== 'undefined' ? defaultSeeds.sub_services : null) || 
-                        (typeof LOCAL_SUB_SERVICES !== 'undefined' ? LOCAL_SUB_SERVICES : null);
-    let opts = [];
-    if (subServices) {
-        if (Array.isArray(subServices)) {
-            opts = subServices.filter(s => s.service_name === main).map(s => s.name);
-        } else if (typeof subServices === 'object') {
-            opts = subServices[main] || [];
-        }
+    const dept = (document.getElementById('f-department')?.value || '').toUpperCase();
+    
+    // Alt servisleri doldur (Departman duyarlı)
+    const subDict = (typeof LOCAL_SUB_SERVICES !== 'undefined' && Object.keys(LOCAL_SUB_SERVICES).length > 0)
+        ? LOCAL_SUB_SERVICES
+        : (appState.settings?.sub_services || {});
+    
+    let subList = [];
+    if (main === 'S6') {
+        subList = subDict['S6'] || [
+            "Full Till System Setup",
+            "Clean OS Installation",
+            "Disk Image Cloning",
+            "OS Upgrade (Windows 10 -> 11 / LTSC)",
+            "SSD / Storage Migration",
+            "Table Plan & Screen Layout Design",
+            "Peripherals / Printers Configuration",
+            "Software Only Configuration",
+            "Cas CN1",
+            "Barcode Label Scale",
+            "Other"
+        ];
+    } else if (main === 'S8') {
+        subList = subDict['S8'] || [
+            "HandHeld Restaurant",
+            "HandHeld Retail",
+            "Kiosk",
+            "Online",
+            "Tablet"
+        ];
+    } else if (main === 'S9') {
+        subList = subDict['S9'] || [
+            "Cas CN1",
+            "Barcode Label Scale",
+            "Other"
+        ];
+    } else {
+        subList = subDict[main] || [];
     }
     
     const subSelect = document.getElementById('f-sub-service');
     if (subSelect) {
-        subSelect.innerHTML = opts.map(o => `<option value="${o}">${o}</option>`).join('');
+        subSelect.innerHTML = subList.map(o => `<option value="${o}">${o}</option>`).join('');
     }
+
+    // Personel listesi
+    const staffOptions = (appState.settings?.personnel && appState.settings.personnel.length > 0 
+        ? appState.settings.personnel 
+        : ['Admin', 'Technician']
+    ).map(name => `<option value="${name}">${name}</option>`).join('');
     
-    let extra = ''; 
+    // Kart Firmaları
+    const cardCoOptions = (appState.settings?.card_companies && appState.settings.card_companies.length > 0
+        ? appState.settings.card_companies
+        : [{name: 'Dojo'}, {name: 'Elavon'}, {name: 'PaymentSense'}, {name: 'WorldPay'}, {name: 'Barclaycard'}]
+    ).map(c => `<option value="${c.name || c}">${c.name || c}</option>`).join('');
+
+    // Till Modelleri & CPU
+    const modelOptions = (appState.settings?.till_models && appState.settings.till_models.length > 0
+        ? appState.settings.till_models
+        : [{name: 'IKA S-300 RT3'}, {name: 'IKA S-150'}, {name: 'POSBANK'}, {name: 'AURES'}, {name: 'OTHER'}]
+    ).map(m => `<option value="${m.name || m}">${m.name || m}</option>`).join('');
+
+    const cpuOptions = (appState.settings?.till_cpu && appState.settings.till_cpu.length > 0
+        ? appState.settings.till_cpu
+        : [{name: 'J6412'}, {name: 'J1900'}, {name: 'I3'}, {name: 'I5'}, {name: 'N97'}]
+    ).map(c => `<option value="${c.name || c}">${c.name || c}</option>`).join('');
+
+    // Sektör listesi
+    const sectorList = (typeof LOCAL_SECTORS !== 'undefined' && LOCAL_SECTORS.length > 0) ? LOCAL_SECTORS : ["HOSPITALITY", "RETAIL", "QUICK SERVICE", "OTHER"];
+    const sectorOptions = sectorList.map(sec => `<option value="${sec}">${sec}</option>`).join('');
+
+    let extra = '';
+
+    // 1. MENU UPDATE (S1)
     if (main === 'S1') {
         extra = `
-            <div style="background: #f8fafc; padding: 15px 25px; border-radius: 12px; border: 1px dashed #cbd5e1; margin-top: 20px; margin-bottom: 25px;">
+        <div style="background: #f0f7ff; padding: 20px; border-radius: 12px; border: 1px solid #bae0ff; margin-top: 20px;">
+            <h4 style="margin: 0 0 15px 0; color: #0958d9; display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600;">
+                <i data-lucide="file-text" style="width: 18px; height: 18px;"></i> Menu Update Details
+            </h4>
+            <div class="grid-2">
+                <div class="field">
+                    <label>Menu Type <span style="color:red">*</span></label>
+                    <select id="f-s1-menu-type">
+                        <option value="Food & Drink Menu">Food & Drink Menu</option>
+                        <option value="Food Menu Only">Food Menu Only</option>
+                        <option value="Drink Menu Only">Drink Menu Only</option>
+                        <option value="Dessert Menu">Dessert Menu</option>
+                        <option value="Set Menu">Set Menu</option>
+                        <option value="Full New Menu Setup">Full New Menu Setup</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label>Menu Attachment / Cloud Link (Google Drive / PDF / Photo URL)</label>
+                    <input type="url" id="f-s1-menu-link" placeholder="https://drive.google.com/... or dropbox link">
+                </div>
+            </div>
+            <div style="background: #fff; padding: 12px 18px; border-radius: 8px; border: 1px dashed #91caff; margin-top: 15px;">
                 <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 600; color: #1e293b;">
                     <input type="checkbox" id="f-s1-no-appointment" onchange="calculatePrice()" style="width: 18px; height: 18px; cursor: pointer;">
-                    <span>Urgent / No Prior Appointment (+£25.00 Service Fee)</span>
+                    <span>⚡ Urgent / No Prior Appointment (+£25.00 Fast-Track Fee)</span>
                 </label>
-            </div>`;
-    } else if (main === 'S2') {
-        extra = `
-            <div style="background: #f8fafc; padding: 25px; border-radius: 12px; border: 1px dashed #cbd5e1; margin-top: 20px; margin-bottom: 25px;">
-                <div class="grid-3">
-                    <div class="field">
-                        <label>IKA App <span style="color:red">*</span></label>
-                        <select id="f-ika-app">
-                            <option value="No">No</option>
-                            <option value="Yes">Yes</option>
-                        </select>
-                    </div>
-                    <div class="field">
-                        <label>Card Company <span style="color:red">*</span></label>
-                        <select id="f-card-company">
-                            <option value="">Select company</option>
-                            ${(appState.settings.card_companies || []).map(opt => `<option value="${opt.name}">${opt.name}</option>`).join('')}
-                        </select>
-                    </div>
-                    <div class="field">
-                        <label>Local Settings <span style="color:red">*</span></label>
-                        <select id="f-local-settings" onchange="handleLocalSettingsChange(this)">
-                            <option value="">Select settings</option>
-                            ${(appState.settings.cc_local_settings || []).map(opt => `<option value="${opt.name}">${opt.name}</option>`).join('')}
-                        </select>
-                    </div>
-                </div>
-                <div class="grid-2" style="margin-top: 20px;">
-                    <div class="field">
-                        <label>Sector <span style="color:red">*</span></label>
-                        <select id="f-s2-sector">
-                            <option value="">Select sector</option>
-                            ${LOCAL_SECTORS.map(sec => `<option value="${sec}">${sec}</option>`).join('')}
-                        </select>
-                    </div>
-                    <div class="field">
-                        <label>Card Setup Number <span style="color:red">*</span></label>
-                        <input type="text" id="f-setup-number" placeholder="Enter number">
-                    </div>
-                </div>
-            </div>`;
-    } else if (main === 'S6') {
-        const staffOptions = (appState.settings.personnel || []).map(name => `<option value="${name}">${name}</option>`).join('');
-        extra = `
-            <div style="background: #f8fafc; padding: 25px; border-radius: 12px; border: 1px dashed #1b4376; margin-top: 20px; margin-bottom: 25px;">
-                <div class="grid-4">
-                    <div class="field"><label>Quote No. <span style="color:red">*</span></label><input type="text" id="f-s6-quote" placeholder="CRM Quote#"></div>
-                    <div class="field"><label>System Type <span style="color:red">*</span></label><select id="f-s6-type">
-                        <option value="">Select type</option>
-                        ${LOCAL_SYS_TYPES.map(t => `<option value="${t}">${t}</option>`).join('')}
-                    </select></div>
-                    <div class="field"><label>Till Model <span style="color:red">*</span></label><select id="f-s6-model">
-                        <option value="">Select Model</option>
-                        ${(appState.settings.till_models || []).map(m => `<option value="${m.name}">${m.name}</option>`).join('')}
-                    </select></div>
-                    <div class="field"><label>CPU <span style="color:red">*</span></label><select id="f-s6-cpu">
-                        <option value="">Select CPU</option>
-                        ${(appState.settings.till_cpu || []).map(c => `<option value="${c.name}">${c.name}</option>`).join('')}
-                    </select></div>
-                </div>
-                <div class="grid-4" style="margin-top: 20px;">
-                    <div class="field"><label>OS Version <span style="color:red">*</span></label><select id="f-s6-os">
-                        <option value="">Select OS</option>
-                        ${(appState.settings.operating_systems || []).map(os => `<option value="${os.name}">${os.name}</option>`).join('')}
-                    </select></div>
-                    <div class="field"><label>App Version <span style="color:red">*</span></label><input type="text" id="f-s6-app-ver" placeholder="e.g. v2.4.5"></div>
-                    <div class="field"><label>Sector <span style="color:red">*</span></label><select id="f-s6-sector">
-                        <option value="">Select sector</option>
-                        ${LOCAL_SECTORS.map(sec => `<option value="${sec}">${sec}</option>`).join('')}
-                    </select></div>
-                    <div class="field"><label>Service Option <span style="color:red">*</span></label><select id="f-s6-option">
-                        <option value="">Select option</option>
-                        ${((appState.settings.sub_services || {})['S6'] || []).map(opt => `<option value="${opt}">${opt}</option>`).join('')}
-                    </select></div>
-                </div>
-                <div class="grid-3" style="margin-top: 20px;">
-                    <div class="field"><label>Till Programmer <span style="color:red">*</span></label><select id="f-s6-prog-till">${staffOptions}</select></div>
-                    <div class="field"><label>Image Programmer <span style="color:red">*</span></label><select id="f-s6-prog-img">${staffOptions}</select></div>
-                    <div class="field"><label>Programmers -> Menu <span style="color:red">*</span></label><input type="text" id="f-s6-prog-menu" placeholder="Name"></div>
-                </div>
-            </div>`;
+            </div>
+        </div>`;
     }
-    
+    // 2. CREDIT CARD (S2)
+    else if (main === 'S2') {
+        extra = `
+        <div style="background: #f6ffed; padding: 20px; border-radius: 12px; border: 1px solid #b7eb8f; margin-top: 20px;">
+            <h4 style="margin: 0 0 15px 0; color: #389e0d; display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600;">
+                <i data-lucide="credit-card" style="width: 18px; height: 18px;"></i> Payment & Terminal Details
+            </h4>
+            <div class="grid-3">
+                <div class="field">
+                    <label>Card Company / Provider <span style="color:red">*</span></label>
+                    <select id="f-card-company">
+                        <option value="">Select provider</option>
+                        ${cardCoOptions}
+                    </select>
+                </div>
+                <div class="field">
+                    <label>Terminal Serial / TID No <span style="color:red">*</span></label>
+                    <input type="text" id="f-setup-number" placeholder="e.g. SN-892183 / TID-1002">
+                </div>
+                <div class="field">
+                    <label>IKA POS Integration Status <span style="color:red">*</span></label>
+                    <select id="f-ika-app">
+                        <option value="Yes - Fully Integrated">Yes - Fully Integrated</option>
+                        <option value="No - Standalone Terminal">No - Standalone Terminal</option>
+                    </select>
+                </div>
+            </div>
+            <div class="grid-2" style="margin-top: 15px;">
+                <div class="field">
+                    <label>Sector</label>
+                    <select id="f-s2-sector">${sectorOptions}</select>
+                </div>
+                <div class="field">
+                    <label>Terminal Model / Notes</label>
+                    <input type="text" id="f-s2-terminal-model" placeholder="Pax A920, Castles, etc.">
+                </div>
+            </div>
+        </div>`;
+    }
+    // 3. DATA RESET (S3)
+    else if (main === 'S3') {
+        extra = `
+        <div style="background: #fff2f0; padding: 20px; border-radius: 12px; border: 1px solid #ffccc7; margin-top: 20px;">
+            <h4 style="margin: 0 0 15px 0; color: #cf1322; display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600;">
+                <i data-lucide="refresh-cw" style="width: 18px; height: 18px;"></i> Database Reset & Security Authorisation
+            </h4>
+            <div class="grid-2">
+                <div class="field">
+                    <label>Reset Scope / Type <span style="color:red">*</span></label>
+                    <select id="f-s3-reset-type">
+                        <option value="Clear Daily Z-Reports Only">Clear Daily Z-Reports Only</option>
+                        <option value="Delete Customer Sales History (Fresh Start)">Delete Customer Sales History (Fresh Start)</option>
+                        <option value="Full Database Wipe / Factory Reset">Full Database Wipe / Factory Reset</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label>Authorising Manager / Customer Name <span style="color:red">*</span></label>
+                    <input type="text" id="f-s3-authoriser" placeholder="Full name of person authorising reset">
+                </div>
+            </div>
+            <div style="background: #fff; padding: 15px; border-radius: 8px; border: 1px dashed #ffa39e; margin-top: 15px; display: flex; flex-direction: column; gap: 10px;">
+                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 600; color: #cf1322;">
+                    <input type="checkbox" id="f-s3-written-consent" style="width: 18px; height: 18px; cursor: pointer;">
+                    <span>⚠️ Written / Verbal Customer Consent Confirmed</span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 600; color: #1e293b;">
+                    <input type="checkbox" id="f-s3-backup-taken" style="width: 18px; height: 18px; cursor: pointer;">
+                    <span>💾 Pre-Reset Database Backup successfully archived to Cloud / USB</span>
+                </label>
+            </div>
+        </div>`;
+    }
+    // 4. SERVICE (S4)
+    else if (main === 'S4') {
+        extra = `
+        <div style="background: #fffbe6; padding: 20px; border-radius: 12px; border: 1px solid #ffe58f; margin-top: 20px;">
+            <h4 style="margin: 0 0 15px 0; color: #d46b08; display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600;">
+                <i data-lucide="wrench" style="width: 18px; height: 18px;"></i> Hardware / Technical Service Details
+            </h4>
+            <div class="grid-3">
+                <div class="field">
+                    <label>Hardware / Component Type <span style="color:red">*</span></label>
+                    <select id="f-s4-hardware-type">
+                        <option value="Thermal Receipt Printer">Thermal Receipt Printer</option>
+                        <option value="Touchscreen Display / Till">Touchscreen Display / Till</option>
+                        <option value="Cash Drawer">Cash Drawer</option>
+                        <option value="Barcode Scanner">Barcode Scanner</option>
+                        <option value="Network Router / Switch / Wi-Fi">Network Router / Switch / Wi-Fi</option>
+                        <option value="Power Supply / Cables">Power Supply / Cables</option>
+                        <option value="Other Component">Other Component</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label>Fault Classification <span style="color:red">*</span></label>
+                    <select id="f-s4-fault-type">
+                        <option value="Hardware Component Defect">Hardware Component Defect</option>
+                        <option value="Physical Damage / Liquid Spill">Physical Damage / Liquid Spill</option>
+                        <option value="Software / Driver Glitch">Software / Driver Glitch</option>
+                        <option value="Connectivity / Cable Loss">Connectivity / Cable Loss</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label>Warranty Status <span style="color:red">*</span></label>
+                    <select id="f-s4-warranty">
+                        <option value="Under Warranty (Free Repair)">Under Warranty (Free Repair)</option>
+                        <option value="Out of Warranty (Chargeable)">Out of Warranty (Chargeable)</option>
+                        <option value="Inspection Only">Inspection Only</option>
+                    </select>
+                </div>
+            </div>
+            <div class="grid-2" style="margin-top: 15px;">
+                <div class="field">
+                    <label>Hardware Serial Number (S/N)</label>
+                    <input type="text" id="f-s4-serial" placeholder="Serial no on device label">
+                </div>
+                <div class="field">
+                    <label>Assigned Field Technician</label>
+                    <select id="f-s4-technician">${staffOptions}</select>
+                </div>
+            </div>
+        </div>`;
+    }
+    // 5. OTHER (S5)
+    else if (main === 'S5') {
+        extra = `
+        <div style="background: #f9f0ff; padding: 20px; border-radius: 12px; border: 1px solid #d3adf7; margin-top: 20px;">
+            <h4 style="margin: 0 0 15px 0; color: #531dab; display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600;">
+                <i data-lucide="sparkles" style="width: 18px; height: 18px;"></i> Custom Ticket Routing & Priority
+            </h4>
+            <div class="grid-2">
+                <div class="field">
+                    <label>Request Channel / Source <span style="color:red">*</span></label>
+                    <select id="f-s5-source">
+                        <option value="WhatsApp Support Line">WhatsApp Support Line</option>
+                        <option value="Phone Call">Phone Call</option>
+                        <option value="Email / Portal">Email / Portal</option>
+                        <option value="On-Site Visit">On-Site Visit</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label>Priority Level <span style="color:red">*</span></label>
+                    <select id="f-s5-priority">
+                        <option value="Normal">Normal</option>
+                        <option value="Low">Low</option>
+                        <option value="High Priority">High Priority</option>
+                        <option value="Critical / Business Down">Critical / Business Down</option>
+                    </select>
+                </div>
+            </div>
+        </div>`;
+    }
+    // 6. TILL SETUP (S6) - Unified Programming & Imaging
+    else if (main === 'S6') {
+        extra = `
+        <div style="background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #cbd5e1; margin-top: 20px;">
+            <h4 style="margin: 0 0 15px 0; color: #1e293b; display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600;">
+                <i data-lucide="monitor" style="width: 18px; height: 18px;"></i> Till System, Database & OS Image Details
+            </h4>
+            <div class="grid-4">
+                <div class="field">
+                    <label>CRM Quote No</label>
+                    <input type="text" id="f-s6-quote" placeholder="Quote #">
+                </div>
+                <div class="field">
+                    <label>Till Model <span style="color:red">*</span></label>
+                    <select id="f-s6-model">${modelOptions}</select>
+                </div>
+                <div class="field">
+                    <label>CPU <span style="color:red">*</span></label>
+                    <select id="f-s6-cpu">${cpuOptions}</select>
+                </div>
+                <div class="field">
+                    <label>Number of Tills (Qty) <span style="color:red">*</span></label>
+                    <input type="number" id="f-s6-qty" value="1" min="1" max="50">
+                </div>
+            </div>
+            <div class="grid-3" style="margin-top: 15px;">
+                <div class="field">
+                    <label>Target Operating System / Image</label>
+                    <select id="f-s6-os">
+                        <option value="Windows 10 IoT Enterprise LTSC">Windows 10 IoT Enterprise LTSC</option>
+                        <option value="Windows 11 Pro / LTSC">Windows 11 Pro / LTSC</option>
+                        <option value="Windows 7 Embedded POSReady">Windows 7 Embedded POSReady</option>
+                        <option value="Android POS Custom ROM">Android POS Custom ROM</option>
+                        <option value="Other OS">Other OS</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label>Storage Medium / Drive</label>
+                    <select id="f-s6-drive">
+                        <option value="M.2 NVMe SSD (High Speed)">M.2 NVMe SSD (High Speed)</option>
+                        <option value="2.5 SATA SSD">2.5 SATA SSD</option>
+                        <option value="mSATA SSD">mSATA SSD</option>
+                        <option value="eMMC Onboard">eMMC Onboard</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label>License Status</label>
+                    <select id="f-s6-license">
+                        <option value="Digital OEM BIOS Key">Digital OEM BIOS Key</option>
+                        <option value="COA Sticker Attached">COA Sticker Attached</option>
+                        <option value="Customer Provided Key">Customer Provided Key</option>
+                        <option value="Unlicensed / Evaluation">Unlicensed / Evaluation</option>
+                    </select>
+                </div>
+            </div>
+            <div class="grid-2" style="margin-top: 15px;">
+                <div class="field">
+                    <label>Till Lead Programmer <span style="color:red">*</span></label>
+                    <select id="f-s6-prog-till">${staffOptions}</select>
+                </div>
+                <div class="field">
+                    <label>Image Specialist / Builder</label>
+                    <input type="text" id="f-s6-prog-menu" placeholder="Programmer or technician name">
+                </div>
+            </div>
+        </div>`;
+    }
+    // 8. SOFTWARING (S8)
+    else if (main === 'S8') {
+        extra = `
+        <div style="background: #fdf4ff; padding: 20px; border-radius: 12px; border: 1px solid #f0abfc; margin-top: 20px;">
+            <h4 style="margin: 0 0 15px 0; color: #a21caf; display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600;">
+                <i data-lucide="layers" style="width: 18px; height: 18px;"></i> Softwaring & App Deployment Details
+            </h4>
+            <div class="grid-3">
+                <div class="field">
+                    <label>Device / Hardware Type <span style="color:red">*</span></label>
+                    <select id="f-s8-device-type">
+                        <option value="HandHeld Terminal (Sunmi / Pax)">HandHeld Terminal (Sunmi / Pax)</option>
+                        <option value="Self-Service Kiosk (Android/Win)">Self-Service Kiosk (Android/Win)</option>
+                        <option value="Tablet (iPad / Android Tablet)">Tablet (iPad / Android Tablet)</option>
+                        <option value="Online Ordering Box / Server">Online Ordering Box / Server</option>
+                        <option value="Kitchen Display System (KDS)">Kitchen Display System (KDS)</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label>Station / Device Name <span style="color:red">*</span></label>
+                    <input type="text" id="f-s8-station" placeholder="e.g. Waiter-1, Kiosk-Entry, Bar-Tab">
+                </div>
+                <div class="field">
+                    <label>Number of Devices (Qty) <span style="color:red">*</span></label>
+                    <input type="number" id="f-s8-qty" value="1" min="1" max="50">
+                </div>
+            </div>
+            <div class="grid-2" style="margin-top: 15px;">
+                <div class="field">
+                    <label>Till Host IP / Server Connection</label>
+                    <input type="text" id="f-s8-ip" placeholder="e.g. 192.168.1.100:8080 or Cloud URL">
+                </div>
+                <div class="field">
+                    <label>Assigned Software Specialist</label>
+                    <select id="f-s8-technician">${staffOptions}</select>
+                </div>
+            </div>
+        </div>`;
+    }
+    // 9. HARDWARE PROGRAMMING (S9)
+    else if (main === 'S9') {
+        extra = `
+        <div style="background: #fffbeb; padding: 20px; border-radius: 12px; border: 1px solid #fde68a; margin-top: 20px;">
+            <h4 style="margin: 0 0 15px 0; color: #b45309; display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600;">
+                <i data-lucide="scale" style="width: 18px; height: 18px;"></i> Hardware & Scale Programming Details
+            </h4>
+            <div class="grid-3">
+                <div class="field">
+                    <label>Hardware / Scale Model <span style="color:red">*</span></label>
+                    <select id="f-s9-scale-model">
+                        <option value="Cas CN1 Label Scale">Cas CN1 Label Scale</option>
+                        <option value="Cas CL5200 / CL5000">Cas CL5200 / CL5000</option>
+                        <option value="Cas ER Plus / PD-2">Cas ER Plus / PD-2 (Check-out Scale)</option>
+                        <option value="Avery Berkel / Dibal Scale">Avery Berkel / Dibal Scale</option>
+                        <option value="Barcode Label Printer (Zebra/Citizen/TSC)">Barcode Label Printer (Zebra/Citizen/TSC)</option>
+                        <option value="Other Hardware Peripheral">Other Hardware Peripheral</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label>Connection Interface <span style="color:red">*</span></label>
+                    <select id="f-s9-interface">
+                        <option value="Ethernet / TCP/IP LAN">Ethernet / TCP/IP LAN</option>
+                        <option value="RS232 Serial Port (COM)">RS232 Serial Port (COM)</option>
+                        <option value="USB Direct">USB Direct</option>
+                        <option value="Wi-Fi Wireless">Wi-Fi Wireless</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label>Scale IP / Port Address</label>
+                    <input type="text" id="f-s9-ip" placeholder="e.g. 192.168.1.50:2001 or COM1">
+                </div>
+            </div>
+            <div class="grid-3" style="margin-top: 15px;">
+                <div class="field">
+                    <label>Barcode / Label Format</label>
+                    <select id="f-s9-barcode-format">
+                        <option value="EAN-13 (Weight Embedded 20/21/28/29)">EAN-13 (Weight Embedded 20/21/28/29)</option>
+                        <option value="EAN-13 Standard (Item Code)">EAN-13 Standard (Item Code)</option>
+                        <option value="Custom Shelf Label 58x40mm">Custom Shelf Label 58x40mm</option>
+                        <option value="Custom Meat/Deli Label 58x60mm">Custom Meat/Deli Label 58x60mm</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label>PLU / Item Capacity</label>
+                    <input type="text" id="f-s9-plu" placeholder="e.g. 500 PLUs, Meat Dept, Veg">
+                </div>
+                <div class="field">
+                    <label>Hardware Programmer <span style="color:red">*</span></label>
+                    <select id="f-s9-technician">${staffOptions}</select>
+                </div>
+            </div>
+        </div>`;
+    }
+
     const container = document.getElementById('dynamic-fields-container');
     if (container) {
-        container.innerHTML = extra + `
-            <div class="field" style="margin-top: 25px; margin-bottom: 25px;">
-                <label>Work Details</label>
-                <textarea id="f-desc" style="min-height:90px;" placeholder="Describe the work performed..."></textarea>
-            </div>`;
+        container.innerHTML = extra;
+        if (window.lucide) {
+            lucide.createIcons();
+        }
     }
     calculateDuration();
+    calculatePrice();
 }
 
 function renderServiceSelects() {
@@ -1348,22 +1652,26 @@ function calculatePrice() {
     const p = appState.settings.pricing || {};
     
     let price = 0; 
+    let fastTrackFee = 0;
     if (main === 'S1') { 
         const basePrice = p.S1_Base || 125.00;
         const hourlyPrice = p.S1_Hourly || 25.00;
         const setMenuPrice = p.S1_SetMenu || 35.00;
 
-        if (sub === 'Set Menu' || sub === 'Dessert Menu') {
+        if (sub.includes('Set Menu') || sub.includes('Dessert')) {
             price = setMenuPrice;
+        } else if (sub.includes('New Menu')) { 
+            price = 250.00; 
         } else { 
-            price = (sub === 'New Menu') ? 250.00 : basePrice; 
+            price = basePrice;
             if (dur > 60) price += Math.ceil((dur - 60) / 60) * hourlyPrice; 
         } 
         
         // Add urgent fee if checked
         const urgentCheck = document.getElementById('f-s1-no-appointment');
         if (urgentCheck && urgentCheck.checked) {
-            price += 25.00;
+            fastTrackFee = 25.00;
+            price += fastTrackFee;
         }
     } else if (p[main] !== undefined && p[main] !== 0) {
         price = p[main];
@@ -1371,9 +1679,24 @@ function calculatePrice() {
         if (main === 'S2') price = 125.00;
         else if (main === 'S3') price = 125.00;
         else if (main === 'S4') price = 65.00;
+        else if (main === 'S6') price = 150.00;
+        else if (main === 'S7') price = 65.00;
+        else if (main === 'S8') price = 85.00;
+        else if (main === 'S9') price = 85.00;
         else price = 0.00;
     }
     
+    // Update Fast-Track Fee Badge
+    const ftBadge = document.getElementById('f-fast-track-badge');
+    if (ftBadge) {
+        ftBadge.textContent = `£${fastTrackFee.toFixed(2)}`;
+        if (fastTrackFee > 0) {
+            ftBadge.style.cssText = 'background: #fee2e2; color: #dc2626; border: 1px solid #f87171; padding: 6px 12px; border-radius: 50px; font-weight: 700; font-size: 12px;';
+        } else {
+            ftBadge.style.cssText = 'background: var(--card); color: var(--steel); border: 1px solid var(--border-color); padding: 6px 12px; border-radius: 50px; font-weight: 700; font-size: 12px;';
+        }
+    }
+
     const estEl = document.getElementById('f-est-price');
     const finalEl = document.getElementById('f-price');
     const paymentStatus = document.getElementById('f-payment-status')?.value;
@@ -1644,42 +1967,77 @@ document.getElementById('master-form').addEventListener('submit', async (e) => {
     let description = document.getElementById('f-desc').value;
     const main = document.getElementById('f-service-type').value;
     
-    // Collect dynamic fields if S1
-    if (main === 'S1') {
-        const urgent = document.getElementById('f-s1-no-appointment')?.checked ? 'Yes' : 'No';
-        if (urgent === 'Yes') {
-            description = `[URGENT / NO APPOINTMENT: Yes] (+£25.00 Service Fee)\n\n${description}`;
-        }
-    }
-    // Collect dynamic fields if S2
-    else if (main === 'S2') {
-        const ika = document.getElementById('f-ika-app').value;
-        const local = document.getElementById('f-local-settings')?.value || '';
-        const sector = document.getElementById('f-s2-sector')?.value || '';
-        const setupNum = document.getElementById('f-setup-number')?.value || '';
-        const company = document.getElementById('f-card-company')?.value || '';
-        description = `[IKA APP: ${ika}] [SETTINGS: ${local}] [SECTOR: ${sector}] [SETUP #: ${setupNum}] [CARD CO: ${company}]\n\n${description}`;
-    } 
-    // Collect dynamic fields if S6
-    else if (main === 'S6') {
-        const quote = document.getElementById('f-s6-quote').value;
-        const type = document.getElementById('f-s6-type').value;
-        const model = document.getElementById('f-s6-model').value;
-        const cpu = document.getElementById('f-s6-cpu').value;
-        const os = document.getElementById('f-s6-os').value;
-        const appV = document.getElementById('f-s6-app-ver').value;
-        const sector = document.getElementById('f-s6-sector').value;
-        const opt = document.getElementById('f-s6-option').value;
-        const pTill = document.getElementById('f-s6-prog-till').value;
-        const pImg = document.getElementById('f-s6-prog-img').value;
-        const pMenu = document.getElementById('f-s6-prog-menu').value;
+    // ========================================================
+    // DEPARTMAN BAZLI DİNAMİK ALANLARI TOPLAMA & RAPORLAMA
+    // ========================================================
+    let extraSummary = '';
 
-        description = `--- TECHNICAL SPECIFICATIONS (TILL SETUP) ---\n` +
-                     `Quote: ${quote} | Type: ${type} | Model: ${model}\n` +
-                     `CPU: ${cpu} | OS: ${os} | App Ver: ${appV}\n` +
-                     `Sector: ${sector} | Service: ${opt}\n` +
-                     `Programmers -> Till: ${pTill}, Image: ${pImg}, Menu: ${pMenu}\n` +
-                     `-------------------------------------------\n\n${description}`;
+    if (main === 'S1') {
+        const menuType = document.getElementById('f-s1-menu-type')?.value || '';
+        const menuLink = document.getElementById('f-s1-menu-link')?.value || '';
+        const urgent = document.getElementById('f-s1-no-appointment')?.checked ? 'YES (+£25.00 Fast-Track)' : 'No';
+        extraSummary = `[MENU TYPE: ${menuType}] | [URGENT: ${urgent}]` + (menuLink ? `\n[ATTACHMENT LINK: ${menuLink}]` : '');
+    }
+    else if (main === 'S2') {
+        const co = document.getElementById('f-card-company')?.value || '';
+        const sn = document.getElementById('f-setup-number')?.value || '';
+        const ika = document.getElementById('f-ika-app')?.value || '';
+        const sec = document.getElementById('f-s2-sector')?.value || '';
+        const tModel = document.getElementById('f-s2-terminal-model')?.value || '';
+        extraSummary = `[CARD CO: ${co}] | [TID / S/N: ${sn}] | [INTEGRATION: ${ika}] | [SECTOR: ${sec}]` + (tModel ? ` | [MODEL: ${tModel}]` : '');
+    }
+    else if (main === 'S3') {
+        const rType = document.getElementById('f-s3-reset-type')?.value || '';
+        const auth = document.getElementById('f-s3-authoriser')?.value || '';
+        const consent = document.getElementById('f-s3-written-consent')?.checked ? 'CONFIRMED' : 'MISSING';
+        const backup = document.getElementById('f-s3-backup-taken')?.checked ? 'ARCHIVED' : 'NOT ARCHIVED';
+        extraSummary = `[DATA RESET TYPE: ${rType}]\n[AUTHORISED BY: ${auth}] | [CUSTOMER CONSENT: ${consent}] | [BACKUP: ${backup}]`;
+    }
+    else if (main === 'S4') {
+        const hw = document.getElementById('f-s4-hardware-type')?.value || '';
+        const fault = document.getElementById('f-s4-fault-type')?.value || '';
+        const war = document.getElementById('f-s4-warranty')?.value || '';
+        const sn = document.getElementById('f-s4-serial')?.value || 'N/A';
+        const tech = document.getElementById('f-s4-technician')?.value || '';
+        extraSummary = `[SERVICE HARDWARE: ${hw} | S/N: ${sn}]\n[FAULT: ${fault}] | [WARRANTY: ${war}] | [TECH: ${tech}]`;
+    }
+    else if (main === 'S5') {
+        const src = document.getElementById('f-s5-source')?.value || '';
+        const prio = document.getElementById('f-s5-priority')?.value || '';
+        extraSummary = `[REQUEST SOURCE: ${src}] | [PRIORITY: ${prio}]`;
+    }
+    else if (main === 'S6') {
+        const quote = document.getElementById('f-s6-quote')?.value || '';
+        const model = document.getElementById('f-s6-model')?.value || '';
+        const cpu = document.getElementById('f-s6-cpu')?.value || '';
+        const qty = document.getElementById('f-s6-qty')?.value || '1';
+        const os = document.getElementById('f-s6-os')?.value || '';
+        const drv = document.getElementById('f-s6-drive')?.value || '';
+        const lic = document.getElementById('f-s6-license')?.value || '';
+        const pTill = document.getElementById('f-s6-prog-till')?.value || '';
+        const pMenu = document.getElementById('f-s6-prog-menu')?.value || '';
+        extraSummary = `--- TILL SETUP & OS SPECIFICATIONS ---\nQuote: ${quote} | Model: ${model} | CPU: ${cpu} | Qty: ${qty}\nOS: ${os} | Drive: ${drv} | License: ${lic}\nLead Programmer: ${pTill} | Image/Builder: ${pMenu}\n---------------------------------------`;
+    }
+    else if (main === 'S8') {
+        const devType = document.getElementById('f-s8-device-type')?.value || '';
+        const station = document.getElementById('f-s8-station')?.value || '';
+        const qty = document.getElementById('f-s8-qty')?.value || '1';
+        const ip = document.getElementById('f-s8-ip')?.value || '';
+        const tech = document.getElementById('f-s8-technician')?.value || '';
+        extraSummary = `--- SOFTWARING MODULE SPECIFICATIONS ---\nDevice Type: ${devType} | Station: ${station} | Qty: ${qty}\nServer/Host: ${ip} | Software Tech: ${tech}\n----------------------------------------`;
+    }
+    else if (main === 'S9') {
+        const model = document.getElementById('f-s9-scale-model')?.value || '';
+        const iface = document.getElementById('f-s9-interface')?.value || '';
+        const ip = document.getElementById('f-s9-ip')?.value || '';
+        const fmt = document.getElementById('f-s9-barcode-format')?.value || '';
+        const plu = document.getElementById('f-s9-plu')?.value || '';
+        const tech = document.getElementById('f-s9-technician')?.value || '';
+        extraSummary = `--- HARDWARE PROGRAMMING SPECIFICATIONS ---\nScale/Device: ${model} | Interface: ${iface} | IP/Port: ${ip}\nBarcode Format: ${fmt} | Capacity: ${plu} | Hardware Tech: ${tech}\n-------------------------------------------`;
+    }
+
+    if (extraSummary) {
+        description = `${extraSummary}\n\n${description}`;
     }
 
     const dateVal = document.getElementById('f-date') ? document.getElementById('f-date').value : new Date().toISOString().split('T')[0];
@@ -1977,15 +2335,28 @@ window.openDayView = function(year, month, day) {
     document.getElementById('day-view-modal').classList.remove('hidden');
 };
 
-window.createAppointmentForSlot = function(dateStr, timeStr) {
-    document.getElementById('day-view-modal').classList.add('hidden');
+window.createAppointmentForSlot = function(dateStr, timeStr, companyName = '') {
+    const dayModal = document.getElementById('day-view-modal');
+    if (dayModal) dayModal.classList.add('hidden');
     
     // Show quick add modal
-    document.getElementById('quick-add-modal').classList.remove('hidden'); if(window.initPickers) window.initPickers();
+    const qaModal = document.getElementById('quick-add-modal');
+    if (qaModal) {
+        qaModal.classList.remove('hidden');
+        if(window.initPickers) window.initPickers();
+        if(typeof lucide !== 'undefined') lucide.createIcons();
+    }
+    
+    // Populate personnel if not done
+    if (typeof populateStaffDropdowns === 'function') populateStaffDropdowns();
     
     // Reset quick add fields
-    document.getElementById('qa-customer-search').value = '';
-    document.getElementById('qa-date').value = dateStr || '';
+    const searchInput = document.getElementById('qa-customer-search');
+    if (searchInput) {
+        searchInput.value = companyName || '';
+        setTimeout(() => searchInput.focus(), 60);
+    }
+    document.getElementById('qa-date').value = dateStr || new Date().toISOString().split('T')[0];
     document.getElementById('qa-company-name').value = '';
     document.getElementById('qa-company-id').value = '';
     document.getElementById('qa-postcode').value = '';
@@ -1997,9 +2368,9 @@ window.createAppointmentForSlot = function(dateStr, timeStr) {
     const qaStatus = document.getElementById('qa-status');
     if (qaStatus) {
         qaStatus.value = 'Checking...';
-        qaStatus.style.setProperty('background', '#f8fafc', 'important');
-        qaStatus.style.setProperty('color', '#111827', 'important');
-        qaStatus.style.fontWeight = '500';
+        qaStatus.style.setProperty('background', '#F8FAFC', 'important');
+        qaStatus.style.setProperty('color', '#64748B', 'important');
+        qaStatus.style.fontWeight = '600';
     }
     
     const serviceCat = document.getElementById('qa-service-category');
@@ -2007,28 +2378,48 @@ window.createAppointmentForSlot = function(dateStr, timeStr) {
         serviceCat.value = 'S1';
     }
     
-    // Populate times dropdown in qa-time if it's empty
+    // Populate times dropdown in qa-time (07:00 to 21:00 with 30-min intervals)
     const qaTimeSelect = document.getElementById('qa-time');
-    if (qaTimeSelect && qaTimeSelect.options.length === 0) {
-        let timesHtml = '';
-        for (let h = 9; h <= 18; h++) {
-            const tStr = `${String(h).padStart(2,'0')}:00`;
-            timesHtml += `<option value="${tStr}">${tStr}</option>`;
+    if (qaTimeSelect) {
+        if (qaTimeSelect.options.length < 20) {
+            let timesHtml = '';
+            for (let h = 7; h <= 21; h++) {
+                const hStr = String(h).padStart(2, '0');
+                timesHtml += `<option value="${hStr}:00">${hStr}:00</option>`;
+                if (h < 21) {
+                    timesHtml += `<option value="${hStr}:30">${hStr}:30</option>`;
+                }
+            }
+            qaTimeSelect.innerHTML = timesHtml;
         }
-        qaTimeSelect.innerHTML = timesHtml;
+        if (timeStr) {
+            let exists = Array.from(qaTimeSelect.options).some(o => o.value === timeStr);
+            if (!exists) {
+                const opt = document.createElement('option');
+                opt.value = timeStr;
+                opt.textContent = timeStr;
+                qaTimeSelect.appendChild(opt);
+            }
+            qaTimeSelect.value = timeStr;
+        } else {
+            qaTimeSelect.value = '09:00';
+        }
     }
-    if (timeStr) qaTimeSelect.value = timeStr;
     
     // Populate Assigned Engineer select options
     const qaStaffSelect = document.getElementById('qa-staff-select');
     if (qaStaffSelect && qaStaffSelect.options.length === 0) {
-        const personnel = appState.settings.personnel || [];
+        const personnel = appState.settings?.personnel || [];
         qaStaffSelect.innerHTML = personnel.map(p => `<option value="${p}">${p}</option>`).join('');
     }
     if (qaStaffSelect && appState.currentUser) qaStaffSelect.value = appState.currentUser;
     
     if (typeof updateQaSubServices === 'function') updateQaSubServices();
     if (typeof updatePriorityUI === 'function') updatePriorityUI('Normal');
+    
+    if (companyName && typeof window.autoFillQuickAdd === 'function') {
+        window.autoFillQuickAdd();
+    }
 };
 
 window.updateQaSubServices = function() {
@@ -2223,18 +2614,18 @@ window.submitQuickAdd = async function() {
 window.autoFillQuickAdd = function() {
     const searchInput = document.getElementById('qa-customer-search');
     if (!searchInput) return;
-    const searchVal = searchInput.value;
+    const searchVal = (searchInput.value || '').trim();
     if (!searchVal) return;
+    const q = searchVal.toLowerCase();
     
-    const customer = (appState.customers || []).find(c => {
-        const name = (c.COMPANY || '').toLowerCase();
-        const cid = (c['CUSTOMER ID'] || '').toLowerCase();
-        const pc = (c.POSTCODE || '').toLowerCase();
-        return name === searchVal.toLowerCase() || 
-               cid === searchVal.toLowerCase() || 
-               pc === searchVal.toLowerCase() ||
-               searchVal.toLowerCase().includes(name) ||
-               searchVal.toLowerCase().includes(cid);
+    const custSource = (typeof allCustomersCache !== 'undefined' && allCustomersCache.length > 0) ? allCustomersCache : (appState.customers || []);
+    const customer = custSource.find(c => {
+        const name = (c.organization_name || c.COMPANY || '').toLowerCase();
+        const cid = (c.organization_number || c['CUSTOMER ID'] || '').toLowerCase();
+        const pc = (c.billing_postal_code || c.POSTCODE || '').toLowerCase();
+        return (name && (name === q || q.includes(name) || name.includes(q))) ||
+               (cid && (cid === q || q.includes(cid) || cid.includes(q))) ||
+               (pc && (pc === q || q.includes(pc) || pc.includes(q)));
     });
 
     const companyEl = document.getElementById('qa-company-name');
@@ -2246,24 +2637,24 @@ window.autoFillQuickAdd = function() {
     const statusEl = document.getElementById('qa-status');
 
     if (customer) {
-        companyEl.value = customer.COMPANY || '';
-        companyIdEl.value = customer['CUSTOMER ID'] || '';
-        postcodeEl.value = customer.POSTCODE || '';
-        addressEl.value = customer.ADDRESS1 || customer.ADDRESS2 || 'N/A';
-        contactEl.value = customer.CONTACT_NAME || 'N/A';
-        phoneEl.value = customer.PHONE || 'N/A';
+        companyEl.value = customer.organization_name || customer.COMPANY || '';
+        companyIdEl.value = customer.organization_number || customer['CUSTOMER ID'] || '';
+        postcodeEl.value = customer.billing_postal_code || customer.POSTCODE || '';
+        addressEl.value = customer.billing_address || customer.ADDRESS1 || customer.ADDRESS2 || 'N/A';
+        contactEl.value = customer.contact_name || customer.CONTACT_NAME || 'N/A';
+        phoneEl.value = customer.phone || customer.PHONE || 'N/A';
         
-        const statusVal = customer['SERVICE STATUS'] || 'No Contract';
+        const statusVal = customer.service_status || customer['SERVICE STATUS'] || 'Contract';
         statusEl.value = statusVal;
         
         const isContract = statusVal.toLowerCase().includes('contract') || statusVal.toLowerCase().includes('var');
         if (isContract) {
             statusEl.style.setProperty('background', '#dcfce7', 'important');
-            statusEl.style.setProperty('color', '#15803d', 'important');
+            statusEl.style.setProperty('color', '#4F7A5C', 'important');
             statusEl.style.fontWeight = '800';
         } else {
             statusEl.style.setProperty('background', '#fee2e2', 'important');
-            statusEl.style.setProperty('color', '#b91c1c', 'important');
+            statusEl.style.setProperty('color', '#B5563A', 'important');
             statusEl.style.fontWeight = '800';
         }
     } else {
@@ -2274,11 +2665,13 @@ window.autoFillQuickAdd = function() {
         contactEl.value = '';
         phoneEl.value = '';
         statusEl.value = '';
-        statusEl.style.background = '#f8fafc';
-        statusEl.style.color = '#111827';
+        statusEl.style.background = '#FBF9F3';
+        statusEl.style.color = '#1D2430';
         statusEl.style.fontWeight = '500';
     }
 };
+
+
 
 
 window.loadIntoDashboard = function(id) {
@@ -2576,7 +2969,9 @@ window.renderWaitingJobs = function() {
         'S3': 'DATA RESET',
         'S4': 'SERVICE',
         'S5': 'OTHER',
-        'S6': 'TILL SETUP'
+        'S6': 'TILL SETUP',
+        'S8': 'SOFTWARING',
+        'S9': 'HARDWARE'
     };
 
     let html = `

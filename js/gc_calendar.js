@@ -171,7 +171,7 @@ function renderGcWeekView() {
 
   // Build time grid
   let gridHtml = '';
-  for (let h = 8; h <= 18; h++) {
+  for (let h = 8; h <= 20; h++) {
     const label = `${h.toString().padStart(2,'0')}:00`;
     gridHtml += `<div class="gc-time-row">
       <div class="gc-time-label"><span>${label}</span></div>`;
@@ -365,8 +365,12 @@ function renderGcMonthView() {
     const cellDate = new Date(year, month, d);
     const isSunday = cellDate.getDay() === 0;
     html += `<div class="gc-month-cell ${isToday ? 'today' : ''} ${isSunday ? 'gc-sunday-cell' : ''}"
+      ondblclick="event.stopPropagation(); createAppointmentForSlot('${dateStr}','09:00')"
       onclick="gcDayClick('${dateStr}')">
-      <span class="gc-month-day-number ${isToday ? 'gc-today-circle' : ''}">${d}</span>
+      <div style="display:flex; justify-content:space-between; align-items:center; width:100%; margin-bottom:2px;">
+        <span class="gc-month-day-number ${isToday ? 'gc-today-circle' : ''}">${d}</span>
+        <button onclick="event.stopPropagation(); createAppointmentForSlot('${dateStr}','09:00')" title="Book Appointment for ${dateStr}" style="background:transparent; border:none; color:var(--steel, #64748b); font-size:15px; font-weight:700; cursor:pointer; padding:0 4px; border-radius:4px; opacity:0.6; line-height:1;" onmouseover="this.style.opacity='1'; this.style.color='var(--ink, #1e293b)';" onmouseout="this.style.opacity='0.6'; this.style.color='var(--steel, #64748b)';">+</button>
+      </div>
       <div class="gc-month-events">${evtHtml}</div>
     </div>`;
   }
@@ -405,7 +409,7 @@ function renderGcDayView() {
   const dateNum = d.getDate();
 
   let gridHtml = '';
-  for (let h = 8; h <= 18; h++) {
+  for (let h = 8; h <= 20; h++) {
     const label = `${h.toString().padStart(2,'0')}:00`;
     gridHtml += `<div class="gc-time-row">
       <div class="gc-time-label"><span>${label}</span></div>
@@ -630,16 +634,16 @@ window.gcOpenQuickAdd = function(dateStr, timeStr) {
   if (typeof createAppointmentForSlot === 'function') {
     createAppointmentForSlot(dateStr, timeStr);
   } else {
-    const modal = document.getElementById('gc-quick-add-modal');
+    const modal = document.getElementById('quick-add-modal') || document.getElementById('gc-quick-add-modal');
     if (!modal) return;
     modal.classList.remove('hidden');
 
     const d = dateStr ? new Date(dateStr + 'T12:00:00') : new Date();
-    const dInput = document.getElementById('gc-qa-date');
-    const tInput = document.getElementById('gc-qa-time');
+    const dInput = document.getElementById('qa-date') || document.getElementById('gc-qa-date');
+    const tInput = document.getElementById('qa-time') || document.getElementById('gc-qa-time');
     if (dInput) dInput.value = d.toISOString().split('T')[0];
     if (tInput) tInput.value = timeStr || '09:00';
-    const titleEl = document.getElementById('gc-qa-title');
+    const titleEl = document.getElementById('qa-customer-search') || document.getElementById('gc-qa-title');
     if (titleEl) { titleEl.value = ''; titleEl.focus(); }
   }
 };

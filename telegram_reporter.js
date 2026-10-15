@@ -49,13 +49,14 @@ async function fetchDailyData(targetDate) {
             t.ticketpriorities,
             COALESCE(NULLIF(t.customer_name, ''), c.organization_name, t.company, '') as customer_name,
             t.company, 
-            t.assigned_user_id, 
+            COALESCE(u.full_name, t.assigned_user_id) as assigned_user_id, 
             t.createdtime, 
             t.modifiedtime, 
             t.solution,
             c.organization_name
           FROM vt_tickets t
           LEFT JOIN vt_customers c ON (c.id = '11x' || t.parent_id OR c.id = t.parent_id)
+          LEFT JOIN vt_users u ON (u.id = t.assigned_user_id)
           WHERE substr(t.createdtime, 1, 10) = ? OR substr(t.modifiedtime, 1, 10) = ?
           GROUP BY t.id
           ORDER BY t.modifiedtime DESC`,
