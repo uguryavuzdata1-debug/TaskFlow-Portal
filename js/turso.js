@@ -6,6 +6,8 @@
 
 const TURSO_CONFIG = {
     apiUrl: '/api/query',
+    pipelineUrl: 'https://taskflow-uguryavuz.aws-eu-west-1.turso.io/v2/pipeline',
+    token: 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3OTA0MTMwMDcsImlkIjoiMDFhMGRjZWUtMDIwMS03ZWU3LTliMTMtODk0N2IzYjhjM2ZjIiwia2lkIjoiUGlXX2U0VkRpd1lqdmRHSTg3cGxydE4tY1RhZWdGbG5UeE5fbUlIT0VGYyIsInJpZCI6IjU2OWJhMWM0LTFmZTQtNDQ5Yi04NzM0LTAxOWQ5ZTYyZTQ3NyJ9.ABiOIIp6m7eAvpVfObbk4sT56NkuH5uWuLwyGsrTJdbyq-f8JchXdW0M_JGr72Wpfxf6QCrbIl-N_YVe7DSZBg',
     localApiUrl: '/api'
 };
 
@@ -14,9 +16,43 @@ function getAuthToken() {
     return localStorage.getItem('taskflow_token') || sessionStorage.getItem('taskflow_token') || '';
 }
 
-// Secure SQL Execution on Server API Proxy
+// Convert JavaScript arguments into Turso pipeline argument format
+function formatTursoArgs(args = []) {
+    return args.map(a => {
+        if (a === null || a === undefined) return { type: 'null' };
+        if (typeof a === 'number') {
+            return { type: Number.isInteger(a) ? 'integer' : 'float', value: String(a) };
+        }
+        return { type: 'text', value: String(a) };
+    });
+}
+
+// Convert Turso pipeline response format into array of plain JS objects
+function parseTursoResponse(data) {
+    if (!data || !data.results || !data.results[0]) return [];
+    const res = data.results[0];
+    if (res.type === 'error') {
+        throw new Error(res.error?.message || 'Turso query error');
+    }
+    const result = res.response?.result;
+    if (!result || !result.cols || !result.rows) return [];
+    
+    const cols = result.cols.map(c => c.name);
+    return result.rows.map(row => {
+        const item = {};
+        cols.forEach((col, idx) => {
+            const cell = row[idx];
+            item[col] = cell && cell.value !== undefined ? cell.value : null;
+        });
+        return item;
+    });
+}
+
+// Secure SQL Execution on Server API Proxy with direct Turso pipeline fallback
 async function tursoExecute(sql, args = []) {
     const token = getAuthToken();
+
+    // 1. Try local/proxy API endpoint (/api/query)
     try {
         const response = await fetch(TURSO_CONFIG.apiUrl, {
             method: 'POST',
@@ -34,17 +70,41 @@ async function tursoExecute(sql, args = []) {
             const data = await response.json();
             return data.rows || [];
         }
-
-        if (response.status === 401) {
-            console.warn('[Turso] Oturum doğrulanamadı (401). Giriş ekranına yönlendiriliyor...');
-        }
-
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error || `Sorgu hatası (HTTP ${response.status})`);
-    } catch (err) {
-        console.error('[Turso Query Error]', err.message, { sql, args });
-        throw err;
+    } catch (proxyErr) {
+        // Silent fallback to direct Turso HTTP pipeline
     }
+
+    // 2. Direct Turso HTTP pipeline fallback (for Cloudflare Pages static hosting)
+    try {
+        const directRes = await fetch(TURSO_CONFIG.pipelineUrl, {
+            method: 'POST',
+            headers: {
+                'Authorization': 'Bearer ' + TURSO_CONFIG.token,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                requests: [
+                    {
+                        type: 'execute',
+                        stmt: {
+                            sql: sql,
+                            args: formatTursoArgs(args)
+                        }
+                    }
+                ]
+            })
+        });
+
+        if (directRes.ok) {
+            const data = await directRes.json();
+            return parseTursoResponse(data);
+        }
+    } catch (directErr) {
+        console.error('[Turso Query Error]', directErr.message, { sql, args });
+        throw directErr;
+    }
+
+    return [];
 }
 
 // High-level Turso operations
