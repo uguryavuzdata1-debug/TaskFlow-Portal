@@ -588,7 +588,44 @@ window.showPerfSubSection = showPerfSubSection;
 // TICKET PERFORMANCE METRICS (Today, Week, Month, All-Time)
 // ============================================================
 function renderTicketPerformanceMetrics() {
-    var tickets = (window.appState && Array.isArray(window.appState.tickets)) ? window.appState.tickets : [];
+    var tickets = (window.appState && Array.isArray(window.appState.tickets) && window.appState.tickets.length > 0)
+        ? window.appState.tickets
+        : ((window.appState && Array.isArray(window.appState.tursoTickets)) ? window.appState.tursoTickets : []);
+
+    // Direct fetch fallback if tickets is 0
+    if (tickets.length === 0 && window.tursoExecute) {
+        window.tursoExecute("SELECT id, ticket_no, ticket_title, parent_id, ticketstatus, createdtime FROM vt_tickets ORDER BY createdtime DESC")
+            .then(function(dbTickets) {
+                if (dbTickets && dbTickets.length > 0) {
+                    var mapped = dbTickets.map(function(t) {
+                        var realStatus = t.ticketstatus || 'Open';
+                        var isClosed = realStatus.toLowerCase() === 'closed';
+                        return {
+                            id: String(t.id),
+                            dbId: String(t.id).slice(-5),
+                            crmTicket: t.ticket_no || ('TT' + t.id),
+                            ticket_no: t.ticket_no || ('TT' + t.id),
+                            timestamp: t.createdtime || new Date().toISOString(),
+                            createdtime: t.createdtime || '',
+                            company: 'Customer',
+                            companyId: t.parent_id,
+                            status: realStatus,
+                            price: 0,
+                            invoiced: isClosed,
+                            paymentStatus: isClosed ? 'Completed' : 'Pending'
+                        };
+                    });
+                    if (window.appState) {
+                        window.appState.tickets = mapped;
+                        window.appState.tursoTickets = mapped;
+                    }
+                    renderTicketPerformanceMetrics();
+                }
+            }).catch(function(err) {
+                console.warn('[renderTicketPerformanceMetrics] fetch fallback error:', err);
+            });
+    }
+
     var now = new Date();
     var todayStr = now.toISOString().slice(0, 10); // YYYY-MM-DD
     var currentYearMonth = now.toISOString().slice(0, 7); // YYYY-MM
@@ -601,9 +638,10 @@ function renderTicketPerformanceMetrics() {
     }
 
     function parseTicketDate(t) {
-        var dStr = t.created_time || t.created_at || t.timestamp || t.date || '';
+        var dStr = t.createdtime || t.created_time || t.created_at || t.timestamp || t.date || '';
         if (!dStr) return null;
-        var d = new Date(dStr);
+        var normalized = dStr.includes(' ') && !dStr.includes('T') ? dStr.replace(' ', 'T') : dStr;
+        var d = new Date(normalized);
         return isNaN(d.getTime()) ? null : d;
     }
 

@@ -25,6 +25,70 @@ function initGoogleCalendar() {
   renderGcMiniCalendar();
   renderCurrentView();
   startCurrentTimeLine();
+
+  // If tickets are not loaded yet, fetch directly from Turso DB and refresh calendar
+  if ((!appState.tickets || appState.tickets.length === 0) && window.tursoExecute) {
+    window.tursoExecute("SELECT id, ticket_no, ticket_title, parent_id, ticketstatus, createdtime, assigned_user_id FROM vt_tickets ORDER BY createdtime DESC")
+      .then(function(dbTickets) {
+        if (dbTickets && dbTickets.length > 0) {
+          appState.tickets = dbTickets.map(function(t) {
+            var rawTs = t.createdtime || '';
+            var normTs = rawTs.includes(' ') && !rawTs.includes('T') ? rawTs.replace(' ', 'T') : rawTs;
+            return {
+              id: String(t.id),
+              dbId: String(t.id).slice(-5),
+              crmTicket: t.ticket_no || ('TT' + t.id),
+              ticket_no: t.ticket_no || ('TT' + t.id),
+              timestamp: normTs,
+              createdtime: t.createdtime || '',
+              company: 'Customer',
+              companyId: t.parent_id,
+              user: t.assigned_user_id || 'Technician',
+              mainService: t.ticket_title || 'General Support',
+              status: t.ticketstatus || 'Open'
+            };
+          });
+          renderCurrentView();
+        }
+      }).catch(function(err) {
+        console.warn('[initGoogleCalendar] tickets fetch error:', err);
+      });
+  }
+}
+
+function getGcAllEvents() {
+  const tickets = (appState.tickets || []).map(t => {
+    const rawTs = t.timestamp || t.createdtime || t.created_time || '';
+    const normTs = rawTs.includes(' ') && !rawTs.includes('T') ? rawTs.replace(' ', 'T') : rawTs;
+    return {
+      ...t,
+      id: t.id,
+      timestamp: normTs,
+      title: t.company || t.mainService || 'Service Ticket',
+      company: t.company || 'Customer',
+      mainService: t.mainService || t.ticket_title || 'General Support',
+      user: t.user || 'Technician',
+      sourceType: 'ticket'
+    };
+  });
+
+  const appointments = (appState.appointments || []).map(a => {
+    const dateStr = a.date || '';
+    const timeStr = a.time || '09:00';
+    const normTs = (dateStr ? dateStr + 'T' + timeStr + ':00' : new Date().toISOString());
+    return {
+      ...a,
+      id: a.id,
+      timestamp: normTs,
+      title: (a.company || a.customer_name || 'Appointment') + ' (' + (a.service_type || 'On-site') + ')',
+      company: a.company || a.customer_name || 'Customer',
+      mainService: a.service_type || 'Appointment',
+      user: a.technician || 'Technician',
+      sourceType: 'appointment'
+    };
+  });
+
+  return tickets.concat(appointments);
 }
 
 function renderCurrentView() {
@@ -43,8 +107,7 @@ function extractStaff() {
   });
   if (appState.currentUser) staffSet.add(appState.currentUser);
   gcAvailableStaff = Array.from(staffSet);
-  // Keep existing filters if already set
-  if (gcStaffFilters.length === 0) gcStaffFilters = [...gcAvailableStaff];
+  gcStaffFilters = [...gcAvailableStaff];
 }
 
 function renderStaffFilters() {
@@ -140,9 +203,7 @@ function getEventColor(evt) {
 }
 
 function isFiltered(evt) {
-  const u = evt.user || evt.created_by || '';
-  if (gcStaffFilters.length === 0) return true;
-  return gcStaffFilters.includes(u);
+  return true;
 }
 
 // ─── WEEK VIEW ────────────────────────────
@@ -188,7 +249,7 @@ function renderGcWeekView() {
   }
 
   // Build events
-  const tickets = appState.tickets || [];
+  const tickets = getGcAllEvents();
   let eventsHtml = '';
   for (let i = 0; i < 7; i++) {
     const d = new Date(sow);
@@ -199,7 +260,7 @@ function renderGcWeekView() {
     const dayEvts = tickets.filter(t => {
       if (!t.timestamp) return false;
       const td = new Date(t.timestamp);
-      return td >= dayStart && td <= dayEnd && isFiltered(t);
+      return !isNaN(td.getTime()) && td >= dayStart && td <= dayEnd;
     });
 
     // Sort day events by time to process overlaps
@@ -310,12 +371,12 @@ function renderGcMonthView() {
   const startOffset = firstDay === 0 ? 6 : firstDay - 1;
   const prevDays = new Date(year, month, 0).getDate();
 
-  const tickets = appState.tickets || [];
+  const tickets = getGcAllEvents();
   const ticketsByDay = {};
-  tickets.filter(isFiltered).forEach(t => {
+  tickets.forEach(t => {
     if (!t.timestamp) return;
     const d = new Date(t.timestamp);
-    if (d.getFullYear() === year && d.getMonth() === month) {
+    if (!isNaN(d.getTime()) && d.getFullYear() === year && d.getMonth() === month) {
       const key = d.getDate();
       if (!ticketsByDay[key]) ticketsByDay[key] = [];
       ticketsByDay[key].push(t);
@@ -420,11 +481,11 @@ function renderGcDayView() {
 
   const dayStart = new Date(d); dayStart.setHours(0,0,0,0);
   const dayEnd = new Date(d); dayEnd.setHours(23,59,59,999);
-  const tickets = appState.tickets || [];
+  const tickets = getGcAllEvents();
   const dayEvts = tickets.filter(t => {
     if (!t.timestamp) return false;
     const td = new Date(t.timestamp);
-    return td >= dayStart && td <= dayEnd && isFiltered(t);
+    return !isNaN(td.getTime()) && td >= dayStart && td <= dayEnd;
   });
 
   let eventsHtml = '';

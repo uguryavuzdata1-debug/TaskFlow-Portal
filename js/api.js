@@ -103,329 +103,277 @@ async function initApp() {
         // 3. Set Static Sub-Services
         appState.settings.sub_services = typeof LOCAL_SUB_SERVICES !== 'undefined' ? LOCAL_SUB_SERVICES : {};
 
-        // 4. Fetch Customers (Organizations) FIRST so tickets, quotes, and appointments can be linked
+        // 4. Fetch Customers, Tickets, Quotes, and Appointments CONCURRENTLY
         const customerMap = {};
         const customerPostcodeMap = {};
         const customerPhoneMap = {};
         window.customerMap = customerMap;
         window.customerPostcodeMap = customerPostcodeMap;
 
-        try {
-            console.log("[INIT] Fetching customers from Turso DB...");
-            const TABLE_CANDIDATES = ['vt_customers', 'Organizations', 'customers'];
-            let orgData = [];
-            let usedTable = '';
+        console.log("[INIT] Fetching core data from Turso DB in parallel...");
 
-            for (const tableName of TABLE_CANDIDATES) {
-                try {
-                    const { data, error } = await sbClient.from(tableName).select('*').limit(1);
-                    if (!error && data !== null) {
-                        usedTable = tableName;
-                        break;
-                    }
-                } catch (probeErr) {
-                    console.warn(`[INIT] Table "${tableName}" probe failed:`, probeErr.message);
-                }
-            }
-
-            if (usedTable) {
-                let lastOrgSize = 1000;
-                let orgOffset = 0;
-                while (lastOrgSize === 1000) {
-                    const { data, error } = await sbClient.from(usedTable).select('*').range(orgOffset, orgOffset + 999);
-                    if (error) {
-                        console.error(`[INIT] ${usedTable} pagination error at offset ${orgOffset}:`, error);
-                        break;
-                    }
-                    if (data && data.length > 0) {
-                        orgData = orgData.concat(data);
-                        lastOrgSize = data.length;
-                        orgOffset += 1000;
-                    } else {
-                        break;
-                    }
-                }
-                console.log(`[INIT] Fetched ${orgData.length} organizations from "${usedTable}".`);
-            }
-
-            // Fetch service contracts for contract status mapping
-            let scData = [];
+        // Promise A: Fetch Tickets
+        const ticketsPromise = (async () => {
             try {
-                let lastScSize = 1000;
-                let scOffset = 0;
-                while (lastScSize === 1000) {
-                    const { data, error } = await sbClient.from('vt_contracts').select('*').range(scOffset, scOffset + 999);
-                    if (error) break;
-                    if (data && data.length > 0) {
-                        scData = scData.concat(data);
-                        lastScSize = data.length;
-                        scOffset += 1000;
-                    } else {
-                        break;
-                    }
-                }
-            } catch(scErr) {}
-
-            const contractMap = {};
-            if (scData.length > 0) {
-                scData.forEach(sc => {
-                    let cData = sc.data;
-                    if (typeof cData === 'string') {
-                        try { cData = JSON.parse(cData); } catch(e) { cData = {}; }
-                    }
-                    if (cData && cData.sc_related_to) {
-                        contractMap[cData.sc_related_to] = cData.contract_status;
-                        contractMap[String(cData.sc_related_to).replace('11x', '')] = cData.contract_status;
-                    }
-                });
-            }
-
-            if (orgData.length > 0) {
-                // Populate lookup maps for joins
-                orgData.forEach(c => {
-                    const name = c.organization_name || c.company || c.name || '';
-                    const pc = c.billing_postal_code || c.postcode || '';
-                    const ph = c.primary_phone || c.phone || '';
-                    const rawId = String(c.id || '');
-                    const cleanId = rawId.replace(/^11x/, '');
-                    const orgNum = String(c.organization_number || '').trim().toLowerCase();
-
-                    if (rawId) {
-                        customerMap[rawId] = name;
-                        customerPostcodeMap[rawId] = pc;
-                        customerPhoneMap[rawId] = ph;
-                    }
-                    if (cleanId) {
-                        customerMap[cleanId] = name;
-                        customerPostcodeMap[cleanId] = pc;
-                        customerPhoneMap[cleanId] = ph;
-                        customerMap['11x' + cleanId] = name;
-                        customerPostcodeMap['11x' + cleanId] = pc;
-                        customerPhoneMap['11x' + cleanId] = ph;
-                    }
-                    if (orgNum) customerMap[orgNum] = name;
-                });
-
-                // Map to appState.customers
-                appState.customers = orgData.map(c => {
-                    const cId = c.id || '';
-                    const cleanId = String(cId).replace(/^11x/, '');
-                    const isContract = (c.contract_status === 'Active' || contractMap[cId] === 'In Progress' || contractMap[cleanId] === 'In Progress');
-                    return {
-                        'CUSTOMER ID': c.organization_number || c.id || '',
-                        'DB_ID': c.id || '',
-                        'COMPANY': c.organization_name || c.company || '',
-                        'ORGANIZATION NAME': c.organization_name || c.company || '',
-                        'ORGANIZATION NUMBER': c.organization_number || '',
-                        'ADDRESS': c.billing_address || '',
-                        'CITY': c.billing_city || '',
-                        'POSTCODE': c.billing_postal_code || c.postcode || '',
-                        'PHONE': c.primary_phone || c.phone || '',
-                        'PRIMARY PHONE': c.primary_phone || c.phone || '',
-                        'CONTACT': c.contact_name || c.ownership || '',
-                        'PRIMARY CONTACT': c.contact_name || c.ownership || '',
-                        'OWNERSHIP': c.ownership || '',
-                        'SERVICE STATUS': isContract ? 'Contract' : 'No Contract'
-                    };
-                });
-
-                // Deduplicate by company name
-                const uniqueCustomers = [];
-                const seenCompanies = new Set();
-                for (let i = appState.customers.length - 1; i >= 0; i--) {
-                    const c = appState.customers[i];
-                    const compKey = (c.COMPANY || '').trim().toLowerCase();
-                    if (!seenCompanies.has(compKey)) {
-                        seenCompanies.add(compKey);
-                        uniqueCustomers.unshift(c);
-                    }
-                }
-                appState.customers = uniqueCustomers;
-                console.log(`[INIT] ✓ Loaded ${appState.customers.length} unique customers.`);
-            }
-        } catch (e) {
-            console.error("Error fetching customers from Turso DB:", e);
-        }
-
-        // 5. Fetch Real Turso Tickets (Paginated)
-        appState.tickets = [];
-        try {
-            let tckData = [];
-            let lastSize = 1000;
-            let offset = 0;
-            while (lastSize === 1000) {
-                const { data, error } = await sbClient.from('vt_tickets').select('*').range(offset, offset + 999);
-                if (error) break;
-                if (data && data.length > 0) {
+                let tckData = [];
+                let lastSize = 1000;
+                let offset = 0;
+                while (lastSize === 1000) {
+                    const { data, error } = await sbClient.from('vt_tickets').select('*').range(offset, offset + 999);
+                    if (error || !data || data.length === 0) break;
                     tckData = tckData.concat(data);
                     lastSize = data.length;
                     offset += 1000;
-                } else {
-                    break;
                 }
+                return tckData;
+            } catch (e) {
+                console.warn("[INIT] Tickets fetch error:", e);
+                return [];
             }
-            if (tckData.length > 0) {
-                const mappedTursoTickets = tckData.map(t => {
-                    const parentId = t.parent_id || '';
-                    const resolvedCompany = customerMap[parentId] || customerMap['11x' + parentId] || t.company || t.customer_name || 'General Customer';
-                    const resolvedPostcode = customerPostcodeMap[parentId] || customerPostcodeMap['11x' + parentId] || '';
-                    const realStatus = t.ticketstatus || 'Open';
-                    const isClosed = realStatus.toLowerCase() === 'closed';
+        })();
 
-                    return {
-                        id: String(t.id),
-                        dbId: String(t.id).slice(-5),
-                        crmTicket: t.ticket_no || ('TT' + t.id),
-                        timestamp: t.createdtime || t.modifiedtime || new Date().toISOString(),
-                        company: resolvedCompany,
-                        companyId: parentId,
-                        postcode: resolvedPostcode,
-                        user: t.assigned_user_id || 'Ugur Yavuz',
-                        mainService: t.ticket_title || 'General Support',
-                        subService: '',
-                        status: realStatus,
-                        price: 0,
-                        description: t.description || '',
-                        rawDescription: t.description || '',
-                        solution: t.solution || '',
-                        invoiced: isClosed,
-                        paymentStatus: isClosed ? 'Completed' : 'Pending'
-                    };
-                });
-                mappedTursoTickets.sort((a, b) => {
-                    const diff = toEpoch(b.timestamp) - toEpoch(a.timestamp);
-                    if (diff !== 0) return diff;
-                    return (parseInt(b.id) || 0) - (parseInt(a.id) || 0);
-                });
-                appState.tickets = mappedTursoTickets;
-                appState.tursoTickets = mappedTursoTickets;
-                console.log(`[INIT] ✓ Loaded ${appState.tickets.length} real tickets (sorted latest first).`);
-            }
-        } catch(e) { console.warn("[INIT] Turso tickets fetch error:", e); }
-
-        // Also check if any custom 'records' table entries exist
-        try {
-            const { data: recData } = await sbClient.from('records').select('*');
-            if (recData && recData.length > 0) {
-                const mappedRecords = recData.map(r => {
-                    const parsed = parseMetadata(r.DESCRIPTION || r.description || '');
-                    const priceVal = parseFloat(r.PRICE || r.price || 0);
-                    return {
-                        id: r.id, 
-                        dbId: (r.ID || r.db_id || r.id || 'N/A').toString().split('-')[0].substring(0, 5).toUpperCase(), 
-                        crmTicket: r['CRM TICKET'] || r.crm_ticket || 'N/A', 
-                        timestamp: r.TIMESTAMP || r.timestamp || r['INV DATE'] || r.created_at || new Date().toISOString(),
-                        company: r.COMPANY || r.company_name || customerMap[r.COMPANY_ID] || '', 
-                        companyId: r.COMPANY_ID || r.company_id, 
-                        postcode: r.POSTCODE || r.postcode,
-                        user: r.USER || r.staff_user, 
-                        mainService: r['MAIN SERVICE'] || r.service_type, 
-                        subService: r['SUB SERVICE'] || r.sub_service || '',
-                        startTime: r['START TIME'] || r.start_time, 
-                        endTime: r['END TIME'] || r.end_time, 
-                        duration: r.DURATION || r.duration,
-                        price: priceVal, 
-                        paymentStatus: r['PAYMENT STATUS'] || r.payment_status, 
-                        description: parsed.details, 
-                        rawDescription: r.DESCRIPTION || r.description || '',
-                        status: r.STATUS || r.status || 'Open', 
-                        invoiced: r.invoiced === true || (r.STATUS !== 'Pending' && r.STATUS !== 'Logged'), 
-                        invoiceDate: r['INV DATE'] || r.invoice_date, 
-                        invoiceNo: r['INV NO'] || r.invoice_no,
-                        vat: parsed.metadata.vat !== undefined ? parsed.metadata.vat : (priceVal * 0.20),
-                        invoiceNotes: parsed.metadata.invoiceNotes || '',
-                        estimatedPrice: parsed.metadata.estimatedPrice || 0,
-                        department: parsed.metadata.department || ''
-                    };
-                });
-                appState.tickets = appState.tickets.concat(mappedRecords);
-                appState.tickets.sort((a, b) => {
-                    const diff = toEpoch(b.timestamp) - toEpoch(a.timestamp);
-                    if (diff !== 0) return diff;
-                    return (parseInt(b.id) || 0) - (parseInt(a.id) || 0);
-                });
-            }
-        } catch(e) {}
-
-        // 6. Fetch Real Turso Quotes (Paginated)
-        try {
-            let quoData = [];
-            let lastSize = 1000;
-            let offset = 0;
-            while (lastSize === 1000) {
-                const { data, error } = await sbClient.from('vt_quotes').select('*').range(offset, offset + 999);
-                if (error) break;
-                if (data && data.length > 0) {
+        // Promise B: Fetch Quotes
+        const quotesPromise = (async () => {
+            try {
+                let quoData = [];
+                let lastSize = 1000;
+                let offset = 0;
+                while (lastSize === 1000) {
+                    const { data, error } = await sbClient.from('vt_quotes').select('*').range(offset, offset + 999);
+                    if (error || !data || data.length === 0) break;
                     quoData = quoData.concat(data);
                     lastSize = data.length;
                     offset += 1000;
-                } else {
-                    break;
+                }
+                return quoData;
+            } catch (e) {
+                console.warn("[INIT] Quotes fetch error:", e);
+                return [];
+            }
+        })();
+
+        // Promise C: Fetch Appointments
+        const apptsPromise = (async () => {
+            try {
+                const { data } = await sbClient.from('appointments').select('*');
+                return data || [];
+            } catch (e) {
+                console.warn("[INIT] Appointments fetch error:", e);
+                return [];
+            }
+        })();
+
+        // Promise D: Fetch Customers (Fast first 1000 batch, then remainder)
+        const customersPromise = (async () => {
+            try {
+                let orgData = [];
+                let lastOrgSize = 1000;
+                let orgOffset = 0;
+                while (lastOrgSize === 1000) {
+                    const { data, error } = await sbClient.from('vt_customers').select('*').range(orgOffset, orgOffset + 999);
+                    if (error || !data || data.length === 0) break;
+                    orgData = orgData.concat(data);
+                    lastOrgSize = data.length;
+                    orgOffset += 1000;
+                }
+                return orgData;
+            } catch (e) {
+                console.warn("[INIT] Customers fetch error:", e);
+                return [];
+            }
+        })();
+
+        // Wait for all 4 datasets in parallel
+        const [ticketsRes, quotesRes, apptsRes, custsRes] = await Promise.allSettled([
+            ticketsPromise,
+            quotesPromise,
+            apptsPromise,
+            customersPromise
+        ]);
+
+        const rawCustomers = (custsRes.status === 'fulfilled' && Array.isArray(custsRes.value)) ? custsRes.value : [];
+        const rawTickets   = (ticketsRes.status === 'fulfilled' && Array.isArray(ticketsRes.value)) ? ticketsRes.value : [];
+        const rawQuotes    = (quotesRes.status === 'fulfilled' && Array.isArray(quotesRes.value)) ? quotesRes.value : [];
+        const rawAppts     = (apptsRes.status === 'fulfilled' && Array.isArray(apptsRes.value)) ? apptsRes.value : [];
+
+        // 1. Process Customers & build lookup maps
+        if (rawCustomers.length > 0) {
+            rawCustomers.forEach(c => {
+                const name = c.organization_name || c.company || c.name || '';
+                const pc = c.billing_postal_code || c.postcode || '';
+                const ph = c.primary_phone || c.phone || '';
+                const rawId = String(c.id || '');
+                const cleanId = rawId.replace(/^11x/, '');
+                const orgNum = String(c.organization_number || '').trim().toLowerCase();
+
+                if (rawId) {
+                    customerMap[rawId] = name;
+                    customerPostcodeMap[rawId] = pc;
+                    customerPhoneMap[rawId] = ph;
+                }
+                if (cleanId) {
+                    customerMap[cleanId] = name;
+                    customerPostcodeMap[cleanId] = pc;
+                    customerPhoneMap[cleanId] = ph;
+                    customerMap['11x' + cleanId] = name;
+                    customerPostcodeMap['11x' + cleanId] = pc;
+                    customerPhoneMap['11x' + cleanId] = ph;
+                }
+                if (orgNum) customerMap[orgNum] = name;
+            });
+
+            appState.customers = rawCustomers.map(c => {
+                const cId = c.id || '';
+                const cleanId = String(cId).replace(/^11x/, '');
+                const isContract = (c.contract_status === 'Active');
+                return {
+                    'CUSTOMER ID': c.organization_number || c.id || '',
+                    'DB_ID': c.id || '',
+                    'id': c.id || '',
+                    'organization_name': c.organization_name || c.company || '',
+                    'organization_number': c.organization_number || '',
+                    'billing_postal_code': c.billing_postal_code || c.postcode || '',
+                    'billing_address': c.billing_address || '',
+                    'billing_city': c.billing_city || '',
+                    'primary_phone': c.primary_phone || c.phone || '',
+                    'COMPANY': c.organization_name || c.company || '',
+                    'ORGANIZATION NAME': c.organization_name || c.company || '',
+                    'ORGANIZATION NUMBER': c.organization_number || '',
+                    'ADDRESS': c.billing_address || '',
+                    'CITY': c.billing_city || '',
+                    'POSTCODE': c.billing_postal_code || c.postcode || '',
+                    'PHONE': c.primary_phone || c.phone || '',
+                    'PRIMARY PHONE': c.primary_phone || c.phone || '',
+                    'CONTACT': c.contact_name || c.ownership || '',
+                    'PRIMARY CONTACT': c.contact_name || c.ownership || '',
+                    'OWNERSHIP': c.ownership || '',
+                    'contract_status': c.contract_status || (isContract ? 'Active' : 'No Contract'),
+                    'SERVICE STATUS': isContract ? 'Contract' : 'No Contract'
+                };
+            });
+
+            // Deduplicate by company name
+            const uniqueCustomers = [];
+            const seenCompanies = new Set();
+            for (let i = appState.customers.length - 1; i >= 0; i--) {
+                const c = appState.customers[i];
+                const compKey = (c.COMPANY || '').trim().toLowerCase();
+                if (!seenCompanies.has(compKey)) {
+                    seenCompanies.add(compKey);
+                    uniqueCustomers.unshift(c);
                 }
             }
-            if (quoData.length > 0) {
-                appState.quotes = quoData.map(q => {
-                    const accId = q.account_id || '';
-                    const resolvedCompany = customerMap[accId] || customerMap['11x' + accId] || q.customer_name || '';
-                    const grandTotal = parseFloat(q.hdnGrandTotal) || 0;
-                    return {
-                        id: q.id,
-                        quote_no: q.quote_no || q.id,
-                        subject: q.subject || 'Equipment & Service Quotation',
-                        quotestage: q.quotestage || 'Draft',
-                        validtill: q.validtill || '',
-                        createdtime: q.createdtime || '',
-                        hdnGrandTotal: grandTotal,
-                        total: grandTotal,
-                        details: q.details || '',
-                        company: resolvedCompany,
-                        account_id: accId,
-                        assigned_to: q.assigned_user_id || ''
-                    };
-                });
-                appState.quotes.sort((a, b) => {
-                    const diff = toEpoch(b.createdtime) - toEpoch(a.createdtime);
-                    if (diff !== 0) return diff;
-                    return (parseInt(b.id) || 0) - (parseInt(a.id) || 0);
-                });
-                console.log(`[INIT] ✓ Loaded ${appState.quotes.length} real quotes (sorted latest first).`);
-            }
-        } catch(e) { console.warn("[INIT] Turso quotes fetch error:", e); }
+            appState.customers = uniqueCustomers;
+            console.log(`[INIT] ✓ Loaded ${appState.customers.length} unique customers.`);
+        }
 
-        // 7. Fetch Real Appointments from Turso DB
-        try {
-            const { data: apptData, error: apptErr } = await sbClient.from('appointments').select('*');
-            if (!apptErr && apptData && apptData.length > 0) {
-                appState.appointments = apptData.map(a => {
-                    const parentId = a.parent_id || a.customer_id || '';
-                    const resolvedCompany = customerMap[parentId] || customerMap['11x' + parentId] || a.subject || 'Workplace Appointment';
-                    const resolvedPostcode = customerPostcodeMap[parentId] || customerPostcodeMap['11x' + parentId] || 'N/A';
-                    const st = (a.eventstatus || a.status || 'PLANNED').toUpperCase();
+        // 2. Process Tickets
+        if (rawTickets.length > 0) {
+            const mappedTursoTickets = rawTickets.map(t => {
+                const parentId = String(t.parent_id || '');
+                const cleanParentId = parentId.replace(/^11x/, '');
+                const resolvedCompany = customerMap[parentId] || customerMap[cleanParentId] || customerMap['11x' + cleanParentId] || t.company || t.customer_name || 'General Customer';
+                const resolvedPostcode = customerPostcodeMap[parentId] || customerPostcodeMap[cleanParentId] || '';
+                const realStatus = t.ticketstatus || 'Open';
+                const isClosed = realStatus.toLowerCase() === 'closed';
 
-                    return {
-                        id: String(a.id),
-                        customer_name: resolvedCompany,
-                        company: resolvedCompany,
-                        date: a.date_start || (a.createdtime ? a.createdtime.split(' ')[0] : new Date().toISOString().split('T')[0]),
-                        time: (a.time_start || '09:00:00').slice(0, 5),
-                        status: (st === 'PLANNED' || st === 'PENDING') ? 'PENDING' : ((st === 'HELD' || st === 'CONFIRMED') ? 'CONFIRMED' : st),
-                        postcode: resolvedPostcode,
-                        service_type: a.subject || 'On-site Appointment',
-                        technician: a.assigned_user_id || 'Ugur Yavuz',
-                        description: a.description || ''
-                    };
-                });
-                appState.appointments.sort((a, b) => {
-                    const diff = toEpoch((b.date || '') + ' ' + (b.time || '')) - toEpoch((a.date || '') + ' ' + (a.time || ''));
-                    if (diff !== 0) return diff;
-                    return (parseInt(b.id) || 0) - (parseInt(a.id) || 0);
-                });
-                console.log(`[INIT] ✓ Loaded ${appState.appointments.length} real appointments (sorted latest first).`);
-            } else {
-                appState.appointments = [];
-            }
-        } catch(e) {
-            console.warn("[INIT] Appointments fetch error:", e);
+                return {
+                    id: String(t.id),
+                    dbId: String(t.id).slice(-5),
+                    crmTicket: t.ticket_no || ('TT' + t.id),
+                    ticket_no: t.ticket_no || ('TT' + t.id),
+                    timestamp: t.createdtime || t.modifiedtime || new Date().toISOString(),
+                    createdtime: t.createdtime || '',
+                    company: resolvedCompany,
+                    companyId: parentId || cleanParentId,
+                    parent_id: parentId,
+                    postcode: resolvedPostcode,
+                    user: t.assigned_user_id || 'Ugur Yavuz',
+                    mainService: t.ticket_title || 'General Support',
+                    subService: '',
+                    status: realStatus,
+                    price: 0,
+                    description: t.description || '',
+                    rawDescription: t.description || '',
+                    solution: t.solution || '',
+                    invoiced: isClosed,
+                    paymentStatus: isClosed ? 'Completed' : 'Pending'
+                };
+            });
+            mappedTursoTickets.sort((a, b) => {
+                const diff = toEpoch(b.timestamp) - toEpoch(a.timestamp);
+                if (diff !== 0) return diff;
+                return (parseInt(b.id) || 0) - (parseInt(a.id) || 0);
+            });
+            appState.tickets = mappedTursoTickets;
+            appState.tursoTickets = mappedTursoTickets;
+            console.log(`[INIT] ✓ Loaded ${appState.tickets.length} real tickets (sorted latest first).`);
+        } else {
+            appState.tickets = [];
+        }
+
+        // 3. Process Quotes
+        if (rawQuotes.length > 0) {
+            appState.quotes = rawQuotes.map(q => {
+                const accId = String(q.account_id || '');
+                const cleanAccId = accId.replace(/^11x/, '');
+                const resolvedCompany = customerMap[accId] || customerMap[cleanAccId] || q.customer_name || '';
+                const grandTotal = parseFloat(q.hdnGrandTotal) || 0;
+
+                return {
+                    id: String(q.id),
+                    quote_no: q.quote_no || q.id,
+                    subject: q.subject || 'Equipment & Service Quotation',
+                    quotestage: q.quotestage || 'Draft',
+                    validtill: q.validtill || '',
+                    createdtime: q.createdtime || '',
+                    hdnGrandTotal: grandTotal,
+                    total: grandTotal,
+                    details: q.details || '',
+                    company: resolvedCompany,
+                    account_id: accId,
+                    assigned_to: q.assigned_user_id || ''
+                };
+            });
+            appState.quotes.sort((a, b) => {
+                const diff = toEpoch(b.createdtime) - toEpoch(a.createdtime);
+                if (diff !== 0) return diff;
+                return (parseInt(b.id) || 0) - (parseInt(a.id) || 0);
+            });
+            console.log(`[INIT] ✓ Loaded ${appState.quotes.length} real quotes (sorted latest first).`);
+        } else {
+            appState.quotes = [];
+        }
+
+        // 4. Process Appointments
+        if (rawAppts.length > 0) {
+            appState.appointments = rawAppts.map(a => {
+                const parentId = String(a.parent_id || a.customer_id || '');
+                const cleanParentId = parentId.replace(/^11x/, '');
+                const resolvedCompany = customerMap[parentId] || customerMap[cleanParentId] || a.subject || 'Workplace Appointment';
+                const resolvedPostcode = customerPostcodeMap[parentId] || customerPostcodeMap[cleanParentId] || 'N/A';
+                const st = (a.eventstatus || a.status || 'PLANNED').toUpperCase();
+
+                return {
+                    id: String(a.id),
+                    customer_name: resolvedCompany,
+                    company: resolvedCompany,
+                    date: a.date_start || (a.createdtime ? a.createdtime.split(' ')[0] : new Date().toISOString().split('T')[0]),
+                    time: (a.time_start || '09:00:00').slice(0, 5),
+                    status: (st === 'PLANNED' || st === 'PENDING') ? 'PENDING' : ((st === 'HELD' || st === 'CONFIRMED') ? 'CONFIRMED' : st),
+                    postcode: resolvedPostcode,
+                    service_type: a.subject || 'On-site Appointment',
+                    technician: a.assigned_user_id || 'Ugur Yavuz',
+                    description: a.description || ''
+                };
+            });
+            appState.appointments.sort((a, b) => {
+                const diff = toEpoch((b.date || '') + ' ' + (b.time || '')) - toEpoch((a.date || '') + ' ' + (a.time || ''));
+                if (diff !== 0) return diff;
+                return (parseInt(b.id) || 0) - (parseInt(a.id) || 0);
+            });
+            console.log(`[INIT] ✓ Loaded ${appState.appointments.length} real appointments.`);
+        } else {
             appState.appointments = [];
         }
 
@@ -531,6 +479,9 @@ async function initApp() {
 
         renderAll();
         updateDataStats();
+        if (typeof renderTicketPerformanceMetrics === 'function') renderTicketPerformanceMetrics();
+        if (typeof renderCurrentView === 'function') renderCurrentView();
+        if (typeof updateDashboardKPIs === 'function') updateDashboardKPIs();
         window.lastDataFetchTime = Date.now();
         if (typeof updateSyncStatusBadge === 'function') updateSyncStatusBadge();
 

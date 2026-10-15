@@ -68,13 +68,15 @@ async function tursoExecute(sql, args = []) {
 
         if (response.ok) {
             const data = await response.json();
-            return data.rows || [];
+            if (data && Array.isArray(data.rows)) {
+                return data.rows;
+            }
         }
     } catch (proxyErr) {
-        // Silent fallback to direct Turso HTTP pipeline
+        // Fallback to direct Turso HTTP pipeline
     }
 
-    // 2. Direct Turso HTTP pipeline fallback (for Cloudflare Pages static hosting)
+    // 2. Direct Turso HTTP pipeline fallback (for Cloudflare Pages static hosting or proxy bypass)
     try {
         const directRes = await fetch(TURSO_CONFIG.pipelineUrl, {
             method: 'POST',
@@ -90,7 +92,8 @@ async function tursoExecute(sql, args = []) {
                             sql: sql,
                             args: formatTursoArgs(args)
                         }
-                    }
+                    },
+                    { type: 'close' }
                 ]
             })
         });
@@ -100,8 +103,7 @@ async function tursoExecute(sql, args = []) {
             return parseTursoResponse(data);
         }
     } catch (directErr) {
-        console.error('[Turso Query Error]', directErr.message, { sql, args });
-        throw directErr;
+        console.warn('[Turso Direct Pipeline Error]', directErr.message, { sql, args });
     }
 
     return [];

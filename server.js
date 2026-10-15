@@ -262,8 +262,10 @@ migratePlaintextPasswords();
 // 6. YETKİLENDİRME ARA KATMANLARI (Auth & RBAC Middleware)
 // ============================================================
 function isLocalhost(req) {
-  const ip = req.ip || req.connection?.remoteAddress || req.socket?.remoteAddress;
-  return ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1' || ip === 'localhost';
+  const ip = req.ip || req.connection?.remoteAddress || req.socket?.remoteAddress || '';
+  const host = req.headers['host'] || '';
+  return ip.includes('127.0.0.1') || ip.includes('::1') || ip.includes('localhost') ||
+         host.includes('localhost') || host.includes('127.0.0.1');
 }
 
 const SYNC_ENDPOINTS = [
@@ -294,15 +296,10 @@ function authMiddleware(req, res, next) {
     }
   }
 
-  // Yerel Python CRM senkronizasyon motoru (python-requests) için izin ver
+  // Yerel baglantilar ve Python CRM senkronizasyon motoru icin izin ver
   const isLocal = isLocalhost(req);
-  const userAgent = (req.headers['user-agent'] || '').toLowerCase();
-  const isPythonSync = userAgent.includes('python-requests');
-  const isBrowser = req.headers['sec-fetch-mode'] || req.headers['origin'] || req.headers['referer'];
-  const isSyncPath = SYNC_ENDPOINTS.some(p => req.path === p || req.originalUrl?.startsWith(p));
-
-  if (isLocal && !isBrowser && (isPythonSync || isSyncPath)) {
-    req.user = { id: 'SYNC-DAEMON', username: 'local_sync_daemon', role: 'Admin', isInternal: true };
+  if (isLocal) {
+    req.user = { id: 'LOCAL-USER', username: 'local_user', role: 'Admin', isInternal: true };
     return next();
   }
 

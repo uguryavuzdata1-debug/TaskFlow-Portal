@@ -310,18 +310,21 @@
         if (!c) return [];
         var res = [];
         var allTickets = (window.appState && window.appState.tickets) ? window.appState.tickets : [];
-        var cName = (c.organization_name || '').toLowerCase().trim();
-        var cId = String(c.id || '').trim();
-        var cNo = (c.organization_number || '').toLowerCase().trim();
-        var cPostcode = (c.billing_postal_code || '').toLowerCase().replace(/\s+/g, '');
+        var cName = (c.organization_name || c.company || c['ORGANIZATION NAME'] || c.COMPANY || '').toLowerCase().trim();
+        var cId = String(c.id || c.DB_ID || c['CUSTOMER ID'] || '').trim();
+        var cCleanId = cId.replace(/^11x/, '');
+        var cNo = (c.organization_number || c['ORGANIZATION NUMBER'] || '').toLowerCase().trim();
+        var cPostcode = (c.billing_postal_code || c.postcode || c.POSTCODE || '').toLowerCase().replace(/\s+/g, '');
 
         res = allTickets.filter(function(t) {
             var tComp = (t.company || '').toLowerCase().trim();
-            var tId = String(t.companyId || '').trim();
+            var tId = String(t.companyId || t.parent_id || '').trim();
+            var tCleanId = tId.replace(/^11x/, '');
             var tPostcode = (t.postcode || '').toLowerCase().replace(/\s+/g, '');
 
+            if (cCleanId && tCleanId && cCleanId === tCleanId) return true;
             if (cId && tId && (cId === tId || cId === '11x'+tId || '11x'+cId === tId)) return true;
-            if (cNo && tId && (cNo === tId.toLowerCase() || '11x'+cNo === tId.toLowerCase() || cNo === '11x'+tId.toLowerCase())) return true;
+            if (cNo && tCleanId && cNo === tCleanId) return true;
             if (cName && tComp && (cName === tComp || tComp.includes(cName) || cName.includes(tComp))) return true;
             if (cPostcode && tPostcode && cPostcode === tPostcode && cName && tComp && cName[0] === tComp[0]) return true;
             return false;
@@ -350,6 +353,53 @@
 
         filter = filter || 'all';
         var allTickets = getCustomerTickets(c);
+
+        // Direct fetch fallback if tickets in memory is 0
+        if (allTickets.length === 0 && c && !c._fetchingTickets && window.tursoExecute) {
+            c._fetchingTickets = true;
+            var cRawId = String(c.id || c.DB_ID || c['CUSTOMER ID'] || '').trim();
+            var cCleanId = cRawId.replace(/^11x/, '');
+            var cName = (c.organization_name || c.company || c['ORGANIZATION NAME'] || '').trim();
+
+            window.tursoExecute("SELECT id, ticket_no, ticket_title, parent_id, ticketstatus, createdtime, description, assigned_user_id FROM vt_tickets WHERE parent_id = ? OR parent_id = ? LIMIT 50", [cCleanId, '11x' + cCleanId])
+                .then(function(dbTickets) {
+                    c._fetchingTickets = false;
+                    if (dbTickets && dbTickets.length > 0) {
+                        var fetchedMapped = dbTickets.map(function(t) {
+                            var realStatus = t.ticketstatus || 'Open';
+                            var isClosed = realStatus.toLowerCase() === 'closed';
+                            return {
+                                id: String(t.id),
+                                dbId: String(t.id).slice(-5),
+                                crmTicket: t.ticket_no || ('TT' + t.id),
+                                ticket_no: t.ticket_no || ('TT' + t.id),
+                                timestamp: t.createdtime || new Date().toISOString(),
+                                createdtime: t.createdtime || '',
+                                company: cName || 'Customer',
+                                companyId: t.parent_id,
+                                parent_id: t.parent_id,
+                                postcode: c.billing_postal_code || '',
+                                user: t.assigned_user_id || 'Technician #1',
+                                mainService: t.ticket_title || 'General Support',
+                                subService: '',
+                                status: realStatus,
+                                price: 0,
+                                description: t.description || '',
+                                invoiced: isClosed,
+                                paymentStatus: isClosed ? 'Completed' : 'Pending'
+                            };
+                        });
+                        if (window.appState) {
+                            window.appState.tickets = (window.appState.tickets || []).concat(fetchedMapped);
+                        }
+                        renderCustomerTicketsTable(c, filter);
+                    }
+                }).catch(function(err) {
+                    c._fetchingTickets = false;
+                    console.warn('[renderCustomerTicketsTable] fetch fallback error:', err);
+                });
+        }
+
         if (badge) badge.textContent = allTickets.length;
 
         // Update filter buttons active style
@@ -461,15 +511,18 @@
         if (!c) return [];
         var res = [];
         var allQuotes = (window.appState && window.appState.quotes) ? window.appState.quotes : [];
-        var cName = (c.organization_name || '').toLowerCase().trim();
-        var cId = String(c.id || '').trim();
-        var cNo = (c.organization_number || '').toLowerCase().trim();
+        var cName = (c.organization_name || c.company || c['ORGANIZATION NAME'] || '').toLowerCase().trim();
+        var cId = String(c.id || c.DB_ID || c['CUSTOMER ID'] || '').trim();
+        var cCleanId = cId.replace(/^11x/, '');
+        var cNo = (c.organization_number || c['ORGANIZATION NUMBER'] || '').toLowerCase().trim();
 
         res = allQuotes.filter(function(q) {
             var qAcc = String(q.account_id || q.accountId || q.companyId || '').trim();
+            var qCleanAcc = qAcc.replace(/^11x/, '');
             var qName = (q.account_name || q.company || q.customer_name || '').toLowerCase().trim();
+            if (cCleanId && qCleanAcc && cCleanId === qCleanAcc) return true;
             if (cId && qAcc && (cId === qAcc || cId === '11x'+qAcc || '11x'+cId === qAcc)) return true;
-            if (cNo && qAcc && (cNo === qAcc.toLowerCase() || '11x'+cNo === qAcc.toLowerCase() || cNo === '11x'+qAcc.toLowerCase())) return true;
+            if (cNo && qCleanAcc && cNo === qCleanAcc) return true;
             if (cName && qName && (cName === qName || qName.includes(cName) || cName.includes(qName))) return true;
             return false;
         });
@@ -497,6 +550,45 @@
 
         filter = filter || 'all';
         var allQuotes = getCustomerQuotes(c);
+
+        // Direct fetch fallback if quotes in memory is 0
+        if (allQuotes.length === 0 && c && !c._fetchingQuotes && window.tursoExecute) {
+            c._fetchingQuotes = true;
+            var cRawId = String(c.id || c.DB_ID || c['CUSTOMER ID'] || '').trim();
+            var cCleanId = cRawId.replace(/^11x/, '');
+            var cName = (c.organization_name || c.company || c['ORGANIZATION NAME'] || '').trim();
+
+            window.tursoExecute("SELECT id, quote_no, subject, quotestage, validtill, createdtime, hdnGrandTotal, account_id FROM vt_quotes WHERE account_id = ? OR account_id = ? LIMIT 50", [cCleanId, '11x' + cCleanId])
+                .then(function(dbQuotes) {
+                    c._fetchingQuotes = false;
+                    if (dbQuotes && dbQuotes.length > 0) {
+                        var fetchedMapped = dbQuotes.map(function(q) {
+                            var grandTotal = parseFloat(q.hdnGrandTotal) || 0;
+                            return {
+                                id: String(q.id),
+                                quote_no: q.quote_no || q.id,
+                                subject: q.subject || 'Equipment & Service Quotation',
+                                quotestage: q.quotestage || 'Draft',
+                                validtill: q.validtill || '',
+                                createdtime: q.createdtime || '',
+                                hdnGrandTotal: grandTotal,
+                                total: grandTotal,
+                                details: q.details || '',
+                                company: cName || 'Customer',
+                                account_id: q.account_id
+                            };
+                        });
+                        if (window.appState) {
+                            window.appState.quotes = (window.appState.quotes || []).concat(fetchedMapped);
+                        }
+                        renderCustomerQuotesTable(c, filter);
+                    }
+                }).catch(function(err) {
+                    c._fetchingQuotes = false;
+                    console.warn('[renderCustomerQuotesTable] fetch fallback error:', err);
+                });
+        }
+
         if (badge) badge.textContent = allQuotes.length;
 
         // Update filter buttons active style
