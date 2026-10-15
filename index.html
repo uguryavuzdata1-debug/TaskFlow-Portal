@@ -314,14 +314,14 @@
     </button>
 </div>
   <div style="display: flex; align-items: center; margin-left: auto; gap: 10px;">
-    <button onclick="openCommandPalette()" title="Hızlı Arama (Ctrl + K)" style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; background: rgba(255, 255, 255, 0.9); border: 1px solid rgba(100, 116, 139, 0.25); border-radius: 20px; font-size: 0.78rem; font-weight: 600; color: #334155; cursor: pointer; transition: all 0.2s ease;">
+    <button onclick="openCommandPalette()" title="Quick Search (Ctrl + K)" style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; background: rgba(255, 255, 255, 0.9); border: 1px solid rgba(100, 116, 139, 0.25); border-radius: 20px; font-size: 0.78rem; font-weight: 600; color: #334155; cursor: pointer; transition: all 0.2s ease;">
       <i data-lucide="search" style="width: 14px; height: 14px; color: #64748b;"></i>
-      <span>Ara</span>
+      <span>Search</span>
       <kbd style="font-size: 0.65rem; background: #e2e8f0; padding: 1px 5px; border-radius: 4px; color: #64748b; font-family: monospace;">Ctrl+K</kbd>
     </button>
-    <div class="sync-status-badge" id="sync-status-badge" onclick="showSyncStatusModal()" title="CRM Senkronizasyon Durumu (Detaylar için tıklayın)" style="display: flex; align-items: center; gap: 7px; padding: 6px 14px; background: rgba(34, 197, 94, 0.08); border: 1px solid rgba(34, 197, 94, 0.25); border-radius: 20px; font-size: 0.78rem; font-weight: 600; color: #166534; cursor: pointer; transition: all 0.2s ease; user-select: none;">
+    <div class="sync-status-badge" id="sync-status-badge" onclick="showSyncStatusModal()" title="CRM Sync Status (Click for details)" style="display: flex; align-items: center; gap: 7px; padding: 6px 14px; background: rgba(34, 197, 94, 0.08); border: 1px solid rgba(34, 197, 94, 0.25); border-radius: 20px; font-size: 0.78rem; font-weight: 600; color: #166534; cursor: pointer; transition: all 0.2s ease; user-select: none;">
       <span class="sync-pulse-dot pulse" id="sync-pulse-dot" style="width: 8px; height: 8px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.3); display: inline-block;"></span>
-      <span id="sync-status-text">CRM: Aktif</span>
+      <span id="sync-status-text">CRM: Active</span>
     </div>
     <div class="user-profile-dropdown-wrapper">
     <div class="user-profile-trigger" id="user-display-area" onclick="toggleUserProfileDropdown()">
@@ -1764,17 +1764,17 @@
               <!-- TODAY -->
               <div style="background:var(--card); border:1px solid var(--ink); padding:1.25rem; border-radius:2px; box-shadow:4px 4px 0 rgba(29,36,48,0.12);">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
-                  <span style="font-family:'IBM Plex Mono',monospace; font-size:0.72rem; color:var(--steel); font-weight:600;">BUGÜN (TODAY)</span>
-                  <span id="perf-ticket-today-rate" style="font-family:'IBM Plex Mono',monospace; font-size:0.75rem; font-weight:700; color:var(--green); background:rgba(4,120,87,0.1); padding:2px 6px; border-radius:3px;">%0</span>
+                  <span style="font-family:'IBM Plex Mono',monospace; font-size:0.72rem; color:var(--steel); font-weight:600;">TODAY</span>
+                  <span id="perf-ticket-today-rate" style="font-family:'IBM Plex Mono',monospace; font-size:0.75rem; font-weight:700; color:var(--green); background:rgba(4,120,87,0.1); padding:2px 6px; border-radius:3px;">0%</span>
                 </div>
                 <div style="display:flex; justify-content:space-between; align-items:baseline;">
                   <div>
                     <div id="perf-ticket-today-open" style="font-size:1.8rem; font-weight:700; color:var(--ink); line-height:1;">0</div>
-                    <div style="font-size:0.72rem; color:var(--steel); margin-top:2px;">Açılan / Toplam</div>
+                    <div style="font-size:0.72rem; color:var(--steel); margin-top:2px;">Opened / Total</div>
                   </div>
                   <div style="text-align:right;">
                     <div id="perf-ticket-today-closed" style="font-size:1.8rem; font-weight:700; color:var(--green); line-height:1;">0</div>
-                    <div style="font-size:0.72rem; color:var(--steel); margin-top:2px;">Kapatılan</div>
+                    <div style="font-size:0.72rem; color:var(--steel); margin-top:2px;">Closed</div>
                   </div>
                 </div>
               </div>
@@ -1782,17 +1782,17 @@
               <!-- THIS WEEK -->
               <div style="background:var(--card); border:1px solid var(--ink); padding:1.25rem; border-radius:2px; box-shadow:4px 4px 0 rgba(29,36,48,0.12);">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
-                  <span style="font-family:'IBM Plex Mono',monospace; font-size:0.72rem; color:var(--steel); font-weight:600;">BU HAFTA (THIS WEEK)</span>
-                  <span id="perf-ticket-week-rate" style="font-family:'IBM Plex Mono',monospace; font-size:0.75rem; font-weight:700; color:var(--green); background:rgba(4,120,87,0.1); padding:2px 6px; border-radius:3px;">%0</span>
+                  <span style="font-family:'IBM Plex Mono',monospace; font-size:0.72rem; color:var(--steel); font-weight:600;">THIS WEEK</span>
+                  <span id="perf-ticket-week-rate" style="font-family:'IBM Plex Mono',monospace; font-size:0.75rem; font-weight:700; color:var(--green); background:rgba(4,120,87,0.1); padding:2px 6px; border-radius:3px;">0%</span>
                 </div>
                 <div style="display:flex; justify-content:space-between; align-items:baseline;">
                   <div>
                     <div id="perf-ticket-week-open" style="font-size:1.8rem; font-weight:700; color:var(--ink); line-height:1;">0</div>
-                    <div style="font-size:0.72rem; color:var(--steel); margin-top:2px;">Açılan / Toplam</div>
+                    <div style="font-size:0.72rem; color:var(--steel); margin-top:2px;">Opened / Total</div>
                   </div>
                   <div style="text-align:right;">
                     <div id="perf-ticket-week-closed" style="font-size:1.8rem; font-weight:700; color:var(--green); line-height:1;">0</div>
-                    <div style="font-size:0.72rem; color:var(--steel); margin-top:2px;">Kapatılan</div>
+                    <div style="font-size:0.72rem; color:var(--steel); margin-top:2px;">Closed</div>
                   </div>
                 </div>
               </div>
@@ -1800,17 +1800,17 @@
               <!-- THIS MONTH -->
               <div style="background:var(--card); border:1px solid var(--ink); padding:1.25rem; border-radius:2px; box-shadow:4px 4px 0 rgba(29,36,48,0.12);">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
-                  <span style="font-family:'IBM Plex Mono',monospace; font-size:0.72rem; color:var(--steel); font-weight:600;">BU AY (THIS MONTH)</span>
-                  <span id="perf-ticket-month-rate" style="font-family:'IBM Plex Mono',monospace; font-size:0.75rem; font-weight:700; color:var(--green); background:rgba(4,120,87,0.1); padding:2px 6px; border-radius:3px;">%0</span>
+                  <span style="font-family:'IBM Plex Mono',monospace; font-size:0.72rem; color:var(--steel); font-weight:600;">THIS MONTH</span>
+                  <span id="perf-ticket-month-rate" style="font-family:'IBM Plex Mono',monospace; font-size:0.75rem; font-weight:700; color:var(--green); background:rgba(4,120,87,0.1); padding:2px 6px; border-radius:3px;">0%</span>
                 </div>
                 <div style="display:flex; justify-content:space-between; align-items:baseline;">
                   <div>
                     <div id="perf-ticket-month-open" style="font-size:1.8rem; font-weight:700; color:var(--ink); line-height:1;">0</div>
-                    <div style="font-size:0.72rem; color:var(--steel); margin-top:2px;">Açılan / Toplam</div>
+                    <div style="font-size:0.72rem; color:var(--steel); margin-top:2px;">Opened / Total</div>
                   </div>
                   <div style="text-align:right;">
                     <div id="perf-ticket-month-closed" style="font-size:1.8rem; font-weight:700; color:var(--green); line-height:1;">0</div>
-                    <div style="font-size:0.72rem; color:var(--steel); margin-top:2px;">Kapatılan</div>
+                    <div style="font-size:0.72rem; color:var(--steel); margin-top:2px;">Closed</div>
                   </div>
                 </div>
               </div>
@@ -1818,17 +1818,17 @@
               <!-- ALL TIME -->
               <div style="background:var(--card); border:1px solid var(--ink); padding:1.25rem; border-radius:2px; box-shadow:4px 4px 0 rgba(29,36,48,0.12);">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
-                  <span style="font-family:'IBM Plex Mono',monospace; font-size:0.72rem; color:var(--steel); font-weight:600;">TOPLAM (ALL-TIME)</span>
-                  <span id="perf-ticket-total-rate" style="font-family:'IBM Plex Mono',monospace; font-size:0.75rem; font-weight:700; color:var(--green); background:rgba(4,120,87,0.1); padding:2px 6px; border-radius:3px;">%0</span>
+                  <span style="font-family:'IBM Plex Mono',monospace; font-size:0.72rem; color:var(--steel); font-weight:600;">ALL-TIME TOTAL</span>
+                  <span id="perf-ticket-all-rate" style="font-family:'IBM Plex Mono',monospace; font-size:0.75rem; font-weight:700; color:var(--green); background:rgba(4,120,87,0.1); padding:2px 6px; border-radius:3px;">0%</span>
                 </div>
                 <div style="display:flex; justify-content:space-between; align-items:baseline;">
                   <div>
-                    <div id="perf-ticket-total-open" style="font-size:1.8rem; font-weight:700; color:var(--ink); line-height:1;">0</div>
-                    <div style="font-size:0.72rem; color:var(--steel); margin-top:2px;">Toplam Bilet</div>
+                    <div id="perf-ticket-all-open" style="font-size:1.8rem; font-weight:700; color:var(--ink); line-height:1;">0</div>
+                    <div style="font-size:0.72rem; color:var(--steel); margin-top:2px;">Total Tickets</div>
                   </div>
                   <div style="text-align:right;">
-                    <div id="perf-ticket-total-closed" style="font-size:1.8rem; font-weight:700; color:var(--green); line-height:1;">0</div>
-                    <div style="font-size:0.72rem; color:var(--steel); margin-top:2px;">Çözülen / Kapalı</div>
+                    <div id="perf-ticket-all-closed" style="font-size:1.8rem; font-weight:700; color:var(--green); line-height:1;">0</div>
+                    <div style="font-size:0.72rem; color:var(--steel); margin-top:2px;">Resolved / Closed</div>
                   </div>
                 </div>
               </div>
@@ -1838,42 +1838,170 @@
             <!-- DETAILED STATUS DISTRIBUTION TABLE -->
             <div style="background:var(--card); border:1px solid var(--ink); border-radius:2px; padding:1.5rem; box-shadow:4px 4px 0 rgba(29,36,48,0.12);">
               <h3 style="font-size:1rem; font-weight:700; color:var(--ink); margin:0 0 1rem; text-transform:uppercase; font-family:'IBM Plex Mono',monospace;">Ticket Status Breakdown</h3>
-              <div id="perf-ticket-breakdown-list">Yükleniyor...</div>
+              <div id="perf-ticket-status-breakdown">Loading status metrics...</div>
             </div>
           </div>
 
-          <!-- SUB-PANE 3: REPORT (BURAYI SONRA İNŞA EDECEĞİZ) -->
+          <!-- SUB-PANE 3: REPORT -->
           <div id="perf-sub-reports" class="perf-sub-pane" style="display:none;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:1rem;">
               <div>
                 <h2 style="font-size:1.25rem; font-weight:700; color:var(--ink); margin:0 0 0.3rem;">Report & Analytics Hub</h2>
-                <p style="font-size:0.85rem; color:var(--steel); margin:0;">Özel periyodik raporlar, teknisyen verimlilik analizleri ve dışa aktarım motoru.</p>
+                <p style="font-size:0.85rem; color:var(--steel); margin:0;">Periodic executive summaries, staff efficiency analytics, and automated export engine.</p>
               </div>
-              <span class="stamp pending" style="font-family:'IBM Plex Mono',monospace; padding:4px 10px; font-size:0.75rem;">BURAYI SONRA İNŞA EDECEĞİZ</span>
+              <span class="stamp pending" style="font-family:'IBM Plex Mono',monospace; padding:4px 10px; font-size:0.75rem;">COMING SOON</span>
             </div>
 
             <div style="background:var(--paper); border:2px dashed var(--line); border-radius:4px; padding:2.5rem 1.5rem; text-align:center; margin-bottom:2rem;">
               <div style="width:54px; height:54px; border-radius:50%; background:var(--card); border:1px solid var(--line); display:flex; align-items:center; justify-content:center; margin:0 auto 1rem; color:var(--amber);">
                 <i data-lucide="file-bar-chart" style="width:28px; height:28px;"></i>
               </div>
-              <h3 style="font-size:1.1rem; font-weight:700; color:var(--ink); margin:0 0 0.5rem;">Gelişmiş Raporlama Modülü Hazırlanıyor</h3>
+              <h3 style="font-size:1.1rem; font-weight:700; color:var(--ink); margin:0 0 0.5rem;">Advanced Reporting & Export Hub Under Construction</h3>
               <p style="font-size:0.85rem; color:var(--steel); max-width:550px; margin:0 auto 1.5rem; line-height:1.6;">
-                Bu alanda planlanan özel raporlama araçları bir sonraki adımda inşa edilecektir. Aşağıdaki rapor şablonları hazır olduğunda tek tıkla Excel, PDF ve otomatik Telegram çıktısı olarak üretilecektir.
+                Planned advanced reporting tools will be deployed in the next update. When available, exportable Excel, PDF, and automated Telegram outputs will be generated with a single click.
               </p>
               <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:1rem; max-width:800px; margin:0 auto; text-align:left;">
                 <div style="background:var(--card); border:1px solid var(--line); padding:1rem; border-radius:3px;">
-                  <div style="font-weight:700; font-size:0.88rem; color:var(--ink); margin-bottom:4px;">📊 Aylık Servis & Ciro Raporu</div>
-                  <div style="font-size:0.78rem; color:var(--steel);">Açılan ve faturalandırılan biletlerin ciro ve servis kategorisi dağılımı.</div>
+                  <div style="font-weight:700; font-size:0.88rem; color:var(--ink); margin-bottom:4px;">📊 Monthly Service & Billing Breakdown</div>
+                  <div style="font-size:0.78rem; color:var(--steel);">Revenue and category distribution for resolved and invoiced tickets.</div>
                 </div>
                 <div style="background:var(--card); border:1px solid var(--line); padding:1rem; border-radius:3px;">
-                  <div style="font-weight:700; font-size:0.88rem; color:var(--ink); margin-bottom:4px;">👨‍💻 Teknisyen Performans Analizi</div>
-                  <div style="font-size:0.78rem; color:var(--steel);">Personel bazında çözülen bilet sayıları ve ortalama tamamlama süreleri.</div>
+                  <div style="font-weight:700; font-size:0.88rem; color:var(--ink); margin-bottom:4px;">👨‍💻 Technician Productivity Analysis</div>
+                  <div style="font-size:0.78rem; color:var(--steel);">Resolution volume, response times, and workload per staff member.</div>
                 </div>
                 <div style="background:var(--card); border:1px solid var(--line); padding:1rem; border-radius:3px;">
-                  <div style="font-weight:700; font-size:0.88rem; color:var(--ink); margin-bottom:4px;">📥 Excel / PDF Dışa Aktarım</div>
-                  <div style="font-size:0.78rem; color:var(--steel);">Tarih ve müşteri aralıklarına göre filtrelenmiş verileri dışa aktarma.</div>
+                  <div style="font-weight:700; font-size:0.88rem; color:var(--ink); margin-bottom:4px;">📥 Excel / PDF Direct Export</div>
+                  <div style="font-size:0.78rem; color:var(--steel);">Export filtered records across custom date and customer ranges.</div>
                 </div>
               </div>
+            </div>
+          </div>
+
+      </div>
+
+      <!-- PANE 5: SYSTEM STATUS (TELEGRAM BROADCAST & OPERATION STATUS) -->
+      <div id="admin-pane-status" class="admin-pane" style="display:none;">
+          
+          <!-- STATUS HEADER & TIME PERIOD SELECTOR -->
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:1rem; border-bottom:1px solid var(--line); padding-bottom:1.25rem;">
+            <div>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <div style="width:10px; height:10px; border-radius:50%; background:var(--green, #10b981); box-shadow:0 0 0 3px rgba(16,185,129,0.2);"></div>
+                <h2 style="font-size:1.3rem; font-weight:700; color:var(--ink); margin:0;">System Operations & Telegram Status</h2>
+              </div>
+              <p style="font-size:0.85rem; color:var(--steel); margin:0.3rem 0 0 0;">Live mirror of Telegram daily reports, operational metrics, and CRM sync status.</p>
+            </div>
+
+            <!-- TIME PERIOD PILLS -->
+            <div style="display:flex; gap:0.4rem; background:var(--paper); padding:4px; border:1px solid var(--line); border-radius:6px; flex-wrap:wrap;">
+              <button type="button" class="status-period-btn active" onclick="setSystemStatusPeriod('daily', this)" style="padding:0.45rem 0.9rem; font-size:0.8rem; font-weight:600; cursor:pointer; border:none; border-radius:4px; background:var(--ink); color:var(--card); font-family:'IBM Plex Sans',sans-serif; transition:all 0.15s ease;">
+                Daily (Today)
+              </button>
+              <button type="button" class="status-period-btn" onclick="setSystemStatusPeriod('weekly', this)" style="padding:0.45rem 0.9rem; font-size:0.8rem; font-weight:600; cursor:pointer; border:none; border-radius:4px; background:transparent; color:var(--steel); font-family:'IBM Plex Sans',sans-serif; transition:all 0.15s ease;">
+                Weekly
+              </button>
+              <button type="button" class="status-period-btn" onclick="setSystemStatusPeriod('monthly', this)" style="padding:0.45rem 0.9rem; font-size:0.8rem; font-weight:600; cursor:pointer; border:none; border-radius:4px; background:transparent; color:var(--steel); font-family:'IBM Plex Sans',sans-serif; transition:all 0.15s ease;">
+                Monthly
+              </button>
+              <button type="button" class="status-period-btn" onclick="setSystemStatusPeriod('yearly', this)" style="padding:0.45rem 0.9rem; font-size:0.8rem; font-weight:600; cursor:pointer; border:none; border-radius:4px; background:transparent; color:var(--steel); font-family:'IBM Plex Sans',sans-serif; transition:all 0.15s ease;">
+                Yearly
+              </button>
+            </div>
+          </div>
+
+          <!-- TELEGRAM LIVE BROADCAST BANNER -->
+          <div style="background:linear-gradient(135deg, #1b4376 0%, #0f172a 100%); color:#ffffff; padding:1.5rem; border-radius:6px; margin-bottom:1.5rem; box-shadow:0 8px 24px rgba(15,23,42,0.15); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1.25rem;">
+            <div>
+              <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                <span style="background:rgba(255,255,255,0.18); border-radius:20px; padding:3px 10px; font-family:'IBM Plex Mono',monospace; font-size:0.75rem; font-weight:600; display:flex; align-items:center; gap:5px;">
+                  <i data-lucide="send" style="width:12px; height:12px;"></i> TELEGRAM BOT LIVE
+                </span>
+                <span id="status-telegram-badge" style="color:#86efac; font-size:0.75rem; font-weight:600;">● Scheduled Daily at 17:50 GMT</span>
+              </div>
+              <h3 style="font-size:1.15rem; font-weight:700; margin:0 0 4px 0; color:#fff;" id="status-current-period-title">TaskFlow Operations Report – Today</h3>
+              <p style="font-size:0.82rem; color:#94a3b8; margin:0;" id="status-last-sync-time">Last Sync: Checking...</p>
+            </div>
+
+            <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
+              <button type="button" onclick="triggerManualSync()" class="btn" style="background:rgba(255,255,255,0.15); color:#fff; border:1px solid rgba(255,255,255,0.25); padding:0.6rem 1.1rem; border-radius:4px; font-size:0.82rem; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px;">
+                <i data-lucide="refresh-cw" style="width:14px; height:14px;"></i> Sync & Refresh
+              </button>
+              <button type="button" onclick="triggerTelegramReportSend()" class="btn" style="background:#22c55e; color:#064e3b; border:none; padding:0.6rem 1.25rem; border-radius:4px; font-size:0.82rem; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:6px;">
+                <i data-lucide="send" style="width:14px; height:14px;"></i> Send Telegram Report Now
+              </button>
+            </div>
+          </div>
+
+          <!-- 4 STAT CARDS (PROCESSED TICKETS, SERVICES, CUSTOMERS, QUOTES) -->
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:1.25rem; margin-bottom:1.5rem;">
+            <div style="background:var(--card); border:1px solid var(--ink); padding:1.25rem; border-radius:2px; box-shadow:4px 4px 0 rgba(29,36,48,0.12);">
+              <div style="font-family:'IBM Plex Mono',monospace; font-size:0.72rem; color:var(--steel); margin-bottom:0.4rem; display:flex; justify-content:space-between;">
+                <span>PROCESSED TICKETS</span>
+                <i data-lucide="ticket" style="width:15px; height:15px; color:var(--blue);"></i>
+              </div>
+              <div id="status-count-tickets" style="font-size:2rem; font-weight:700; color:var(--ink);">0</div>
+              <div id="status-desc-tickets" style="font-size:0.75rem; color:var(--steel); margin-top:4px;">In selected period</div>
+            </div>
+
+            <div style="background:var(--card); border:1px solid var(--ink); padding:1.25rem; border-radius:2px; box-shadow:4px 4px 0 rgba(29,36,48,0.12);">
+              <div style="font-family:'IBM Plex Mono',monospace; font-size:0.72rem; color:var(--steel); margin-bottom:0.4rem; display:flex; justify-content:space-between;">
+                <span>SERVICE RECORDS</span>
+                <i data-lucide="briefcase" style="width:15px; height:15px; color:var(--green);"></i>
+              </div>
+              <div id="status-count-services" style="font-size:2rem; font-weight:700; color:var(--green);">0</div>
+              <div id="status-desc-services" style="font-size:0.75rem; color:var(--steel); margin-top:4px;">Completed & billed jobs</div>
+            </div>
+
+            <div style="background:var(--card); border:1px solid var(--ink); padding:1.25rem; border-radius:2px; box-shadow:4px 4px 0 rgba(29,36,48,0.12);">
+              <div style="font-family:'IBM Plex Mono',monospace; font-size:0.72rem; color:var(--steel); margin-bottom:0.4rem; display:flex; justify-content:space-between;">
+                <span>NEW CUSTOMERS</span>
+                <i data-lucide="user-plus" style="width:15px; height:15px; color:var(--amber);"></i>
+              </div>
+              <div id="status-count-customers" style="font-size:2rem; font-weight:700; color:var(--amber);">0</div>
+              <div id="status-desc-customers" style="font-size:0.75rem; color:var(--steel); margin-top:4px;">Registered accounts</div>
+            </div>
+
+            <div style="background:var(--card); border:1px solid var(--ink); padding:1.25rem; border-radius:2px; box-shadow:4px 4px 0 rgba(29,36,48,0.12);">
+              <div style="font-family:'IBM Plex Mono',monospace; font-size:0.72rem; color:var(--steel); margin-bottom:0.4rem; display:flex; justify-content:space-between;">
+                <span>QUOTES & APPOINTMENTS</span>
+                <i data-lucide="calendar" style="width:15px; height:15px; color:var(--clay);"></i>
+              </div>
+              <div id="status-count-quotes-appts" style="font-size:2rem; font-weight:700; color:var(--ink);">0</div>
+              <div id="status-desc-quotes-appts" style="font-size:0.75rem; color:var(--steel); margin-top:4px;">Proposals & bookings</div>
+            </div>
+          </div>
+
+          <!-- 2-COLUMN OPERATIONAL BREAKDOWN (STATUS & TECHNICIAN DISPATCH) -->
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; margin-bottom:1.5rem;">
+            
+            <!-- STATUS BREAKDOWN (TELEGRAM FORMAT) -->
+            <div style="background:var(--card); border:1px solid var(--ink); border-radius:2px; padding:1.25rem; box-shadow:4px 4px 0 rgba(29,36,48,0.12);">
+              <h3 style="font-size:0.95rem; font-weight:700; color:var(--ink); margin:0 0 1rem; display:flex; align-items:center; gap:8px;">
+                <i data-lucide="pie-chart" style="width:16px; height:16px;"></i> Ticket Status Distribution
+              </h3>
+              <div id="status-breakdown-container">Loading status distribution...</div>
+            </div>
+
+            <!-- TECHNICIAN ASSIGNMENT BREAKDOWN -->
+            <div style="background:var(--card); border:1px solid var(--ink); border-radius:2px; padding:1.25rem; box-shadow:4px 4px 0 rgba(29,36,48,0.12);">
+              <h3 style="font-size:0.95rem; font-weight:700; color:var(--ink); margin:0 0 1rem; display:flex; align-items:center; gap:8px;">
+                <i data-lucide="users" style="width:16px; height:16px;"></i> Technician & Staff Workload
+              </h3>
+              <div id="status-technicians-container">Loading staff distribution...</div>
+            </div>
+
+          </div>
+
+          <!-- DETAILED TICKET & OPERATIONS FEED (MATCHING TELEGRAM SUMMARY) -->
+          <div style="background:var(--card); border:1px solid var(--ink); border-radius:2px; padding:1.25rem; box-shadow:4px 4px 0 rgba(29,36,48,0.12);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
+              <h3 style="font-size:0.95rem; font-weight:700; color:var(--ink); margin:0; display:flex; align-items:center; gap:8px;">
+                <i data-lucide="list" style="width:16px; height:16px;"></i> Recent Tickets in Selected Period
+              </h3>
+              <span id="status-feed-count" style="font-family:'IBM Plex Mono',monospace; font-size:0.75rem; color:var(--steel);">Showing 0 items</span>
+            </div>
+            <div id="status-tickets-feed" style="display:flex; flex-direction:column; gap:8px;">
+              Loading operational ticket feed...
             </div>
           </div>
 

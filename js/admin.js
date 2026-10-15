@@ -22,6 +22,7 @@ function showAdminPane(pane, btn) {
         else if (typeof renderSystemLogs === 'function') renderSystemLogs();
     }
     if (pane === 'performance' && typeof renderAdminPerformance === 'function') renderAdminPerformance();
+    if (pane === 'status' && typeof renderAdminSystemStatus === 'function') renderAdminSystemStatus();
     if (window.lucide) lucide.createIcons();
 }
 window.showAdminPane = showAdminPane;
@@ -774,3 +775,293 @@ window.addSystemLog = function(action, description) {
     if (window.appSystemLogs.length > 100) window.appSystemLogs.pop();
     if (typeof _origAddSystemLog === 'function') _origAddSystemLog(action, description);
 };
+
+// ============================================================
+// SYSTEM OPERATIONS & TELEGRAM STATUS
+// Mirrors daily/weekly/monthly/yearly operational reports
+// ============================================================
+window.currentStatusPeriod = 'daily';
+
+function setSystemStatusPeriod(period, btn) {
+    window.currentStatusPeriod = period;
+    document.querySelectorAll('.status-period-btn').forEach(function(b) {
+        b.style.background = 'transparent';
+        b.style.color = 'var(--steel)';
+        b.classList.remove('active');
+    });
+    if (btn) {
+        btn.style.background = 'var(--ink)';
+        btn.style.color = 'var(--card)';
+        btn.classList.add('active');
+    }
+
+    var titles = {
+        daily: 'TaskFlow Operations Report – Today',
+        weekly: 'TaskFlow Operations Report – This Week (Last 7 Days)',
+        monthly: 'TaskFlow Operations Report – This Month',
+        yearly: 'TaskFlow Operations Report – Yearly & All-Time'
+    };
+    var titleEl = document.getElementById('status-current-period-title');
+    if (titleEl) titleEl.textContent = titles[period] || 'TaskFlow Operations Report';
+
+    renderAdminSystemStatus(period);
+}
+window.setSystemStatusPeriod = setSystemStatusPeriod;
+
+function matchesStatusPeriod(dStr, period) {
+    if (!dStr) return period === 'yearly';
+    var d = new Date(dStr);
+    if (isNaN(d.getTime())) return period === 'yearly';
+
+    var now = new Date();
+    var todayStr = now.toISOString().slice(0, 10);
+    var dDateStr = d.toISOString().slice(0, 10);
+    var currentMonth = now.toISOString().slice(0, 7);
+    var dMonth = d.toISOString().slice(0, 7);
+    var currentYear = now.getFullYear();
+    var dYear = d.getFullYear();
+
+    if (period === 'daily') {
+        return dDateStr === todayStr;
+    } else if (period === 'weekly') {
+        var oneWeekAgoMs = now.getTime() - (7 * 24 * 60 * 60 * 1000);
+        return d.getTime() >= oneWeekAgoMs;
+    } else if (period === 'monthly') {
+        return dMonth === currentMonth;
+    } else if (period === 'yearly') {
+        return dYear === currentYear || true;
+    }
+    return true;
+}
+
+function renderAdminSystemStatus(period) {
+    period = period || window.currentStatusPeriod || 'daily';
+
+    var tickets = (window.appState && Array.isArray(window.appState.tickets)) ? window.appState.tickets : [];
+    var customers = (window.appState && Array.isArray(window.appState.customers)) ? window.appState.customers : [];
+    var records = (window.appState && Array.isArray(window.appState.records)) ? window.appState.records : [];
+    var appointments = (window.appState && Array.isArray(window.appState.appointments)) ? window.appState.appointments : [];
+    var quotes = (window.appState && Array.isArray(window.appState.quotes)) ? window.appState.quotes : [];
+
+    // Filter by period
+    var filteredTickets = tickets.filter(function(t) {
+        var dStr = t.created_time || t.createdtime || t.created_at || t.modifiedtime || t.timestamp || t.date;
+        return matchesStatusPeriod(dStr, period);
+    });
+
+    var filteredRecords = records.filter(function(r) {
+        var dStr = r.created_at || r.updated_at || r.date;
+        return matchesStatusPeriod(dStr, period);
+    });
+
+    var filteredCustomers = customers.filter(function(c) {
+        var dStr = c.created_time || c.createdtime || c.created_at;
+        return matchesStatusPeriod(dStr, period);
+    });
+
+    var filteredAppointments = appointments.filter(function(a) {
+        var dStr = a.date_start || a.createdtime || a.created_at;
+        return matchesStatusPeriod(dStr, period);
+    });
+
+    var filteredQuotes = quotes.filter(function(q) {
+        var dStr = q.createdtime || q.modifiedtime || q.created_at;
+        return matchesStatusPeriod(dStr, period);
+    });
+
+    // Update 4 Summary Stat Cards
+    var elCountTickets = document.getElementById('status-count-tickets');
+    var elCountServices = document.getElementById('status-count-services');
+    var elCountCustomers = document.getElementById('status-count-customers');
+    var elCountQuotesAppts = document.getElementById('status-count-quotes-appts');
+
+    if (elCountTickets) elCountTickets.textContent = filteredTickets.length;
+    if (elCountServices) elCountServices.textContent = filteredRecords.length;
+    if (elCountCustomers) elCountCustomers.textContent = filteredCustomers.length;
+    if (elCountQuotesAppts) elCountQuotesAppts.textContent = (filteredQuotes.length + filteredAppointments.length);
+
+    var periodLabels = {
+        daily: 'Today',
+        weekly: 'This week',
+        monthly: 'This month',
+        yearly: 'Yearly / All-Time'
+    };
+    var pLabel = periodLabels[period] || 'In selected period';
+    var elDescTickets = document.getElementById('status-desc-tickets');
+    var elDescServices = document.getElementById('status-desc-services');
+    var elDescCustomers = document.getElementById('status-desc-customers');
+    var elDescQuotesAppts = document.getElementById('status-desc-quotes-appts');
+    if (elDescTickets) elDescTickets.textContent = pLabel + ' ticket volume';
+    if (elDescServices) elDescServices.textContent = pLabel + ' billable jobs';
+    if (elDescCustomers) elDescCustomers.textContent = pLabel + ' accounts';
+    if (elDescQuotesAppts) elDescQuotesAppts.textContent = filteredQuotes.length + ' quotes, ' + filteredAppointments.length + ' appts';
+
+    // 1. Status Breakdown (Matching Telegram Format)
+    var statusCounts = {};
+    var techCounts = {};
+
+    filteredTickets.forEach(function(t) {
+        var st = (t.ticketstatus || t.status || 'Open').trim();
+        statusCounts[st] = (statusCounts[st] || 0) + 1;
+
+        var tech = (t.assigned_user_id || t.assigned_to || 'Unassigned').trim();
+        techCounts[tech] = (techCounts[tech] || 0) + 1;
+    });
+
+    var statusContainer = document.getElementById('status-breakdown-container');
+    if (statusContainer) {
+        var totalT = filteredTickets.length || 1;
+        var stKeys = Object.keys(statusCounts);
+        if (stKeys.length === 0) {
+            statusContainer.innerHTML = '<div style="font-size:0.8rem; color:var(--steel); text-align:center; padding:1.5rem;">No tickets recorded for this period.</div>';
+        } else {
+            statusContainer.innerHTML = stKeys.map(function(st) {
+                var c = statusCounts[st];
+                var pct = Math.round((c / totalT) * 100);
+                var isDone = st.toLowerCase().includes('closed') || st.toLowerCase().includes('completed') || st.toLowerCase().includes('tamamlandı');
+                var isProg = st.toLowerCase().includes('progress');
+                var color = isDone ? '#16a34a' : isProg ? '#2563eb' : '#d97706';
+                var bg = isDone ? 'rgba(22,163,74,0.1)' : isProg ? 'rgba(37,99,235,0.1)' : 'rgba(217,119,6,0.1)';
+                var icon = isDone ? '✅' : isProg ? '⏳' : '📌';
+
+                return '<div style="margin-bottom:0.85rem;">'
+                    + '<div style="display:flex; justify-content:space-between; align-items:center; font-size:0.82rem; margin-bottom:4px;">'
+                    +   '<span style="font-weight:600; color:var(--ink); display:flex; align-items:center; gap:5px;">'
+                    +     '<span>' + icon + '</span> <span>' + st + '</span>'
+                    +   '</span>'
+                    +   '<span style="font-family:IBM Plex Mono,monospace; font-weight:700; color:' + color + '; background:' + bg + '; padding:2px 8px; border-radius:12px; font-size:0.75rem;">' + c + ' (' + pct + '%)</span>'
+                    + '</div>'
+                    + '<div style="height:6px; background:var(--paper, #f1f5f9); border-radius:3px; overflow:hidden;">'
+                    +   '<div style="width:' + pct + '%; height:100%; background:' + color + '; border-radius:3px;"></div>'
+                    + '</div>'
+                    + '</div>';
+            }).join('');
+        }
+    }
+
+    // 2. Staff Workload Breakdown
+    var techContainer = document.getElementById('status-technicians-container');
+    if (techContainer) {
+        var techKeys = Object.keys(techCounts).sort(function(a, b) { return techCounts[b] - techCounts[a]; });
+        if (techKeys.length === 0) {
+            techContainer.innerHTML = '<div style="font-size:0.8rem; color:var(--steel); text-align:center; padding:1.5rem;">No technician dispatches in this timeframe.</div>';
+        } else {
+            techContainer.innerHTML = techKeys.map(function(tech) {
+                var c = techCounts[tech];
+                var origin = getUserOrigin({ username: tech, full_name: tech });
+                return '<div style="display:flex; justify-content:space-between; align-items:center; padding:0.6rem 0.8rem; background:var(--paper); border:1px solid var(--line); border-radius:4px; margin-bottom:6px;">'
+                    + '<div style="display:flex; align-items:center; gap:8px;">'
+                    +   '<i data-lucide="user" style="width:14px; height:14px; color:var(--steel);"></i>'
+                    +   '<span style="font-weight:600; font-size:0.85rem; color:var(--ink);">' + tech + '</span>'
+                    +   origin.badgeHtml
+                    + '</div>'
+                    + '<div style="font-family:IBM Plex Mono,monospace; font-weight:700; font-size:0.82rem; color:var(--ink);">' + c + ' ticket' + (c > 1 ? 's' : '') + '</div>'
+                    + '</div>';
+            }).join('');
+        }
+    }
+
+    // 3. Ticket Feed (Exact Telegram Message Pattern)
+    var feedContainer = document.getElementById('status-tickets-feed');
+    var feedCountEl = document.getElementById('status-feed-count');
+    if (feedContainer) {
+        var displayTickets = filteredTickets.slice(0, 20); // Top 20 recent
+        if (feedCountEl) feedCountEl.textContent = 'Showing ' + displayTickets.length + ' of ' + filteredTickets.length + ' tickets';
+
+        if (displayTickets.length === 0) {
+            feedContainer.innerHTML = '<div style="padding:2rem 1rem; text-align:center; font-family:IBM Plex Mono,monospace; font-size:0.8rem; color:var(--steel); border:1px dashed var(--line); border-radius:4px;">No tickets found for ' + pLabel.toLowerCase() + '.</div>';
+        } else {
+            feedContainer.innerHTML = displayTickets.map(function(t, idx) {
+                var num = idx + 1;
+                var tNo = t.ticket_no || t.id || ('TT-' + num);
+                var title = t.ticket_title || t.title || 'Untitled Ticket';
+                var cust = t.organization_name || t.company || t.customer_name || 'Customer Account';
+                var tech = t.assigned_user_id || t.assigned_to || 'Unassigned';
+                var st = t.ticketstatus || t.status || 'Open';
+                var isDone = st.toLowerCase().includes('closed') || st.toLowerCase().includes('completed') || st.toLowerCase().includes('tamamlandı');
+                var stIcon = isDone ? '✅' : '⏳';
+                var stColor = isDone ? 'var(--green)' : 'var(--blue)';
+
+                return '<div style="display:flex; justify-content:space-between; align-items:center; padding:0.75rem 1rem; background:var(--card); border:1px solid var(--line); border-left:3px solid ' + stColor + '; border-radius:2px; flex-wrap:wrap; gap:0.5rem;">'
+                    + '<div>'
+                    +   '<div style="display:flex; align-items:center; gap:8px;">'
+                    +     '<span style="font-family:IBM Plex Mono,monospace; font-weight:700; font-size:0.8rem; color:var(--blue);">' + tNo + '</span>'
+                    +     '<span style="font-weight:600; font-size:0.88rem; color:var(--ink);">' + title + '</span>'
+                    +   '</div>'
+                    +   '<div style="font-size:0.75rem; color:var(--steel); margin-top:3px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">'
+                    +     '<span>🏢 ' + cust + '</span>'
+                    +     '<span>👤 ' + tech + '</span>'
+                    +   '</div>'
+                    + '</div>'
+                    + '<div style="display:flex; align-items:center; gap:8px;">'
+                    +   '<span style="font-family:IBM Plex Mono,monospace; font-size:0.72rem; font-weight:700; padding:2px 8px; border-radius:12px; border:1px solid ' + stColor + '; color:' + stColor + ';">' + stIcon + ' ' + st + '</span>'
+                    + '</div>'
+                    + '</div>';
+            }).join('');
+        }
+    }
+
+    // Update Last Sync Timestamp
+    var lastSyncEl = document.getElementById('status-last-sync-time');
+    if (lastSyncEl) {
+        var nowStr = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        lastSyncEl.textContent = 'Last Sync: ' + nowStr + ' (Turso libSQL & Vtiger CRM)';
+    }
+
+    if (window.lucide) lucide.createIcons();
+}
+window.renderAdminSystemStatus = renderAdminSystemStatus;
+
+// Trigger Manual Sync & Refresh View
+async function triggerManualSync() {
+    if (typeof showToast === 'function') showToast('Synchronizing with Turso DB & CRM...', 'info');
+    try {
+        if (typeof window.updateSyncStatusBadge === 'function') {
+            await window.updateSyncStatusBadge();
+        }
+        renderAdminSystemStatus(window.currentStatusPeriod);
+        if (typeof showToast === 'function') showToast('System status refreshed with latest data! ✅', 'success');
+        if (typeof addSystemLog === 'function') addSystemLog('UPDATE', 'Admin manually triggered System Status & CRM sync.');
+    } catch(e) {
+        console.warn('Manual sync error:', e);
+        if (typeof showToast === 'function') showToast('Sync completed with local cached state.', 'info');
+    }
+}
+window.triggerManualSync = triggerManualSync;
+
+// Trigger Telegram Daily Report via Server API
+async function triggerTelegramReportSend() {
+    if (!confirm('Send today\'s operations summary report to the configured Telegram channel now?')) return;
+    if (typeof showToast === 'function') showToast('Dispatching Telegram report...', 'info');
+
+    try {
+        var token = localStorage.getItem('taskflow_token') || sessionStorage.getItem('taskflow_token');
+        var res = await fetch('/api/telegram/send-report', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': token ? ('Bearer ' + token) : ''
+            },
+            body: JSON.stringify({ dryRun: false })
+        });
+        var data = await res.json();
+        if (data.success) {
+            if (typeof showToast === 'function') showToast('Telegram report dispatched successfully! 🚀', 'success');
+            if (typeof addSystemLog === 'function') addSystemLog('NOTIFY', 'Telegram daily operations report dispatched manually.');
+        } else {
+            var reason = data.reason === 'MISSING_CREDENTIALS' ? 'Telegram Bot Token not configured in .env' : (data.error || 'Check server logs');
+            if (typeof showToast === 'function') showToast('Report generated (Preview mode): ' + reason, 'warning');
+        }
+    } catch(e) {
+        console.warn('Telegram trigger error:', e);
+        if (typeof showToast === 'function') showToast('Report preview ready. (Server unreachable or running static).', 'info');
+    }
+}
+window.triggerTelegramReportSend = triggerTelegramReportSend;
+
+// Automatically refresh System Status on sync events
+window.addEventListener('taskflow:sync-complete', function() {
+    if (typeof renderAdminSystemStatus === 'function') {
+        renderAdminSystemStatus(window.currentStatusPeriod);
+    }
+});

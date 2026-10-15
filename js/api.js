@@ -1258,15 +1258,18 @@ async function updateSyncStatusBadge() {
             badge.style.color = '#166534';
             dotEl.style.background = '#22c55e';
             dotEl.className = 'sync-pulse-dot pulse';
-            textEl.textContent = `CRM: Aktif (${timeStr})`;
+            textEl.textContent = `CRM: Active (${timeStr})`;
         } else {
             badge.style.background = 'rgba(234, 179, 8, 0.08)';
             badge.style.borderColor = 'rgba(234, 179, 8, 0.3)';
             badge.style.color = '#854d0e';
             dotEl.style.background = '#eab308';
             dotEl.className = 'sync-pulse-dot';
-            textEl.textContent = `CRM: Beklemede (${timeStr})`;
+            textEl.textContent = `CRM: Idle (${timeStr})`;
         }
+
+        // Notify System Status pane to auto-update
+        window.dispatchEvent(new CustomEvent('taskflow:sync-complete'));
     } catch(e) {
         console.warn("Sync status badge update error:", e);
     }
@@ -1286,12 +1289,12 @@ window.showSyncStatusModal = async function() {
             <div style="background:linear-gradient(135deg,#1b4376 0%,#0f172a 100%);color:#ffffff;padding:1.25rem 1.5rem;display:flex;justify-content:space-between;align-items:center;">
                 <div style="display:flex;align-items:center;gap:10px;">
                     <div style="width:10px;height:10px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 3px rgba(34,197,94,0.3);"></div>
-                    <h3 style="margin:0;font-size:1.05rem;font-weight:600;color:#fff;">Vtiger & Turso Canlı Eşitleme</h3>
+                    <h3 style="margin:0;font-size:1.05rem;font-weight:600;color:#fff;">Vtiger & Turso Live Sync</h3>
                 </div>
                 <button onclick="document.getElementById('sync-details-modal').style.display='none'" style="background:rgba(255,255,255,0.15);border:none;color:#fff;border-radius:8px;width:28px;height:28px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:1.1rem;">✕</button>
             </div>
             <div id="sync-modal-body" style="padding:1.5rem;">
-                <div style="text-align:center;padding:2rem;color:#64748b;">Veriler yükleniyor...</div>
+                <div style="text-align:center;padding:2rem;color:#64748b;">Loading synchronization status...</div>
             </div>
         </div>
     `;
@@ -1299,14 +1302,14 @@ window.showSyncStatusModal = async function() {
 
     try {
         let stats = null;
-        let lastMod = 'Az önce';
+        let lastMod = 'Just now';
         try {
             const res = await fetch('/api/sync/status');
             if (res.ok) {
                 const j = await res.json();
                 if (j.success && j.stats) {
                     stats = j.stats;
-                    lastMod = j.lastModified ? new Date(j.lastModified).toLocaleTimeString('tr-TR') : lastMod;
+                    lastMod = j.lastModified ? new Date(j.lastModified).toLocaleTimeString('en-GB') : lastMod;
                 }
             }
         } catch(e) {}
@@ -1317,43 +1320,44 @@ window.showSyncStatusModal = async function() {
         bodyEl.innerHTML = `
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.2rem;padding-bottom:0.8rem;border-bottom:1px solid #f1f5f9;">
                 <div>
-                    <span style="font-size:0.75rem;color:#64748b;display:block;">MOTOR DURUMU</span>
-                    <strong style="color:#16a34a;font-size:0.95rem;">● Arka Plan Eşitleme Aktif</strong>
+                    <span style="font-size:0.75rem;color:#64748b;display:block;">SYNC ENGINE STATUS</span>
+                    <strong style="color:#16a34a;font-size:0.95rem;">● Background Sync Active</strong>
                 </div>
                 <div style="text-align:right;">
-                    <span style="font-size:0.75rem;color:#64748b;display:block;">SON EŞİTLEME</span>
+                    <span style="font-size:0.75rem;color:#64748b;display:block;">LAST SYNC</span>
                     <strong style="color:#1e293b;font-size:0.95rem;">${lastMod}</strong>
                 </div>
             </div>
 
-            <h4 style="font-size:0.8rem;color:#64748b;text-transform:uppercase;margin:0 0 0.6rem 0;letter-spacing:0.5px;">Bugünkü Aktarılan Kayıtlar</h4>
+            <h4 style="font-size:0.8rem;color:#64748b;text-transform:uppercase;margin:0 0 0.6rem 0;letter-spacing:0.5px;">Records Processed Today</h4>
             <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:1.5rem;">
                 <div style="background:#f8fafc;padding:0.75rem 1rem;border-radius:10px;border:1px solid #e2e8f0;">
-                    <div style="font-size:0.75rem;color:#64748b;">🎫 Biletler (Tickets)</div>
-                    <div style="font-size:1.25rem;font-weight:700;color:#1e293b;">${stats ? Number(stats.tickets).toLocaleString('tr-TR') : '81.320+'}</div>
+                    <div style="font-size:0.75rem;color:#64748b;">🎫 Tickets</div>
+                    <div style="font-size:1.25rem;font-weight:700;color:#1e293b;">${stats ? Number(stats.tickets).toLocaleString('en-GB') : '81,320+'}</div>
                 </div>
                 <div style="background:#f8fafc;padding:0.75rem 1rem;border-radius:10px;border:1px solid #e2e8f0;">
-                    <div style="font-size:0.75rem;color:#64748b;">👥 Müşteriler</div>
-                    <div style="font-size:1.25rem;font-weight:700;color:#1e293b;">${stats ? Number(stats.customers).toLocaleString('tr-TR') : '92.200+'}</div>
+                    <div style="font-size:0.75rem;color:#64748b;">👥 Customers</div>
+                    <div style="font-size:1.25rem;font-weight:700;color:#1e293b;">${stats ? Number(stats.customers).toLocaleString('en-GB') : '92,200+'}</div>
                 </div>
                 <div style="background:#f8fafc;padding:0.75rem 1rem;border-radius:10px;border:1px solid #e2e8f0;">
-                    <div style="font-size:0.75rem;color:#64748b;">📜 Teklifler (Quotes)</div>
-                    <div style="font-size:1.25rem;font-weight:700;color:#1e293b;">${stats ? Number(stats.quotes).toLocaleString('tr-TR') : '5.044'}</div>
+                    <div style="font-size:0.75rem;color:#64748b;">📜 Quotes</div>
+                    <div style="font-size:1.25rem;font-weight:700;color:#1e293b;">${stats ? Number(stats.quotes).toLocaleString('en-GB') : '5,044'}</div>
                 </div>
                 <div style="background:#f8fafc;padding:0.75rem 1rem;border-radius:10px;border:1px solid #e2e8f0;">
-                    <div style="font-size:0.75rem;color:#64748b;">🔄 Eşitleme Turu</div>
+                    <div style="font-size:0.75rem;color:#64748b;">🔄 Sync Cycles</div>
                     <div style="font-size:1.25rem;font-weight:700;color:#0284c7;">${stats ? stats.sync_runs : '50+'}</div>
                 </div>
             </div>
 
             <div style="display:flex;gap:10px;justify-content:flex-end;">
                 <button onclick="window.updateSyncStatusBadge(); window.showSyncStatusModal();" style="padding:0.6rem 1.1rem;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:8px;color:#334155;font-weight:600;font-size:0.85rem;cursor:pointer;">
-                    🔄 Yenile
+                    🔄 Refresh
                 </button>
                 <button onclick="document.getElementById('sync-details-modal').style.display='none'" style="padding:0.6rem 1.3rem;background:#1b4376;border:none;border-radius:8px;color:#ffffff;font-weight:600;font-size:0.85rem;cursor:pointer;">
-                    Tamam
+                    Close
                 </button>
             </div>
+        `;
         `;
     } catch(err) {
         console.error("Modal render error:", err);
