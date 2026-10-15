@@ -481,12 +481,30 @@ function createTursoSbAdapter() {
 
                         // Resolve actual Turso database table
                         let actualTable = table;
-                        if (table === 'organizations' || table === 'vtigercrm_organizations' || table === 'customers') {
+                        if (table === 'organizations' || table === 'vtigercrm_organizations' || table === 'customers' || table === 'vt_customers') {
                             actualTable = 'vt_customers';
-                        } else if (table === 'vt_tickets' || table === 'tickets') {
+                        } else if (table === 'tickets' || table === 'vt_tickets') {
                             actualTable = 'vt_tickets';
-                        } else if (table === 'vt_quotes' || table === 'quotes') {
+                        } else if (table === 'quotes' || table === 'vt_quotes') {
                             actualTable = 'vt_quotes';
+                        } else if (table === 'appointments' || table === 'vt_appointments' || table === 'events') {
+                            actualTable = 'appointments';
+                        } else if (table === 'products' || table === 'vt_products') {
+                            actualTable = 'vt_products';
+                        } else if (table === 'contracts' || table === 'vt_contracts') {
+                            actualTable = 'vt_contracts';
+                        } else if (table === 'documents' || table === 'vt_documents') {
+                            actualTable = 'vt_documents';
+                        } else if (table === 'comments' || table === 'vt_comments') {
+                            actualTable = 'vt_comments';
+                        } else if (table === 'contacts' || table === 'vt_contacts') {
+                            actualTable = 'vt_contacts';
+                        } else if (table === 'vt_users' || table === 'crm_users') {
+                            actualTable = 'vt_users';
+                        } else if (table === 'taskflow_users') {
+                            actualTable = 'taskflow_users';
+                        } else if (table === 'invoices') {
+                            actualTable = 'invoices';
                         } else if (table === 'records') {
                             actualTable = 'records';
                         }
