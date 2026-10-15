@@ -65,12 +65,16 @@ function showToast(message, type = 'success') {
     if (!container) return;
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
-    toast.innerHTML = `<span>${type === 'success' ? '✅' : '❌'}</span> <span>${message}</span>`;
+    let icon = '✅';
+    if (type === 'error') icon = '❌';
+    else if (type === 'info') icon = '🔄';
+    else if (type === 'warning') icon = '⚠️';
+    toast.innerHTML = `<span>${icon}</span> <span>${message}</span>`;
     container.appendChild(toast);
     setTimeout(() => {
         toast.style.animation = 'fadeOut 0.5s ease-out forwards';
         setTimeout(() => toast.remove(), 500);
-    }, 4000);
+    }, 3500);
 }
 
 // --- Fallback Handlers for Offline or Unconfigured Databases ---

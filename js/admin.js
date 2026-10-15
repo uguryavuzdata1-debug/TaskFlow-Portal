@@ -810,26 +810,31 @@ window.setSystemStatusPeriod = setSystemStatusPeriod;
 
 function matchesStatusPeriod(dStr, period) {
     if (!dStr) return period === 'yearly';
-    var d = new Date(dStr);
-    if (isNaN(d.getTime())) return period === 'yearly';
 
+    // Direct date string comparison (handles YYYY-MM-DD cleanly)
+    var datePart = String(dStr).trim().slice(0, 10);
     var now = new Date();
-    var todayStr = now.toISOString().slice(0, 10);
-    var dDateStr = d.toISOString().slice(0, 10);
-    var currentMonth = now.toISOString().slice(0, 7);
-    var dMonth = d.toISOString().slice(0, 7);
-    var currentYear = now.getFullYear();
-    var dYear = d.getFullYear();
+    var todayUTC = now.toISOString().slice(0, 10);
+    var todayLocal = now.toLocaleDateString('en-CA'); // YYYY-MM-DD in local time
 
     if (period === 'daily') {
-        return dDateStr === todayStr;
-    } else if (period === 'weekly') {
+        return datePart === todayUTC || datePart === todayLocal;
+    }
+
+    var cleanDStr = String(dStr).includes('T') ? dStr : String(dStr).replace(' ', 'T');
+    var d = new Date(cleanDStr);
+    if (isNaN(d.getTime())) return period === 'yearly';
+
+    if (period === 'weekly') {
         var oneWeekAgoMs = now.getTime() - (7 * 24 * 60 * 60 * 1000);
         return d.getTime() >= oneWeekAgoMs;
     } else if (period === 'monthly') {
-        return dMonth === currentMonth;
+        var currentMonth = todayLocal.slice(0, 7);
+        var currentMonthUTC = todayUTC.slice(0, 7);
+        var dMonth = datePart.slice(0, 7);
+        return dMonth === currentMonth || dMonth === currentMonthUTC;
     } else if (period === 'yearly') {
-        return dYear === currentYear || true;
+        return true;
     }
     return true;
 }
@@ -904,7 +909,7 @@ function renderAdminSystemStatus(period) {
         var st = (t.ticketstatus || t.status || 'Open').trim();
         statusCounts[st] = (statusCounts[st] || 0) + 1;
 
-        var tech = (t.assigned_user_id || t.assigned_to || 'Unassigned').trim();
+        var tech = (t.user || t.assigned_user_id || t.assigned_to || 'Unassigned').trim();
         techCounts[tech] = (techCounts[tech] || 0) + 1;
     });
 
@@ -1016,6 +1021,11 @@ window.renderAdminSystemStatus = renderAdminSystemStatus;
 async function triggerManualSync() {
     if (typeof showToast === 'function') showToast('Synchronizing with Turso DB & CRM...', 'info');
     try {
+        if (typeof window.fetchAppData === 'function') {
+            await window.fetchAppData();
+        } else if (typeof fetchAppData === 'function') {
+            await fetchAppData();
+        }
         if (typeof window.updateSyncStatusBadge === 'function') {
             await window.updateSyncStatusBadge();
         }
@@ -1024,7 +1034,8 @@ async function triggerManualSync() {
         if (typeof addSystemLog === 'function') addSystemLog('UPDATE', 'Admin manually triggered System Status & CRM sync.');
     } catch(e) {
         console.warn('Manual sync error:', e);
-        if (typeof showToast === 'function') showToast('Sync completed with local cached state.', 'info');
+        renderAdminSystemStatus(window.currentStatusPeriod);
+        if (typeof showToast === 'function') showToast('Sync completed with local cached state.', 'warning');
     }
 }
 window.triggerManualSync = triggerManualSync;

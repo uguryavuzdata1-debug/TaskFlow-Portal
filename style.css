@@ -727,6 +727,8 @@ input:focus, select:focus, textarea:focus {
 }
 
 .toast-success { border-left-color: #10b981; }
+.toast-info { border-left-color: #2563eb; }
+.toast-warning { border-left-color: #f59e0b; }
 .toast-error { border-left-color: #ef4444; }
 
 @keyframes slideUp {
