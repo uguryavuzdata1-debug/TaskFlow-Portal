@@ -1858,7 +1858,7 @@
               </div>
               <h3 style="font-size:1.1rem; font-weight:700; color:var(--ink); margin:0 0 0.5rem;">Advanced Reporting & Export Hub Under Construction</h3>
               <p style="font-size:0.85rem; color:var(--steel); max-width:550px; margin:0 auto 1.5rem; line-height:1.6;">
-                Planned advanced reporting tools will be deployed in the next update. When available, exportable Excel, PDF, and automated Telegram outputs will be generated with a single click.
+                Planned advanced reporting tools will be deployed in the next update. When available, exportable Excel, PDF, and automated executive summaries will be generated with a single click.
               </p>
               <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:1rem; max-width:800px; margin:0 auto; text-align:left;">
                 <div style="background:var(--card); border:1px solid var(--line); padding:1rem; border-radius:3px;">
@@ -1879,7 +1879,7 @@
 
       </div>
 
-      <!-- PANE 5: SYSTEM STATUS (TELEGRAM BROADCAST & OPERATION STATUS) -->
+      <!-- PANE 5: SYSTEM STATUS (OPERATIONS & ACTIVITY OVERVIEW) -->
       <div id="admin-pane-status" class="admin-pane" style="display:none;">
           
           <!-- STATUS HEADER & TIME PERIOD SELECTOR -->
@@ -1887,9 +1887,9 @@
             <div>
               <div style="display:flex; align-items:center; gap:8px;">
                 <div style="width:10px; height:10px; border-radius:50%; background:var(--green, #10b981); box-shadow:0 0 0 3px rgba(16,185,129,0.2);"></div>
-                <h2 style="font-size:1.3rem; font-weight:700; color:var(--ink); margin:0;">System Operations & Telegram Status</h2>
+                <h2 style="font-size:1.3rem; font-weight:700; color:var(--ink); margin:0;">System Operations & Activity Overview</h2>
               </div>
-              <p style="font-size:0.85rem; color:var(--steel); margin:0.3rem 0 0 0;">Live mirror of Telegram daily reports, operational metrics, and CRM sync status.</p>
+              <p style="font-size:0.85rem; color:var(--steel); margin:0.3rem 0 0 0;">Live mirror of operational performance, staff workload, and CRM sync status.</p>
             </div>
 
             <!-- TIME PERIOD PILLS -->
@@ -1909,25 +1909,22 @@
             </div>
           </div>
 
-          <!-- TELEGRAM LIVE BROADCAST BANNER -->
+          <!-- OPERATIONS STATUS BANNER -->
           <div style="background:linear-gradient(135deg, #1b4376 0%, #0f172a 100%); color:#ffffff; padding:1.5rem; border-radius:6px; margin-bottom:1.5rem; box-shadow:0 8px 24px rgba(15,23,42,0.15); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1.25rem;">
             <div>
               <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
                 <span style="background:rgba(255,255,255,0.18); border-radius:20px; padding:3px 10px; font-family:'IBM Plex Mono',monospace; font-size:0.75rem; font-weight:600; display:flex; align-items:center; gap:5px;">
-                  <i data-lucide="send" style="width:12px; height:12px;"></i> TELEGRAM BOT LIVE
+                  <i data-lucide="activity" style="width:12px; height:12px;"></i> OPERATIONAL ENGINE ACTIVE
                 </span>
-                <span id="status-telegram-badge" style="color:#86efac; font-size:0.75rem; font-weight:600;">● Scheduled Daily at 17:50 GMT</span>
+                <span id="status-engine-badge" style="color:#86efac; font-size:0.75rem; font-weight:600;">● Live Real-Time Tracking</span>
               </div>
               <h3 style="font-size:1.15rem; font-weight:700; margin:0 0 4px 0; color:#fff;" id="status-current-period-title">TaskFlow Operations Report – Today</h3>
               <p style="font-size:0.82rem; color:#94a3b8; margin:0;" id="status-last-sync-time">Last Sync: Checking...</p>
             </div>
 
             <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
-              <button type="button" onclick="triggerManualSync()" class="btn" style="background:rgba(255,255,255,0.15); color:#fff; border:1px solid rgba(255,255,255,0.25); padding:0.6rem 1.1rem; border-radius:4px; font-size:0.82rem; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px;">
+              <button type="button" onclick="triggerManualSync()" class="btn" style="background:#22c55e; color:#064e3b; border:none; padding:0.6rem 1.25rem; border-radius:4px; font-size:0.82rem; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:6px;">
                 <i data-lucide="refresh-cw" style="width:14px; height:14px;"></i> Sync & Refresh
-              </button>
-              <button type="button" onclick="triggerTelegramReportSend()" class="btn" style="background:#22c55e; color:#064e3b; border:none; padding:0.6rem 1.25rem; border-radius:4px; font-size:0.82rem; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:6px;">
-                <i data-lucide="send" style="width:14px; height:14px;"></i> Send Telegram Report Now
               </button>
             </div>
           </div>
@@ -1974,7 +1971,7 @@
           <!-- 2-COLUMN OPERATIONAL BREAKDOWN (STATUS & TECHNICIAN DISPATCH) -->
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; margin-bottom:1.5rem;">
             
-            <!-- STATUS BREAKDOWN (TELEGRAM FORMAT) -->
+            <!-- STATUS BREAKDOWN -->
             <div style="background:var(--card); border:1px solid var(--ink); border-radius:2px; padding:1.25rem; box-shadow:4px 4px 0 rgba(29,36,48,0.12);">
               <h3 style="font-size:0.95rem; font-weight:700; color:var(--ink); margin:0 0 1rem; display:flex; align-items:center; gap:8px;">
                 <i data-lucide="pie-chart" style="width:16px; height:16px;"></i> Ticket Status Distribution
@@ -1992,7 +1989,7 @@
 
           </div>
 
-          <!-- DETAILED TICKET & OPERATIONS FEED (MATCHING TELEGRAM SUMMARY) -->
+          <!-- DETAILED TICKET & OPERATIONS FEED -->
           <div style="background:var(--card); border:1px solid var(--ink); border-radius:2px; padding:1.25rem; box-shadow:4px 4px 0 rgba(29,36,48,0.12);">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
               <h3 style="font-size:0.95rem; font-weight:700; color:var(--ink); margin:0; display:flex; align-items:center; gap:8px;">

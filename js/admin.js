@@ -777,7 +777,7 @@ window.addSystemLog = function(action, description) {
 };
 
 // ============================================================
-// SYSTEM OPERATIONS & TELEGRAM STATUS
+// SYSTEM OPERATIONS & ACTIVITY OVERVIEW
 // Mirrors daily/weekly/monthly/yearly operational reports
 // ============================================================
 window.currentStatusPeriod = 'daily';
@@ -896,7 +896,7 @@ function renderAdminSystemStatus(period) {
     if (elDescCustomers) elDescCustomers.textContent = pLabel + ' accounts';
     if (elDescQuotesAppts) elDescQuotesAppts.textContent = filteredQuotes.length + ' quotes, ' + filteredAppointments.length + ' appts';
 
-    // 1. Status Breakdown (Matching Telegram Format)
+    // 1. Status Breakdown
     var statusCounts = {};
     var techCounts = {};
 
@@ -961,7 +961,7 @@ function renderAdminSystemStatus(period) {
         }
     }
 
-    // 3. Ticket Feed (Exact Telegram Message Pattern)
+    // 3. Ticket Feed
     var feedContainer = document.getElementById('status-tickets-feed');
     var feedCountEl = document.getElementById('status-feed-count');
     if (feedContainer) {
@@ -1028,36 +1028,6 @@ async function triggerManualSync() {
     }
 }
 window.triggerManualSync = triggerManualSync;
-
-// Trigger Telegram Daily Report via Server API
-async function triggerTelegramReportSend() {
-    if (!confirm('Send today\'s operations summary report to the configured Telegram channel now?')) return;
-    if (typeof showToast === 'function') showToast('Dispatching Telegram report...', 'info');
-
-    try {
-        var token = localStorage.getItem('taskflow_token') || sessionStorage.getItem('taskflow_token');
-        var res = await fetch('/api/telegram/send-report', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': token ? ('Bearer ' + token) : ''
-            },
-            body: JSON.stringify({ dryRun: false })
-        });
-        var data = await res.json();
-        if (data.success) {
-            if (typeof showToast === 'function') showToast('Telegram report dispatched successfully! 🚀', 'success');
-            if (typeof addSystemLog === 'function') addSystemLog('NOTIFY', 'Telegram daily operations report dispatched manually.');
-        } else {
-            var reason = data.reason === 'MISSING_CREDENTIALS' ? 'Telegram Bot Token not configured in .env' : (data.error || 'Check server logs');
-            if (typeof showToast === 'function') showToast('Report generated (Preview mode): ' + reason, 'warning');
-        }
-    } catch(e) {
-        console.warn('Telegram trigger error:', e);
-        if (typeof showToast === 'function') showToast('Report preview ready. (Server unreachable or running static).', 'info');
-    }
-}
-window.triggerTelegramReportSend = triggerTelegramReportSend;
 
 // Automatically refresh System Status on sync events
 window.addEventListener('taskflow:sync-complete', function() {
