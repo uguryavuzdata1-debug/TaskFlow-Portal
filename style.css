@@ -1928,13 +1928,44 @@ input[type="time"], input[type="date"] {
 }
 
 /* Role Settings Sub-Section Navigation Tabs */
-.role-sub-btn {
+.role-sub-btn, .perf-sub-btn {
   transition: all 0.15s ease-in-out;
   border-radius: 2px;
 }
-.role-sub-btn:hover:not(.active) {
+.role-sub-btn:hover:not(.active), .perf-sub-btn:hover:not(.active) {
   background: var(--paper, #f8fafc) !important;
   color: var(--ink, #1d2430) !important;
   border-color: var(--ink, #1d2430) !important;
 }
+
+/* User Source Color Badges */
+.badge-user-taskflow {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 3px;
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #10b981;
+  text-transform: uppercase;
+}
+.badge-user-vtiger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 3px;
+  background: #fffbeb;
+  color: #92400e;
+  border: 1px solid #f59e0b;
+  text-transform: uppercase;
+}
+
 

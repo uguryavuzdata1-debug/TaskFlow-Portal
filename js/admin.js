@@ -28,6 +28,31 @@ window.showAdminPane = showAdminPane;
 
 
 // ============================================================
+// HELPER: USER ORIGIN BADGE (TASKFLOW vs VTIGER CRM)
+// ============================================================
+function getUserOrigin(u) {
+    if (!u) return { type: 'taskflow', badgeHtml: '<span class="badge-user-origin badge-user-taskflow"><i data-lucide="zap" style="width:11px;height:11px;"></i> TASKFLOW</span>' };
+    var id = String(u.id || '');
+    var name = (u.full_name || u.username || '').toLowerCase();
+    var vtNames = ['ismail administrator', 'ugur yavuz', 'ahmet baltaci', 'ibrahim ahmet', 'alpay burc', 'ugur isikcevahir', 'osman akgul', 'support user'];
+    if (id.startsWith('19x') || vtNames.indexOf(name) !== -1 || (u.source && u.source.toLowerCase() === 'vtiger')) {
+        return {
+            type: 'vtiger',
+            label: 'VTIGER CRM',
+            icon: 'refresh-cw',
+            badgeHtml: '<span class="badge-user-origin badge-user-vtiger"><i data-lucide="refresh-cw" style="width:11px;height:11px;"></i> VTIGER CRM</span>'
+        };
+    }
+    return {
+        type: 'taskflow',
+        label: 'TASKFLOW',
+        icon: 'zap',
+        badgeHtml: '<span class="badge-user-origin badge-user-taskflow"><i data-lucide="zap" style="width:11px;height:11px;"></i> TASKFLOW</span>'
+    };
+}
+window.getUserOrigin = getUserOrigin;
+
+// ============================================================
 // RENDER ACTIVE PERSONNEL DIRECTORY
 // ============================================================
 function renderAdminUsersList() {
@@ -77,11 +102,17 @@ function renderAdminUsersList() {
         var username = u.username || (u.id ? u.id : '');
         var role  = u.role || 'User';
         var badge = roleColors[role] || { color: 'var(--steel)', label: role.toUpperCase() };
+        var origin = getUserOrigin(u);
         var uid   = (u.id || '').toString().replace(/'/g, '');
         var safeKey = (u.username || u.full_name || u.id || '').replace(/'/g, '');
         return '<div class="ledger-row" style="grid-template-columns:1fr 1fr 150px 100px; align-items:center;">'
-            + '<div><div style="font-weight:600;color:var(--ink);font-size:0.9rem;">' + name + '</div>'
-            + '<div style="font-family:IBM Plex Mono,monospace;font-size:0.72rem;color:var(--steel);">' + (username ? ('@' + username) : '') + '</div></div>'
+            + '<div>'
+            +   '<div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">'
+            +     '<span style="font-weight:600;color:var(--ink);font-size:0.9rem;">' + name + '</span>'
+            +     origin.badgeHtml
+            +   '</div>'
+            +   '<div style="font-family:IBM Plex Mono,monospace;font-size:0.72rem;color:var(--steel);margin-top:2px;">' + (username ? ('@' + username) : '') + '</div>'
+            + '</div>'
             + '<div style="font-size:0.85rem;color:var(--ink);">' + role + '</div>'
             + '<div><span style="font-family:IBM Plex Mono,monospace;font-size:0.65rem;font-weight:600;border-radius:20px;padding:2px 10px;border:1.5px solid ' + badge.color + ';color:' + badge.color + ';">' + badge.label + '</span></div>'
             + '<div style="text-align:right;"><button onclick="adminRemoveUser(\'' + uid + '\',\'' + safeKey + '\')" style="font-family:IBM Plex Mono,monospace;font-size:0.7rem;color:#b91c1c;background:transparent;border:1px solid #b91c1c;padding:3px 10px;border-radius:2px;cursor:pointer;">Remove</button></div>'
@@ -262,10 +293,14 @@ async function renderAdminRolesList() {
         var username = u.username || (u.id ? u.id : '');
         var role     = u.role || 'User';
         var badge    = roleBadges[role] || { color: 'var(--steel)', bg: 'rgba(100,116,139,0.08)', label: role.toUpperCase() };
+        var origin   = getUserOrigin(u);
 
         return '<tr style="border-bottom:1px solid var(--paper);">'
             + '<td style="padding:1rem;">'
-            +   '<div style="font-weight:600; color:var(--ink); font-size:0.9rem;">' + fullName + '</div>'
+            +   '<div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">'
+            +     '<span style="font-weight:600; color:var(--ink); font-size:0.9rem;">' + fullName + '</span>'
+            +     origin.badgeHtml
+            +   '</div>'
             +   '<div style="font-family:IBM Plex Mono,monospace; font-size:0.72rem; color:var(--steel); margin-top:2px;">' + (username ? ('@' + username) : '') + '</div>'
             + '</td>'
             + '<td style="padding:1rem;">'
@@ -509,22 +544,178 @@ function renderAdminLogs() {
                      : log.action === 'CREATE' ? 'create'
                      : log.action === 'UPDATE' ? 'update'
                      : log.action === 'DELETE' ? 'delete' : 'auth';
-        return '<div class="ledger-row" style="grid-template-columns:140px 150px 120px 1fr; align-items:start;">'
+        var origin = getUserOrigin({ username: log.user, full_name: log.user });
+        return '<div class="ledger-row" style="grid-template-columns:140px 170px 110px 1fr; align-items:center;">'
             + '<div class="ledger-ts">' + (log.ts || '—') + '</div>'
-            + '<div class="ledger-user">' + (log.user || '—') + '</div>'
+            + '<div class="ledger-user" style="display:flex; align-items:center; gap:0.4rem;"><span>' + (log.user || '—') + '</span>' + (log.user !== 'SYSTEM' ? origin.badgeHtml : '') + '</div>'
             + '<div><span class="ledger-tag ' + tagClass + '">' + (log.action || '—') + '</span></div>'
             + '<div class="ledger-detail">' + (log.detail || '—') + '</div>'
             + '</div>';
     }).join('');
+
+    if (window.lucide) lucide.createIcons();
 }
 window.renderAdminLogs = renderAdminLogs;
 
 // ============================================================
-// PERFORMANCE PANE - render metrics
+// PERFORMANCE SUB-SECTION SWITCHER
+// ============================================================
+function showPerfSubSection(tabName, btn) {
+    document.querySelectorAll('.perf-sub-pane').forEach(function(p) { p.style.display = 'none'; });
+    document.querySelectorAll('.perf-sub-btn').forEach(function(b) {
+        b.style.borderColor = 'var(--line, #cbd5e1)';
+        b.style.background = 'var(--card, #ffffff)';
+        b.style.color = 'var(--steel, #64748b)';
+        b.classList.remove('active');
+    });
+    var target = document.getElementById('perf-sub-' + tabName);
+    if (target) target.style.display = 'block';
+    if (btn) {
+        btn.style.borderColor = 'var(--ink, #1d2430)';
+        btn.style.background = 'var(--ink, #1d2430)';
+        btn.style.color = 'var(--card, #ffffff)';
+        btn.classList.add('active');
+    }
+    if (tabName === 'tickets') {
+        renderTicketPerformanceMetrics();
+    }
+    if (window.lucide) lucide.createIcons();
+}
+window.showPerfSubSection = showPerfSubSection;
+
+// ============================================================
+// TICKET PERFORMANCE METRICS (Today, Week, Month, All-Time)
+// ============================================================
+function renderTicketPerformanceMetrics() {
+    var tickets = (window.appState && Array.isArray(window.appState.tickets)) ? window.appState.tickets : [];
+    var now = new Date();
+    var todayStr = now.toISOString().slice(0, 10); // YYYY-MM-DD
+    var currentYearMonth = now.toISOString().slice(0, 7); // YYYY-MM
+    var oneWeekAgoMs = now.getTime() - (7 * 24 * 60 * 60 * 1000);
+
+    function isClosed(status) {
+        if (!status) return false;
+        var s = String(status).toLowerCase().trim();
+        return s === 'closed' || s === 'tamamlandı' || s === 'completed' || s === 'resolved';
+    }
+
+    function parseTicketDate(t) {
+        var dStr = t.created_time || t.created_at || t.timestamp || t.date || '';
+        if (!dStr) return null;
+        var d = new Date(dStr);
+        return isNaN(d.getTime()) ? null : d;
+    }
+
+    var stats = {
+        today: { open: 0, closed: 0 },
+        week:  { open: 0, closed: 0 },
+        month: { open: 0, closed: 0 },
+        all:   { open: 0, closed: 0 }
+    };
+
+    var statusCounts = {};
+
+    tickets.forEach(function(t) {
+        var closed = isClosed(t.status);
+        var sName = t.status || 'Open';
+        statusCounts[sName] = (statusCounts[sName] || 0) + 1;
+
+        // All time
+        stats.all.open++;
+        if (closed) stats.all.closed++;
+
+        var d = parseTicketDate(t);
+        if (d) {
+            var dIso = d.toISOString();
+            var dDateStr = dIso.slice(0, 10);
+            var dMonthStr = dIso.slice(0, 7);
+
+            // Today
+            if (dDateStr === todayStr) {
+                stats.today.open++;
+                if (closed) stats.today.closed++;
+            }
+
+            // This week (last 7 days)
+            if (d.getTime() >= oneWeekAgoMs) {
+                stats.week.open++;
+                if (closed) stats.week.closed++;
+            }
+
+            // This month
+            if (dMonthStr === currentYearMonth) {
+                stats.month.open++;
+                if (closed) stats.month.closed++;
+            }
+        }
+    });
+
+    function calcRate(open, closed) {
+        if (open === 0) return '0%';
+        return Math.round((closed / open) * 100) + '%';
+    }
+
+    // Populate DOM cards
+    var elTodayOpen   = document.getElementById('perf-ticket-today-open');
+    var elTodayClosed = document.getElementById('perf-ticket-today-closed');
+    var elTodayRate   = document.getElementById('perf-ticket-today-rate');
+    if (elTodayOpen)   elTodayOpen.textContent   = stats.today.open;
+    if (elTodayClosed) elTodayClosed.textContent = stats.today.closed;
+    if (elTodayRate)   elTodayRate.textContent   = calcRate(stats.today.open, stats.today.closed);
+
+    var elWeekOpen   = document.getElementById('perf-ticket-week-open');
+    var elWeekClosed = document.getElementById('perf-ticket-week-closed');
+    var elWeekRate   = document.getElementById('perf-ticket-week-rate');
+    if (elWeekOpen)   elWeekOpen.textContent   = stats.week.open;
+    if (elWeekClosed) elWeekClosed.textContent = stats.week.closed;
+    if (elWeekRate)   elWeekRate.textContent   = calcRate(stats.week.open, stats.week.closed);
+
+    var elMonthOpen   = document.getElementById('perf-ticket-month-open');
+    var elMonthClosed = document.getElementById('perf-ticket-month-closed');
+    var elMonthRate   = document.getElementById('perf-ticket-month-rate');
+    if (elMonthOpen)   elMonthOpen.textContent   = stats.month.open;
+    if (elMonthClosed) elMonthClosed.textContent = stats.month.closed;
+    if (elMonthRate)   elMonthRate.textContent   = calcRate(stats.month.open, stats.month.closed);
+
+    var elAllOpen   = document.getElementById('perf-ticket-all-open');
+    var elAllClosed = document.getElementById('perf-ticket-all-closed');
+    var elAllRate   = document.getElementById('perf-ticket-all-rate');
+    if (elAllOpen)   elAllOpen.textContent   = stats.all.open;
+    if (elAllClosed) elAllClosed.textContent = stats.all.closed;
+    if (elAllRate)   elAllRate.textContent   = calcRate(stats.all.open, stats.all.closed);
+
+    // Render Status Breakdown List
+    var breakdownEl = document.getElementById('perf-ticket-status-breakdown');
+    if (breakdownEl) {
+        var totalTickets = tickets.length || 1;
+        var keys = Object.keys(statusCounts);
+        if (keys.length === 0) {
+            breakdownEl.innerHTML = '<div style="font-size:0.8rem; color:var(--steel); text-align:center; padding:1rem;">No status data available.</div>';
+        } else {
+            breakdownEl.innerHTML = keys.map(function(status) {
+                var count = statusCounts[status];
+                var pct = Math.round((count / totalTickets) * 100);
+                var isDone = isClosed(status);
+                var barColor = isDone ? 'var(--green, #10b981)' : 'var(--blue, #2563eb)';
+                return '<div style="margin-bottom:0.75rem;">'
+                    + '<div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:4px;">'
+                    +   '<span style="font-weight:600; color:var(--ink);">' + status + '</span>'
+                    +   '<span style="font-family:IBM Plex Mono,monospace; color:var(--steel);">' + count + ' (' + pct + '%)</span>'
+                    + '</div>'
+                    + '<div style="height:6px; background:var(--paper, #f1f5f9); border-radius:3px; overflow:hidden;">'
+                    +   '<div style="width:' + pct + '%; height:100%; background:' + barColor + '; border-radius:3px; transition:width 0.4s ease;"></div>'
+                    + '</div>'
+                    + '</div>';
+            }).join('');
+        }
+    }
+}
+window.renderTicketPerformanceMetrics = renderTicketPerformanceMetrics;
+
+// ============================================================
+// PERFORMANCE PANE - SYSTEM & TICKET METRICS
 // ============================================================
 function renderAdminPerformance() {
-    // API response time test
-    var start = Date.now();
     var apiEl = document.getElementById('perf-api-time');
     var dbEl  = document.getElementById('perf-db-load');
     var sessEl = document.getElementById('perf-sessions');
@@ -536,25 +727,25 @@ function renderAdminPerformance() {
 
     // Ping Turso DB to measure response
     var pingStart = Date.now();
-    sbClient.from('users').select('id').limit(1)
-        .then(function() {
-            var ms = Date.now() - pingStart;
-            if (apiEl) apiEl.textContent = ms + 'ms';
-            if (apiEl) apiEl.style.color = ms < 200 ? 'var(--green)' : ms < 500 ? 'var(--amber)' : 'var(--clay)';
+    if (window.sbClient && typeof window.sbClient.from === 'function') {
+        window.sbClient.from('users').select('id').limit(1)
+            .then(function() {
+                var ms = Date.now() - pingStart;
+                if (apiEl) apiEl.textContent = ms + 'ms';
+                if (apiEl) apiEl.style.color = ms < 200 ? 'var(--green)' : ms < 500 ? 'var(--amber)' : 'var(--clay)';
 
-            // DB load estimate
-            var ticketCount = (appState && appState.tickets) ? appState.tickets.length : 0;
-            var custCount = (appState && appState.customers) ? appState.customers.length : 0;
-            if (dbEl) {
-                dbEl.textContent = (ticketCount + custCount) + ' rows';
-                dbEl.style.color = 'var(--blue)';
-            }
-        })
-        .catch(function() {
-            if (apiEl) { apiEl.textContent = 'Offline'; apiEl.style.color = 'var(--clay)'; }
-        });
+                var ticketCount = (appState && appState.tickets) ? appState.tickets.length : 0;
+                var custCount = (appState && appState.customers) ? appState.customers.length : 0;
+                if (dbEl) {
+                    dbEl.textContent = (ticketCount + custCount) + ' rows';
+                    dbEl.style.color = 'var(--blue)';
+                }
+            })
+            .catch(function() {
+                if (apiEl) { apiEl.textContent = 'Offline'; apiEl.style.color = 'var(--clay)'; }
+            });
+    }
 
-    // Chart area: simple stat summary
     if (chartEl) {
         var tickets = (appState && appState.tickets) ? appState.tickets.length : 0;
         var customers = (appState && appState.customers) ? appState.customers.length : 0;
@@ -565,6 +756,11 @@ function renderAdminPerformance() {
             + '<div><div style="font-family:IBM Plex Mono,monospace;font-size:0.7rem;color:var(--steel);margin-bottom:0.5rem;">ACTIVE USERS</div><div style="font-size:2.5rem;font-weight:700;color:var(--ink);">' + users + '</div></div>'
             + '</div>';
     }
+
+    // Also compute tickets metrics
+    renderTicketPerformanceMetrics();
+
+    if (window.lucide) lucide.createIcons();
 }
 window.renderAdminPerformance = renderAdminPerformance;
 
